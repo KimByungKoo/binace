@@ -31,6 +31,6 @@ jobs:
             git clone https://github.com/KimByungKoo/binace.git .
           fi
           pkill -f bot.py || true
-          nohup crypto-bot/python3 bot.py > bot.log 2>&1 &
+          nohup python3 crypto-bot/bot.py > crypto-bot/bot.log 2>&1 &
         EOF
    

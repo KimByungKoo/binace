@@ -4,6 +4,9 @@ from telegram.commands import telegram_command_listener
 import threading
 
 if __name__ == "__main__":
+    #!/bin/bash
+    print("🔧 실행 중...") 
+     
     # MA365 감시 (1분봉, 기울기 포함)
     threading.Thread(target=monitor_top10_ma365, daemon=True).start()
 

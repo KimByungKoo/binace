@@ -22,6 +22,7 @@ def telegram_command_listener():
                     continue
                 message = update["message"].get("text", "").strip().lower()
 
+                print("[텔레그램 message]",message )
                 if message == "/ma90":
                     send_telegram_message("🔍 MA90 이격도 리포트 생성 중...")
                     report_15m_ma90_outliers()

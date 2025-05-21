@@ -1,0 +1,12 @@
+{
+  "name": "crypto-telegram-bot",
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "postCreateCommand": "pip install -r requirements.txt && chmod +x start.sh",
+  "runArgs": ["--env-file", ".env"],
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  },
+  "postStartCommand": "./start.sh"
+}

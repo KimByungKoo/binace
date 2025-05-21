@@ -23,14 +23,14 @@ jobs:
     - name: Deploy via SSH
       run: |
         ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          mkdir -p ~/binace/crypto-bot
-          cd ~/binace/crypto-bot
+          mkdir -p ~/binace
+          cd ~/binace
           if [ -d ".git" ]; then
             git pull origin main
           else
             git clone https://github.com/KimByungKoo/binace.git .
           fi
           pkill -f bot.py || true
-          nohup python3 bot.py > bot.log 2>&1 &
+          nohup crypto-bot/python3 bot.py > bot.log 2>&1 &
         EOF
    

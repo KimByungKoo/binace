@@ -1,5 +1,7 @@
 from strategy.ma90_disparity import report_15m_ma90_outliers
 from utils.telegram import send_telegram_message
+from strategy.spike_disparity import report_spike_disparity
+
 import requests
 import time
 import os

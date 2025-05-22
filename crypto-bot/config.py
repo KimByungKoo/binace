@@ -7,8 +7,8 @@ SPIKE_CONFIG = {
     "spike_multiplier": 2,          # 스파이크 배수
     "disparity_ma": 90,             # 이격도 기준 MA
     "disparity_thresh": 1,          # 몇 % 이상 벗어나야 과이격
-    "lookback": 5,                  # 최근 N봉 이내 스파이크 발생해야 인정
-    "top_n": 10    ,                 # 검사할 종목 
+    "lookback": 15,                  # 최근 N봉 이내 스파이크 발생해야 인정
+    "top_n": 300    ,                 # 검사할 종목 
     
     "volatility_multiplier": 2.5,    # 과거 평균 변동률의 N배 이상이어야 spike로 인정
     

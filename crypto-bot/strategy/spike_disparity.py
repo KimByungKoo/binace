@@ -34,7 +34,18 @@ def check_volume_spike_disparity(symbol):
                     f"현재 이격도: `{round(disparity, 2)}%` | 기준: ±{cfg['disparity_thresh']}%"
                 )
             return None
-
+            
+        recent_close = df['close'].iloc[-cfg["price_lookback"]]
+        latest_close = df['close'].iloc[-1]
+        price_slope = ((latest_close - recent_close) / recent_close) * 100
+        
+        if abs(price_slope) < cfg["min_price_slope_pct"]:
+            if cfg.get("notify_on_price_slope_fail", False):
+                send_telegram_message(
+                    f"📉 [{symbol}] 가격 기울기 부족 → 현재 {round(price_slope, 3)}% / 기준 {cfg['min_price_slope_pct']}%"
+                )
+            return None
+        
         return {
             'symbol': symbol,
             'price': latest['close'],

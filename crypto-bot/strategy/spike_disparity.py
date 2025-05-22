@@ -79,6 +79,10 @@ def check_volume_spike_disparity(symbol):
         if direction is None:
             issues.append("MA 배열이 정배열/역배열 아님")
     
+
+        df['return_pct'] = df['close'].pct_change().abs() * 100
+        median_disparity = df['return_pct'].median()
+        
         # === 시작가 위치 + 1% 변동성 조건 ===
         if len(df) < cfg["price_lookback"] + 1:
             issues.append("봉 수 부족")
@@ -95,8 +99,7 @@ def check_volume_spike_disparity(symbol):
             lo = df['low'].iloc[-cfg["price_lookback"]:].min()
             vrange = (hi - lo) / lo * 100
             
-            df['return_pct'] = df['close'].pct_change().abs() * 100
-            median_disparity = df['return_pct'].median()
+            send_telegram_message(f"📊 {symbol} 전봉값 : {vrange} < 최근 변동성 중간값 : {round(median_disparity, 2)}%")
             
             if vrange <  median_disparity:
                 issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")

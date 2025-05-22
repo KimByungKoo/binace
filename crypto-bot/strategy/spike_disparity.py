@@ -21,7 +21,8 @@ def check_volume_spike_disparity(
             return None
 
         latest = df.iloc[-1]
-        recent_spike = df.iloc[-lookback:][df['volume'] > df['volume_ma'] * spike_multiplier]
+        recent_spike = df.iloc[-lookback:].copy()
+        recent_spike = recent_spike[recent_spike['volume'] > recent_spike['volume_ma'] * spike_multiplier]
 
         if recent_spike.empty:
             return None

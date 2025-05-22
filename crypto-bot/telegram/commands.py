@@ -1,10 +1,12 @@
 from strategy.ma90_disparity import report_15m_ma90_outliers
 from utils.telegram import send_telegram_message
 from strategy.spike_disparity import report_spike_disparity
-
+from dotenv import load_dotenv
 import requests
 import time
 import os
+
+load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")

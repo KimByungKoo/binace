@@ -1,7 +1,7 @@
 from strategy.ma365 import monitor_top10_ma365
 from strategy.ma90_disparity import ma90_watcher_loop
 from telegram.commands import telegram_command_listener
-from strategy.spike_disparity import report_spi
+from strategy.spike_disparity import spike_watcher_loop
 
 import threading
 

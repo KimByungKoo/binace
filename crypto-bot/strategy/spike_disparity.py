@@ -75,7 +75,7 @@ def check_volume_spike_disparity(symbol):
         lo = df['open'].iloc[-cfg["price_lookback"]:].min()
         vrange = (hi - lo) / lo * 100
         if vrange > median_disparity*3:
-            send_telegram_message(f"📊 {symbol} 전봉값 : {round(vrange,2)} < 최근 변동성 중간값 : {round(median_disparity*3, 2)}%")
+            send_telegram_message(f"📊 {symbol}  {round(vrange,2)}>{round(median_disparity*3, 2)} : 전봉값 > 중간값*3 %")
                 
         if "volatility" in cfg["checks"]:
             

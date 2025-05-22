@@ -32,7 +32,7 @@ def telegram_command_listener():
                     continue
                 message = update["message"].get("text", "").strip().lower()
 
-                print("[텔레그램 message]",message )
+                send_telegram_message("[텔레그램 message received]",message )
                 
                 
                 if message == "/ma90":

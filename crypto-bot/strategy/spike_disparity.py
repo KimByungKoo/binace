@@ -197,7 +197,7 @@ def check_disparity(symbol):
     
 # 자동 감시 루프
 def spike_watcher_loop():
-    send_telegram_message(f"😀 spike_watcher_loop: {str(e)}")
+    send_telegram_message(f"😀 spike_watcher_loop")
     while True:
         report_spike_disparity()
         time.sleep(60)  # 1분 주기

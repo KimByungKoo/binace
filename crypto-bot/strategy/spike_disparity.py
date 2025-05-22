@@ -2,6 +2,7 @@ from utils.binance import get_top_symbols, get_1m_klines
 from utils.telegram import send_telegram_message
 import time
 from config import SPIKE_CONFIG as cfg
+from order_manager import auto_trade_from_signal
 
 def check_volume_spike_disparity(symbol):
     issues = []  # 실패 이유 리스트
@@ -27,13 +28,13 @@ def check_volume_spike_disparity(symbol):
         latest = df.iloc[-1]
         
         disparity = (latest['close'] / latest['ma']) * 100
-        # if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
-        #     issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
+        if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
+            issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
 
         recent_close = df['close'].iloc[-cfg["price_lookback"]]
         price_slope = ((latest['close'] - recent_close) / recent_close) * 100
-        # if abs(price_slope) < cfg["min_price_slope_pct"]:
-        #     issues.append(f"📈 가격 기울기 부족 ({round(price_slope, 3)}%)")
+        if abs(price_slope) < cfg["min_price_slope_pct"]:
+            issues.append(f"📈 가격 기울기 부족 ({round(price_slope, 3)}%)")
 
         #price_lookback = cfg["price_lookback"]
         #lowest_open = df['open'].iloc[-price_lookback:].min()
@@ -139,6 +140,8 @@ def report_spike_disparity():
             result, issues = output
             if result:
                 found = True
+                if cfg["auto_execute"]:
+                    auto_trade_from_signal(result)
                 msg += (
                     f"*{symbol}* → `{result['direction'].upper()}`\n"
                     f"   ├ 현재가      : `{round(result.get('price', 0), 4)}`\n"

@@ -29,11 +29,20 @@ def check_volume_spike_disparity(symbol):
         if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
             issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
 
-        recent_close = df['close'].iloc[-cfg["price_lookback"]]
-        price_slope = ((latest['close'] - recent_close) / recent_close) * 100
-        if abs(price_slope) < cfg["min_price_slope_pct"]:
-            issues.append(f"📈 가격 기울기 부족 ({round(price_slope, 3)}%)")
+        # recent_close = df['close'].iloc[-cfg["price_lookback"]]
+        # price_slope = ((latest['close'] - recent_close) / recent_close) * 100
+        # if abs(price_slope) < cfg["min_price_slope_pct"]:
+            # issues.append(f"📈 가격 기울기 부족 ({round(price_slope, 3)}%)")
 
+        price_lookback = cfg["price_lookback"]
+        lowest_open = df['open'].iloc[-price_lookback:].min()
+        highest_close = df['close'].iloc[-price_lookback:].max()
+        
+        price_slope = ((highest_close - lowest_open) / lowest_open) * 100
+        
+        if price_slope < cfg["min_price_slope_pct"]:
+            issues.append(f"📉 가격 폭발 부족 (최저시가→최고종가 {round(price_slope, 2)}%)")
+            
         # 조건 모두 통과 → 진입 신호 리턴
         if not issues:
             return {

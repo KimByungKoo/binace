@@ -18,7 +18,7 @@ SPIKE_CONFIG = {
     
     # 알림 제어
     "notify_on_spike_fail": True,
-    "notify_on_disparity_fail": False,
+    "notify_on_disparity_fail": True,
     "notify_on_error": True
 
 }

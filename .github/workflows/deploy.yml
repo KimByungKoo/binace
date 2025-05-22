@@ -32,5 +32,10 @@ jobs:
           fi
           pkill -f bot.py || true
           nohup python3 crypto-bot/bot.py > crypto-bot/bot.log 2>&1 &
+
+          pkill -f realtime_spike_bot.py || true
+          nohup python3 crypto-bot/realtime_spike_bot.py > crypto-bot/realtime_spike_bot.log 2>&1 &
+
+
         EOF
    

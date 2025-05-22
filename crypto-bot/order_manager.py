@@ -16,8 +16,21 @@ def set_leverage(symbol, leverage):
     except Exception as e:
         send_telegram_message(f"⚠️ 레버리지 설정 실패: {symbol} → {e}")
 
+def round_qty(symbol, raw_qty):
+    info = client.futures_exchange_info()
+    for s in info['symbols']:
+        if s['symbol'] == symbol:
+            for f in s['filters']:
+                if f['filterType'] == 'LOT_SIZE':
+                    step_size = float(f['stepSize'])
+                    return round((raw_qty // step_size) * step_size, 8)
+    return round(raw_qty, 3)  # fallback
+
 def place_order(symbol, side, quantity, entry_price, tp_price):
     try:
+
+        quantity = round_qty(symbol, quantity)
+
         client.futures_create_order(
             symbol=symbol,
             side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,

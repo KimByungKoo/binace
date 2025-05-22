@@ -24,10 +24,10 @@ def check_volume_spike_disparity(symbol):
         if recent_spike.empty:
             issues.append(f"📉 거래량 스파이크 없음 (최근 {cfg['lookback']}봉 기준)")
 
-        latest = df.iloc[-1]
-        disparity = (latest['close'] / latest['ma']) * 100
-        if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
-            issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
+        # latest = df.iloc[-1]
+        # disparity = (latest['close'] / latest['ma']) * 100
+        # if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
+            # issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
 
         # recent_close = df['close'].iloc[-cfg["price_lookback"]]
         # price_slope = ((latest['close'] - recent_close) / recent_close) * 100

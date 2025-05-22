@@ -10,6 +10,9 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 def telegram_command_listener():
+    
+    print("[텔레그램 TOKEN]",TELEGRAM_TOKEN )
+    print("[텔레그램 CHAT]",TELEGRAM_CHAT_ID )
     offset = None
     while True:
         try:

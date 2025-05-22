@@ -101,10 +101,10 @@ def check_volume_spike_disparity(symbol):
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
             if  (green_count == 5 and above_ma_count == 5) or  (green_count == 0 and above_ma_count == 0):
                 send_telegram_message(
-            f"💡 *{symbol}* 5봉 모멘텀 포착\n"
-            f"   ├ 방향: `{direction.upper()}`\n"
-            f"   └ 현재가: `{latest_price}`"
-        )
+                                f"💡 *{symbol}* 5봉 모멘텀 포착\n"
+                                f"   ├ 방향: `{direction.upper()}`\n"
+                                f"   └ 현재가: `{latest_price}`"
+                            )
 
                 if cfg.get("auto_execute", False):
                     if has_open_position(symbol):

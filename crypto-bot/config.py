@@ -21,6 +21,7 @@ SPIKE_CONFIG = {
     "min_price_slope_pct": 0.5,
     
     "checks": [
+    "five_green_ma5",
         "disparity",        # 이격도
         "ma_order",         # MA 정배열/역배열
         "slope",            # 시작점 기준 기울기

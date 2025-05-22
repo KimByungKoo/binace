@@ -61,15 +61,15 @@ def on_open(ws):
         "id": 1
     }
     ws.send(json.dumps(payload))
-    print("✅ WebSocket 구독 시작")
+    send_telegram_message("✅ WebSocket 구독 시작")
 
 
 def on_error(ws, error):
-    print("WebSocket 에러:", error)
+    send_telegram_message("WebSocket 에러:", error)
 
 
 def on_close(ws, *args):
-    print("WebSocket 연결 종료")
+    send_telegram_message("WebSocket 연결 종료")
 
 # 감시 로직
 
@@ -131,4 +131,4 @@ if __name__ == "__main__":
     )
     threading.Thread(target=spike_checker, daemon=True).start()
     ws.run_forever()
-    print("WebSocket 실행 중...")
+    send_telegram_message("WebSocket 실행 중...")

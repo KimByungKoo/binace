@@ -24,7 +24,7 @@ SPIKE_CONFIG = {
         "disparity",        # 이격도
         "ma_order",         # MA 정배열/역배열
         "slope",            # 시작점 기준 기울기
-        "spike_strength",   # 과열 강도 (최저시가 → 최고종가)
+       # "spike_strength",   # 과열 강도 (최저시가 → 최고종가)
         "volatility"        # 최근 변동성 대비 파동폭
         ],
     
@@ -32,7 +32,7 @@ SPIKE_CONFIG = {
     "notify_on_spike_fail": True,
     "notify_on_disparity_fail": True,
     "notify_on_price_slope_fail":True,
-    "notify_on_error": True,
+    "notify_on_error": False,   
 
     "auto_execute": True
 

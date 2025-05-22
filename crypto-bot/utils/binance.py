@@ -16,6 +16,13 @@ API_SECRET = os.getenv("API_SECRET")
 client = Client(API_KEY, API_SECRET)
 
 
+def has_open_position(symbol):
+    positions = client.futures_account()['positions']
+    for p in positions:
+        if p['symbol'] == symbol.upper() and float(p['positionAmt']) != 0:
+            return True
+    return False
+
 def get_1m_klines(symbol, interval='1m', limit=120):
     try:
         klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)

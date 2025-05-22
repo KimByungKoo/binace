@@ -129,26 +129,26 @@ def report_spike_disparity():
     try:
         symbols = get_top_symbols(20)
         msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
-    found = False
-    
-    for symbol in symbols:
-        result, issues = check_volume_spike_disparity(symbol)
-        if result:
-            found = True
-            msg += (
-                f"*{symbol}* → `{result['direction'].upper()}`\n"
-                f"   ├ 현재가      : `{round(result.get('price', 0), 4)}`\n"
-                f"   ├ MA90        : `{round(result.get('ma', 0), 4)}`\n"
-                f"   ├ 이격도      : `{round(result.get('disparity', 0), 2)}%`\n"
-                f"   ├ 거래량      : `{round(result.get('volume', 0), 2)}` vs 평균 `{round(result.get('volume_ma', 0), 2)}`\n"
-                f"   ├ 가격 기울기 : `{round(result.get('price_slope', 0), 2)}%`\n"
-                f"   └ 변동폭      : `{round(result.get('volatility', 0), 2)}%`\n\n"
-            )
-    
-    if found:
-        send_telegram_message(msg)
-    else:
-        send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
+        found = False
+        
+        for symbol in symbols:
+            result, issues = check_volume_spike_disparity(symbol)
+            if result:
+                found = True
+                msg += (
+                    f"*{symbol}* → `{result['direction'].upper()}`\n"
+                    f"   ├ 현재가      : `{round(result.get('price', 0), 4)}`\n"
+                    f"   ├ MA90        : `{round(result.get('ma', 0), 4)}`\n"
+                    f"   ├ 이격도      : `{round(result.get('disparity', 0), 2)}%`\n"
+                    f"   ├ 거래량      : `{round(result.get('volume', 0), 2)}` vs 평균 `{round(result.get('volume_ma', 0), 2)}`\n"
+                    f"   ├ 가격 기울기 : `{round(result.get('price_slope', 0), 2)}%`\n"
+                    f"   └ 변동폭      : `{round(result.get('volatility', 0), 2)}%`\n\n"
+                )
+        
+        if found:
+            send_telegram_message(msg)
+        else:
+            send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
         #else:
             #send_telegram_message("🙅‍♂️ 예측 조건을 만족하는 종목이 없습니다. (볼륨 + 이격도 기준)")
     except Exception as e:

@@ -31,13 +31,13 @@ def on_message(ws, message):
 
     #print("[RAW]", message)  # 이걸로 구조 먼저 확인
     # message = message.decode('utf-8')  # 바이낸스에서 오는 메시지는 UTF-8로 인코딩되어 있음
-    print("[RAW]", message)
+    #print("[RAW]", message)
     # 바이낸스에서 오는 메시지는 JSON 형식이므로 파싱
    
     try:
         data = json.loads(message)
 
-        print("[ㅇㅁㅅㅁ]", data)
+        #print("[ㅇㅁㅅㅁ]", data)
         if data.get("e") == "trade":
             symbol = data["s"].lower()
             price = float(data["p"])

@@ -132,7 +132,11 @@ def report_spike_disparity():
         found = False
         
         for symbol in symbols:
-            result, issues = check_volume_spike_disparity(symbol)
+            output = check_volume_spike_disparity(symbol)
+            if not output:
+                continue
+            
+            result, issues = output
             if result:
                 found = True
                 msg += (

@@ -16,9 +16,9 @@ API_SECRET = os.getenv("API_SECRET")
 client = Client(API_KEY, API_SECRET)
 
 
-def get_1m_klines(symbol, limit=120):
+def get_1m_klines(symbol, interval='1m', limit=120):
     try:
-        klines = client.futures_klines(symbol=symbol, interval='1m', limit=limit)
+        klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
         df = pd.DataFrame(klines, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume',
             'close_time', 'quote_asset_volume', 'number_of_trades',

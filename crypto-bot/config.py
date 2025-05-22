@@ -9,4 +9,10 @@ SPIKE_CONFIG = {
     "disparity_thresh": 1,          # 몇 % 이상 벗어나야 과이격
     "lookback": 5,                  # 최근 N봉 이내 스파이크 발생해야 인정
     "top_n": 20                     # 검사할 종목 수
+
+    # 알림 제어
+    "notify_on_spike_fail": False,
+    "notify_on_disparity_fail": False,
+    "notify_on_error": True
+
 }

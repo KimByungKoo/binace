@@ -7,29 +7,21 @@ API_SECRET = os.getenv("API_SECRET")
 client = Client(API_KEY, API_SECRET)
 
 
-
-def get_1m_klines(symbol: str, limit: int = 100):
-    """
-    지정한 심볼의 1분봉 캔들 데이터를 가져옵니다.
-    :param symbol: 거래할 심볼, 예: 'BTCUSDT'
-    :param limit: 몇 개의 캔들 데이터 조회할지 (최대 1000)
-    :return: 리스트 형태의 캔들 데이터
-    """
-    url = "https://api.binance.com/api/v3/klines"
-    params = {
-        "symbol": symbol,
-        "interval": "1m",
-        "limit": limit
-    }
+def get_1m_klines(symbol, limit=120):
     try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        klines = response.json()
-        return klines
+        klines = client.futures_klines(symbol=symbol, interval='1m', limit=limit)
+        df = pd.DataFrame(klines, columns=[
+            'timestamp', 'open', 'high', 'low', 'close', 'volume',
+            'close_time', 'quote_asset_volume', 'number_of_trades',
+            'taker_buy_base', 'taker_buy_quote', 'ignore'
+        ])
+        df['close'] = df['close'].astype(float)
+        df['volume'] = df['volume'].astype(float)
+        return df
     except Exception as e:
-        print(f"Error fetching klines: {e}")
-        return None
-        
+        print(f"[{symbol}] 1분봉 데이터 불러오기 실패: {e}")
+        return pd.DataFrame()
+      
 def get_top_symbols(n=20):
     try:
         tickers = client.futures_ticker()

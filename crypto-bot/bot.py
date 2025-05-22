@@ -11,10 +11,10 @@ if __name__ == "__main__":
     
      
     # MA365 감시 (1분봉, 기울기 포함)
-    threading.Thread(target=monitor_top10_ma365, daemon=True).start()
+    # threading.Thread(target=monitor_top10_ma365, daemon=True).start()
 
     # 15분봉 MA90 이격도 감시 (자동 알림)
-    threading.Thread(target=ma90_watcher_loop, daemon=True).start()
+    # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
     threading.Thread(target=spike_watcher_loop, daemon=True).start()
     

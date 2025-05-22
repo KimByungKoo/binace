@@ -1,35 +1,26 @@
 from utils.binance import get_top_symbols, get_1m_klines
 from utils.telegram import send_telegram_message
 import time
+from config import SPIKE_CONFIG
 
 # 유연한 스파이크 + 이격도 예측 함수
-def check_volume_spike_disparity(
-    symbol,
-    vol_ma_window=10,
-    spike_multiplier=3,
-    disparity_ma=90,
-    disparity_thresh=2,
-    lookback=5
-):
+def check_volume_spike_disparity(symbol, cfg=SPIKE_CONFIG):
     try:
-        df = get_1m_klines(symbol, limit=max(100, disparity_ma + lookback))
-        df['volume_ma'] = df['volume'].rolling(vol_ma_window).mean()
-        df['ma'] = df['close'].rolling(disparity_ma).mean()
+        df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["limit"])
+        df['volume_ma'] = df['volume'].rolling(cfg["vol_ma_window"]).mean()
+        df['ma'] = df['close'].rolling(cfg["disparity_ma"]).mean()
         df.dropna(inplace=True)
 
-        if len(df) < 2:
-            return None
-
-        latest = df.iloc[-1]
-        recent_spike = df.iloc[-lookback:].copy()
-        recent_spike = recent_spike[recent_spike['volume'] > recent_spike['volume_ma'] * spike_multiplier]
+        recent = df.iloc[-cfg["lookback"]:].copy()
+        recent_spike = recent[recent['volume'] > recent['volume_ma'] * cfg["spike_multiplier"]]
 
         if recent_spike.empty:
             return None
 
+        latest = df.iloc[-1]
         disparity = (latest['close'] / latest['ma']) * 100
 
-        if disparity < (100 - disparity_thresh) or disparity > (100 + disparity_thresh):
+        if disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"]):
             return {
                 'symbol': symbol,
                 'price': latest['close'],

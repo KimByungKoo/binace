@@ -21,14 +21,14 @@ def check_volume_spike_disparity(symbol):
 
         recent = df.iloc[-cfg["lookback"]:].copy()
         recent_spike = recent[recent['volume'] > recent['volume_ma'] * cfg["spike_multiplier"]]
-        # if recent_spike.empty:
-        #     issues.append(f"📉 거래량 스파이크 없음 (최근 {cfg['lookback']}봉 기준)")
+        if recent_spike.empty:
+            issues.append(f"📉 거래량 스파이크 없음 (최근 {cfg['lookback']}봉 기준)")
 
         latest = df.iloc[-1]
         
         disparity = (latest['close'] / latest['ma']) * 100
-        if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
-            issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
+        # if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
+        #     issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
 
         recent_close = df['close'].iloc[-cfg["price_lookback"]]
         price_slope = ((latest['close'] - recent_close) / recent_close) * 100
@@ -75,26 +75,26 @@ def check_volume_spike_disparity(symbol):
     
         direction = "long" if is_long else "short" if is_short else None
     
-        # if direction is None:
-        #     issues.append("MA 배열이 정배열/역배열 아님")
+        if direction is None:
+            issues.append("MA 배열이 정배열/역배열 아님")
     
-        # # === 시작가 위치 + 1% 변동성 조건 ===
-        # if len(df) < cfg["price_lookback"] + 1:
-        #     issues.append("봉 수 부족")
-        # else:
-        #     current_start = df['open'].iloc[-cfg["price_lookback"]]
-        #     current_ma = df['ma5'].iloc[-cfg["price_lookback"]]
+        # === 시작가 위치 + 1% 변동성 조건 ===
+        if len(df) < cfg["price_lookback"] + 1:
+            issues.append("봉 수 부족")
+        else:
+            current_start = df['open'].iloc[-cfg["price_lookback"]]
+            current_ma = df['ma5'].iloc[-cfg["price_lookback"]]
     
-        #     if direction == "long" and current_start < current_ma:
-        #         issues.append("롱인데 시작가가 MA5 아래")
-        #     elif direction == "short" and current_start > current_ma:
-        #         issues.append("숏인데 시작가가 MA5 위")
+            if direction == "long" and current_start < current_ma:
+                issues.append("롱인데 시작가가 MA5 아래")
+            elif direction == "short" and current_start > current_ma:
+                issues.append("숏인데 시작가가 MA5 위")
     
-        #     hi = df['high'].iloc[-cfg["price_lookback"]:].max()
-        #     lo = df['low'].iloc[-cfg["price_lookback"]:].min()
-        #     vrange = (hi - lo) / lo * 100
-        #     if vrange < 1.0:
-        #         issues.append(f"변동폭 부족: {round(vrange,2)}% < 1.0%")
+            hi = df['high'].iloc[-cfg["price_lookback"]:].max()
+            lo = df['low'].iloc[-cfg["price_lookback"]:].min()
+            vrange = (hi - lo) / lo * 100
+            if vrange < 1.0:
+                issues.append(f"변동폭 부족: {round(vrange,2)}% < 1.0%")
     
 
     

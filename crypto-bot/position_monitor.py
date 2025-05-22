@@ -42,19 +42,13 @@ def broadcast_position_status():
         send_telegram_message("💤 현재 보유 중인 포지션이 없습니다.")
         return
 
-    msg = "📊 *현재 포지션 현황*
-"
+    msg = "📊 *현재 포지션 현황*"
     for p in positions:
         msg += (
-            f"*{p['symbol']}* `{p['side']}`
-"
-            f"   ├ 진입가: `{round(p['entry'], 4)}`
-"
-            f"   ├ 현재가: `{round(p['current'], 4)}`
-"
-            f"   └ 손익: `{round(p['pnl'], 2)} USDT`
-
-"
+            f"*{p['symbol']}* `{p['side']}`"
+            f"   ├ 진입가: `{round(p['entry'], 4)}`"
+            f"   ├ 현재가: `{round(p['current'], 4)}`"
+            f"   └ 손익: `{round(p['pnl'], 2)} USDT`"
         )
     send_telegram_message(msg)
 

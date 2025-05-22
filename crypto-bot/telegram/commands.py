@@ -1,7 +1,7 @@
 from strategy.ma90_disparity import report_15m_ma90_outliers
 from order_manager import auto_trade_from_signal
 from utils.telegram import send_telegram_message
-from utils.binance import get_klines
+from utils.binance import get_1m_klines
 
 from strategy.spike_disparity import report_spike_disparity
 from dotenv import load_dotenv
@@ -48,7 +48,7 @@ def telegram_command_listener():
                         symbol = parts[1].upper()
                         direction = parts[2].lower()
 
-                        df = get_klines(symbol, interval='1m', limit=5)
+                        df = get_1m_klines(symbol, interval='1m', limit=5)
                         if df.empty:
                             send_telegram_message(f"❌ {symbol} 데이터 불러오기 실패")
                             continue

@@ -4,63 +4,58 @@ import time
 from config import SPIKE_CONFIG as cfg
 
 def check_volume_spike_disparity(symbol):
+    issues = []  # 실패 이유 리스트
+
     try:
         df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["limit"])
         if df.empty or 'volume' not in df.columns:
-            raise ValueError("❌ 데이터프레임이 비어 있거나 volume 컬럼 없음")
+            issues.append("❌ 데이터프레임 비어 있음 or volume 누락")
+            raise Exception("중단")  # 더 아래 계산은 무의미하니까
 
         df['volume_ma'] = df['volume'].rolling(cfg["vol_ma_window"]).mean()
         df['ma'] = df['close'].rolling(cfg["disparity_ma"]).mean()
         df.dropna(inplace=True)
 
-        if len(df) < cfg["lookback"] + 1:
-            raise ValueError("❌ 유효한 데이터 부족 (이격도 및 볼륨 MA 계산 실패)")
+        if len(df) < cfg["lookback"] + cfg["price_lookback"]:
+            issues.append("❌ 유효 캔들 부족")
 
         recent = df.iloc[-cfg["lookback"]:].copy()
         recent_spike = recent[recent['volume'] > recent['volume_ma'] * cfg["spike_multiplier"]]
-
         if recent_spike.empty:
-            if cfg.get("notify_on_spike_fail", False):
-                send_telegram_message(f"ℹ️ [{symbol}] 최근 {cfg['lookback']}봉 거래량 스파이크 없음")
-            return None
+            issues.append(f"📉 거래량 스파이크 없음 (최근 {cfg['lookback']}봉 기준)")
 
         latest = df.iloc[-1]
         disparity = (latest['close'] / latest['ma']) * 100
-
         if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
-            if cfg.get("notify_on_disparity_fail", False):
-                send_telegram_message(
-                    f"⚖️ [{symbol}] 이격도 조건 불충족\n"
-                    f"현재 이격도: `{round(disparity, 2)}%` | 기준: ±{cfg['disparity_thresh']}%"
-                )
-            return None
-            
+            issues.append(f"⚖️ 이격도 부족 ({round(disparity, 2)}%)")
+
         recent_close = df['close'].iloc[-cfg["price_lookback"]]
-        latest_close = df['close'].iloc[-1]
-        price_slope = ((latest_close - recent_close) / recent_close) * 100
-        
+        price_slope = ((latest['close'] - recent_close) / recent_close) * 100
         if abs(price_slope) < cfg["min_price_slope_pct"]:
-            if cfg.get("notify_on_price_slope_fail", False):
-                send_telegram_message(
-                    f"📉 [{symbol}] 가격 기울기 부족 → 현재 {round(price_slope, 3)}% / 기준 {cfg['min_price_slope_pct']}%"
-                )
-            return None
-        
-        return {
-            'symbol': symbol,
-            'price': latest['close'],
-            'ma': latest['ma'],
-            'disparity': disparity,
-            'volume': latest['volume'],
-            'volume_ma': latest['volume_ma'],
-            'direction': 'LONG' if disparity < 100 else 'SHORT'
-        }
+            issues.append(f"📈 가격 기울기 부족 ({round(price_slope, 3)}%)")
+
+        # 조건 모두 통과 → 진입 신호 리턴
+        if not issues:
+            return {
+                'symbol': symbol,
+                'price': latest['close'],
+                'ma': latest['ma'],
+                'disparity': disparity,
+                'volume': latest['volume'],
+                'volume_ma': latest['volume_ma'],
+                'direction': 'LONG' if disparity < 100 else 'SHORT'
+            }
+
+        # 조건 실패 이유 메시지
+        if cfg.get("notify_on_error", True):
+            msg = f"⚠️ [{symbol}] 조건 불충족:\n" + "\n".join(issues)
+            send_telegram_message(msg)
+
+        return None
 
     except Exception as e:
-        msg = f"⚠️ [{symbol}] 스파이크 분석 실패:\n{str(e)}"
-        print(msg)
-        if cfg.get("notify_on_error", True):
-            send_telegram_message(msg)
+        if str(e) != "중단" and cfg.get("notify_on_error", True):
+            send_telegram_message(f"💥 [{symbol}] 예외 발생: {str(e)}")
         return None
 
 # 수동 리포트 호출용

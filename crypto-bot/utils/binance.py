@@ -24,6 +24,12 @@ def get_1m_klines(symbol, interval='1m', limit=120):
             'close_time', 'quote_asset_volume', 'number_of_trades',
             'taker_buy_base', 'taker_buy_quote', 'ignore'
         ])
+        #df['close'] = df['close'].astype(float)
+        #df['volume'] = df['volume'].astype(float)
+        
+        df['open'] = df['open'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
         df['close'] = df['close'].astype(float)
         df['volume'] = df['volume'].astype(float)
         return df

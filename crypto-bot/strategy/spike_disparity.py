@@ -1,38 +1,55 @@
 from utils.binance import get_top_symbols, get_1m_klines
 from utils.telegram import send_telegram_message
 import time
-from config import SPIKE_CONFIG
+from config import SPIKE_CONFIG as cfg
 
-# 유연한 스파이크 + 이격도 예측 함수
-def check_volume_spike_disparity(symbol, cfg=SPIKE_CONFIG):
+def check_volume_spike_disparity(symbol):
     try:
         df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["limit"])
+        if df.empty or 'volume' not in df.columns:
+            raise ValueError("❌ 데이터프레임이 비어 있거나 volume 컬럼 없음")
+
         df['volume_ma'] = df['volume'].rolling(cfg["vol_ma_window"]).mean()
         df['ma'] = df['close'].rolling(cfg["disparity_ma"]).mean()
         df.dropna(inplace=True)
+
+        if len(df) < cfg["lookback"] + 1:
+            raise ValueError("❌ 유효한 데이터 부족 (이격도 및 볼륨 MA 계산 실패)")
 
         recent = df.iloc[-cfg["lookback"]:].copy()
         recent_spike = recent[recent['volume'] > recent['volume_ma'] * cfg["spike_multiplier"]]
 
         if recent_spike.empty:
+            if cfg.get("notify_on_spike_fail", False):
+                send_telegram_message(f"ℹ️ [{symbol}] 최근 {cfg['lookback']}봉 거래량 스파이크 없음")
             return None
 
         latest = df.iloc[-1]
         disparity = (latest['close'] / latest['ma']) * 100
 
-        if disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"]):
-            return {
-                'symbol': symbol,
-                'price': latest['close'],
-                'ma': latest['ma'],
-                'disparity': disparity,
-                'volume': latest['volume'],
-                'volume_ma': latest['volume_ma'],
-                'direction': 'LONG' if disparity < 100 else 'SHORT'
-            }
-        return None
+        if not (disparity < (100 - cfg["disparity_thresh"]) or disparity > (100 + cfg["disparity_thresh"])):
+            if cfg.get("notify_on_disparity_fail", False):
+                send_telegram_message(
+                    f"⚖️ [{symbol}] 이격도 조건 불충족\n"
+                    f"현재 이격도: `{round(disparity, 2)}%` | 기준: ±{cfg['disparity_thresh']}%"
+                )
+            return None
+
+        return {
+            'symbol': symbol,
+            'price': latest['close'],
+            'ma': latest['ma'],
+            'disparity': disparity,
+            'volume': latest['volume'],
+            'volume_ma': latest['volume_ma'],
+            'direction': 'LONG' if disparity < 100 else 'SHORT'
+        }
+
     except Exception as e:
-        print(f"[{symbol}] 스파이크 이격도 분석 오류:", e)
+        msg = f"⚠️ [{symbol}] 스파이크 분석 실패:\n{str(e)}"
+        print(msg)
+        if cfg.get("notify_on_error", True):
+            send_telegram_message(msg)
         return None
 
 # 수동 리포트 호출용

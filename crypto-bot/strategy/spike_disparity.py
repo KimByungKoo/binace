@@ -82,8 +82,8 @@ def check_volume_spike_disparity(symbol):
                 elif direction == "short" and current_start > current_ma:
                     issues.append("숏인데 시작가가 MA5 위")
 
-                hi = df['high'].iloc[-cfg["price_lookback"]:].max()
-                lo = df['low'].iloc[-cfg["price_lookback"]:].min()
+                hi = df['close'].iloc[-cfg["price_lookback"]:].max()
+                lo = df['open'].iloc[-cfg["price_lookback"]:].min()
                 vrange = (hi - lo) / lo * 100
                 send_telegram_message(f"📊 {symbol} 전봉값 : {vrange} < 최근 변동성 중간값 : {round(median_disparity, 2)}%")
                 if vrange <  median_disparity:

@@ -59,7 +59,29 @@ def check_volume_spike_disparity(symbol):
         #if price_slope < required_slope:
             #issues.append(f"📉 과열 부족 (가격 스파이크 {round(price_slope, 2)}% < 평균의 {cfg['volatility_multiplier']}배: {round(required_slope, 2)}%)")
         
-        
+        # === 1봉 전 양봉/음봉 + 현재 1분봉 시작가 위치 + 1% 변동성 조건 ===
+        if len(df) < cfg["price_lookback"] + 1:
+            issues.append("봉 수 부족")
+        else:
+            prev_1m = df.iloc[-cfg["price_lookback"] - 1]
+            is_long = prev_1m['close'] > prev_1m['open']
+            current_start = df['open'].iloc[-cfg["price_lookback"]]
+            current_ma = df['close'].rolling(cfg["ma_window"]).mean().iloc[-cfg["price_lookback"]]
+            
+            if is_long and current_start < current_ma:
+                issues.append("롱인데 시작가가 MA 아래")
+            elif not is_long and current_start > current_ma:
+                issues.append("숏인데 시작가가 MA 위")
+    
+            hi = df['high'].iloc[-cfg["price_lookback"]:].max()
+            lo = df['low'].iloc[-cfg["price_lookback"]:].min()
+            vrange = (hi - lo) / lo * 100
+            if vrange < 1.0:
+                issues.append(f"변동폭 부족: {round(vrange,2)}% < 1.0%")
+    
+    
+
+
         # 조건 모두 통과 → 진입 신호 리턴
         if not issues:
             return {

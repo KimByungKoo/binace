@@ -92,6 +92,16 @@ def check_volume_spike_disparity(symbol):
                 if vrange <  median_disparity:
                     issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
 
+
+
+        if "five_green_ma5" in cfg["checks"]:
+            df['ma5'] = df['close'].rolling(5).mean()
+            recent_rows = df.iloc[-5:]
+            green_count = (recent_rows['close'] > recent_rows['open']).sum()
+            above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
+            if not (green_count == 5 and above_ma_count == 5) and not (green_count == 0 and above_ma_count == 0):
+                send_telegram_message("최근 5봉 모두 양봉 + MA5 위 또는 음봉 + MA5 아래 아님")
+
         if not issues:
             return {
                 'symbol': symbol,

@@ -100,8 +100,21 @@ def check_volume_spike_disparity(symbol):
             green_count = (recent_rows['close'] > recent_rows['open']).sum()
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
             if  (green_count == 5 and above_ma_count == 5) or  (green_count == 0 and above_ma_count == 0):
-                send_telegram_message(f"{symbol} 5봉 모두 양봉 + MA5 위 또는 음봉 + MA5 아래 아님")
+                send_telegram_message(
+            f"💡 *{symbol}* 5봉 모멘텀 포착\n"
+            f"   ├ 방향: `{direction.upper()}`\n"
+            f"   └ 현재가: `{latest_price}`"
+        )
 
+                if cfg.get("auto_execute", False):
+                    signal = {
+                        "symbol": symbol,
+                        "direction": direction,
+                        "price": latest_price,
+                        "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
+                        "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
+                    }
+                    auto_trade_from_signal(signal)
         if not issues:
             return {
                 'symbol': symbol,

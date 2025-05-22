@@ -111,19 +111,19 @@ def check_volume_spike_disparity(symbol):
                 'volume': latest['volume'],
                 'volume_ma': latest['volume_ma'],
                 'direction': 'LONG' if disparity < 100 else 'SHORT'
-            }
+            },[]
 
         # 조건 실패 이유 메시지
         if cfg.get("notify_on_error", True):
             msg = f"⚠️ [{symbol}] 조건 불충족:\n" + "\n".join(issues)
             send_telegram_message(msg)
 
-        return None
+        return None,[]
 
     except Exception as e:
         if str(e) != "중단" and cfg.get("notify_on_error", True):
             send_telegram_message(f"💥 [{symbol}] 예외 발생: {str(e)}")
-        return None
+        return None,[]
 
 # 수동 리포트 호출용
 def report_spike_disparity():

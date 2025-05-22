@@ -10,6 +10,12 @@ SPIKE_CONFIG = {
     "lookback": 5,                  # 최근 N봉 이내 스파이크 발생해야 인정
     "top_n": 20    ,                 # 검사할 종목 수
 
+
+    # 가격 기울기
+    "price_lookback": 5,
+    "min_price_slope_pct": 0.5,
+    
+    
     # 알림 제어
     "notify_on_spike_fail": False,
     "notify_on_disparity_fail": False,

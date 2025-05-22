@@ -22,7 +22,7 @@ def get_active_positions():
                 symbol = pos['symbol']
                 side = 'LONG' if qty > 0 else 'SHORT'
                 current_price = float(client.futures_mark_price(symbol=symbol)['markPrice'])
-                pnl = float(pos['unRealizedProfit'])
+                pnl = float(pos.get('unRealizedProfit') or 0)
                 result.append({
                     'symbol': symbol,
                     'side': side,

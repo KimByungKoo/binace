@@ -69,15 +69,16 @@ def check_volume_spike_disparity(symbol):
             if price_slope < required_slope:
                 issues.append(f"📉 과열 부족 (가격 스파이크 {round(price_slope, 2)}% < 평균의 {cfg['volatility_multiplier']}배: {round(required_slope, 2)}%)")
 
+        df['return_pct'] = df['close'].pct_change().abs() * 100
+        median_disparity = df['return_pct'].median()
         hi = df['close'].iloc[-cfg["price_lookback"]:].max()
         lo = df['open'].iloc[-cfg["price_lookback"]:].min()
         vrange = (hi - lo) / lo * 100
-        if vrange > 1:
-            send_telegram_message(f"📊 {symbol} 전봉값 : {vrange} < 최근 변동성 중간값 : {round(median_disparity, 2)}%")
+        if vrange > median_disparity*1.5:
+            send_telegram_message(f"📊 {symbol} 전봉값 : {vrange} < 최근 변동성 중간값 : {round(median_disparity*1.5, 2)}%")
                 
         if "volatility" in cfg["checks"]:
-            df['return_pct'] = df['close'].pct_change().abs() * 100
-            median_disparity = df['return_pct'].median()
+            
             if len(df) < cfg["price_lookback"] + 1:
                 issues.append("봉 수 부족")
             else:

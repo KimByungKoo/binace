@@ -1,10 +1,11 @@
 from utils.binance import get_top_symbols, check_15m_ma90_disparity
 from utils.telegram import send_telegram_message
 import time
+from config import SPIKE_CONFIG as cfg
 
 def report_15m_ma90_outliers():
     try:
-        symbols = get_top_symbols(20)
+        symbols = get_top_symbols(cfg["top_n"])
         msg = "🧭 *15분봉 MA90 이격도 알림*\n"
         msg += "_이격도 < 98% 또는 > 102% 종목만 표시_\n\n"
 

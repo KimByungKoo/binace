@@ -2,6 +2,7 @@ import time
 import threading
 from utils.binance import get_top_symbols
 from strategy.disparity_monitor import check_disparity
+from config import SPIKE_CONFIG as cfg
 
 def run_disparity_monitor():
     sent = {}

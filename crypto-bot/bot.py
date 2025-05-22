@@ -2,9 +2,10 @@ from strategy.ma365 import monitor_top10_ma365
 from strategy.ma90_disparity import ma90_watcher_loop
 from telegram.commands import telegram_command_listener
 from strategy.spike_disparity import spike_watcher_loop
+from position_monitor import position_watcher_loop
 #from strategy.disparity_monitor import run_disparity_monitor
 
-import threading
+
 
 if __name__ == "__main__":
     #!/bin/bash
@@ -19,6 +20,7 @@ if __name__ == "__main__":
 
     threading.Thread(target=spike_watcher_loop, daemon=True).start()
     
+    threading.Thread(target=position_watcher_loop, daemon=True).start()
     
     #threading.Thread(target=run_disparity_monitor, daemon=True).start()
 

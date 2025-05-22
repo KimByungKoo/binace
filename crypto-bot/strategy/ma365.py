@@ -1,6 +1,7 @@
 from utils.telegram import send_telegram_message
 from utils.binance import get_top_symbols, check_ma365_proximity_with_slope
 import time
+from config import SPIKE_CONFIG as cfg
 
 def monitor_top10_ma365():
     active = {}
@@ -8,7 +9,7 @@ def monitor_top10_ma365():
     
     while True:
         try:
-            top20 = get_top_symbols(20)
+            top20 = get_top_symbols(cfg["top_n"])
             for symbol in top20:
                 result = check_ma365_proximity_with_slope(symbol)
                 if not result:

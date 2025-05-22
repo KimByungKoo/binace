@@ -56,3 +56,8 @@ if __name__ == "__main__":
     while True:
         broadcast_position_status()
         time.sleep(300)  # 5분마다
+def position_watcher_loop():
+    send_telegram_message(f"😀 position_watcher_loop: {str(e)}")
+    while True:
+        broadcast_position_status()
+        time.sleep(600)  # 1분 주기

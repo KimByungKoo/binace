@@ -107,14 +107,20 @@ def check_volume_spike_disparity(symbol):
         )
 
                 if cfg.get("auto_execute", False):
-                    signal = {
-                        "symbol": symbol,
-                        "direction": direction,
-                        "price": latest_price,
-                        "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
-                        "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
-                    }
-                    auto_trade_from_signal(signal)
+                    if has_open_position(symbol):
+                        send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 자동 진입 생략")
+                    else:
+                        signal = {
+                            "symbol": symbol,
+                            "direction": direction,
+                            "price": latest_price,
+                            "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
+                            "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
+                        }
+                        auto_trade_from_signal(signal)
+                
+                
+                
         if not issues:
             return {
                 'symbol': symbol,

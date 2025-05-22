@@ -6,6 +6,30 @@ API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 client = Client(API_KEY, API_SECRET)
 
+
+
+def get_1m_klines(symbol: str, limit: int = 100):
+    """
+    지정한 심볼의 1분봉 캔들 데이터를 가져옵니다.
+    :param symbol: 거래할 심볼, 예: 'BTCUSDT'
+    :param limit: 몇 개의 캔들 데이터 조회할지 (최대 1000)
+    :return: 리스트 형태의 캔들 데이터
+    """
+    url = "https://api.binance.com/api/v3/klines"
+    params = {
+        "symbol": symbol,
+        "interval": "1m",
+        "limit": limit
+    }
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        klines = response.json()
+        return klines
+    except Exception as e:
+        print(f"Error fetching klines: {e}")
+        return None
+        
 def get_top_symbols(n=20):
     try:
         tickers = client.futures_ticker()

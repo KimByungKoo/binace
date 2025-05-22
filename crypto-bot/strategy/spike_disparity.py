@@ -101,6 +101,19 @@ def report_spike_disparity():
                 msg += f"   ├ 이격도: `{round(data['disparity'], 2)}%`\n"
                 msg += f"   ├ 볼륨: `{round(data['volume'], 2)}` vs 평균: `{round(data['volume_ma'], 2)}`\n\n"
 
+            result = check_disparity(symbol)
+            if result:
+                key = f"{symbol}"
+                if sent.get(key) != int(result["disparity"]):
+                    msg = (
+                        f"📊 *{symbol}* 5분봉 이격 감지!\n"
+                        f"   ├ 현재가: `{round(result['close'], 4)}`\n"
+                        f"   ├ MA{cfg['ma_window']}: `{round(result['ma'], 4)}`\n"
+                        f"   └ 이격도: `{round(result['disparity'], 2)}%` 🚨"
+                    )
+                    send_telegram_message(msg)
+                    sent[key] = int(result["disparity"])
+
         if found:
             send_telegram_message(msg)
         #else:
@@ -108,6 +121,30 @@ def report_spike_disparity():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
+
+
+def check_disparity(symbol):
+    df = get_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 5)
+    if df.empty or 'close' not in df.columns:
+        return None
+
+    df['ma'] = df['close'].rolling(cfg["ma_window"]).mean()
+    latest_close = df['close'].iloc[-1]
+    latest_ma = df['ma'].iloc[-1]
+
+    if pd.isna(latest_ma) or latest_ma == 0:
+        return None
+
+    disparity = (latest_close / latest_ma) * 100
+    if disparity >= cfg["disparity_threshold"]:
+        return {
+            "symbol": symbol,
+            "close": latest_close,
+            "ma": latest_ma,
+            "disparity": disparity
+        }
+    return None
+    
 # 자동 감시 루프
 def spike_watcher_loop():
     while True:

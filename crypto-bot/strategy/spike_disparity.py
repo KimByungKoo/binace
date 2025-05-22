@@ -148,11 +148,17 @@ def report_spike_disparity():
                     f"   ├ 가격 기울기 : `{round(result.get('price_slope', 0), 2)}%`\n"
                     f"   └ 변동폭      : `{round(result.get('volatility', 0), 2)}%`\n\n"
                 )
+            elif len(issues) == 1:
+                found = True
+                msg += (
+                    f"*{symbol}* ⚠️ 애매한 조건\n"
+                    f"   └ `{issues[0]}`\n\n"
+                )
         
         if found:
             send_telegram_message(msg)
-        else:
-            send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
+        #else:
+            #send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
         #else:
             #send_telegram_message("🙅‍♂️ 예측 조건을 만족하는 종목이 없습니다. (볼륨 + 이격도 기준)")
     except Exception as e:

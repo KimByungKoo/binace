@@ -94,8 +94,12 @@ def check_volume_spike_disparity(symbol):
             hi = df['high'].iloc[-cfg["price_lookback"]:].max()
             lo = df['low'].iloc[-cfg["price_lookback"]:].min()
             vrange = (hi - lo) / lo * 100
-            if vrange < 1.0:
-                issues.append(f"변동폭 부족: {round(vrange,2)}% < 1.0%")
+            
+            df['return_pct'] = df['close'].pct_change().abs() * 100
+            median_disparity = df['return_pct'].median()
+            
+            if vrange <  median_disparity:
+                issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
     
 
     

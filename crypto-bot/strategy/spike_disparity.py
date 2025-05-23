@@ -95,8 +95,9 @@ def check_volume_spike_disparity(symbol):
                 if vrange <  median_disparity:
                     issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
 
-        send_telegram_message(f"""💡 auto_execute *{cfg.get("auto_execute", True)}* """)
-        
+        print("DEBUG: auto_execute =", cfg.get("auto_execute", True))
+        send_telegram_message(f"💡 auto_execute: *{cfg.get('auto_execute', True)}*")
+
         if "five_green_ma5" in cfg["checks"]:
             df['ma5'] = df['close'].rolling(5).mean()
             recent_rows = df.iloc[-5:]

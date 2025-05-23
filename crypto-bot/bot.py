@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     threading.Thread(target=spike_watcher_loop, daemon=True).start()
     
-    threading.Thread(target=position_watcher_loop, daemon=True).start()
+    #threading.Thread(target=position_watcher_loop, daemon=True).start()
     
     threading.Thread(target=monitor_trailing_stop, daemon=True).start()
 

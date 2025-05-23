@@ -178,6 +178,18 @@ def monitor_trailing_stop():
                 d2 = abs(last_close - ma7)
 
                 if pd.notna(ma7) and pd.notna(ma20):
+                    
+                    
+                    # 익절 조건 판단 전에 필터링
+                    if d1 / ma7 * 100 < 0.5:
+                        send_telegram_message(
+                            f"⛔ *익절 무시: 추세선 거리 좁음*\n"
+                            f"   ├ MA7: `{round(ma7, 4)}` / MA20: `{round(ma20, 4)}`\n"
+                            f"   ├ D1: `{round(d1, 6)}` → `{round(d1 / ma7 * 100, 3)}%`\n"
+                            f"   └ 이유: 0.5% 미만 추세 간격"
+                        )
+                        continue  # 익절 판단 건너뜀
+                        
                     if d2 > d1:
                         exit_price = last_close
                         reason = "📈 확장이격 감지 → 현재가 익절"

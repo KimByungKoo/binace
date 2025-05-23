@@ -108,7 +108,7 @@ def check_volume_spike_disparity(symbol):
                     f"   ├ 방향: `{direction.upper()}`\n"
                     f"   └ 현재가: `{latest_price}`"
                 )
-                send_telegram_message(f"💡 auto_execute *{cfg.get("auto_execute", True)}* ")
+                send_telegram_message(f"""💡 auto_execute *{cfg.get("auto_execute", True)}* """)
                 if cfg.get("auto_execute", True):
                     if has_open_position(symbol):
                         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 자동 진입 생략")

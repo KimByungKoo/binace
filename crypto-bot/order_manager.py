@@ -71,15 +71,22 @@ def auto_trade_from_signal(signal):
     if not symbol or not direction or not price:
         send_telegram_message("⚠️ 진입 실패: signal 정보 불완전")
         return
+        
+    send_telegram_message("888")
 
     if has_open_position(symbol):
         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 진입 생략")
         return
+        
+    send_telegram_message("9999")
 
     qty = 100 / price  # $100 진입 기준 수량
+    
     set_leverage(symbol, 10)  # 선택적으로 레버리지 설정 추가
+    send_telegram_message("aasa")
     place_order(symbol, direction, qty, price, tp)
-
+    send_telegram_message("bbb")
+    
     active_positions[symbol] = {
         "direction": direction,
         "entry_price": price,

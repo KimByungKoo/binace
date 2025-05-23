@@ -74,22 +74,19 @@ def auto_trade_from_signal(signal):
         return
 
     qty = 100 / price  # $100 진입 기준 수량
-    order_result = place_market_order(symbol, direction, qty)
-    if order_result:
-        active_positions[symbol] = {
-            "direction": direction,
-            "entry_price": price,
-            "entry_time": datetime.utcnow(),
-            "take_profit": tp,
-            "stop_loss": sl,
-            "qty": qty
-        }
-        send_telegram_message(f"""🚀 *진입 완료 {symbol} {direction.upper()}*
-                       ├ 진입가: `{price}`
-                       ├ TP: `{tp}` | SL: `{sl}`""")
-    else:
-        send_telegram_message(f"💥 {symbol} 진입 실패")
+    set_leverage(symbol, 10)  # 선택적으로 레버리지 설정 추가
+    place_order(symbol, direction, qty, price, tp)
 
+    active_positions[symbol] = {
+        "direction": direction,
+        "entry_price": price,
+        "entry_time": datetime.utcnow(),
+        "take_profit": tp,
+        "stop_loss": sl,
+        "qty": qty
+    }
+    
+    
 def monitor_trailing_stop():
     while True:
         for symbol, pos in list(active_positions.items()):

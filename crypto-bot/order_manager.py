@@ -148,7 +148,12 @@ def monitor_trailing_stop():
                         direction == 'long' and last_close < ma7 or
                         direction == 'short' and last_close > ma7
                     )
-                    send_telegram_message(f" {p['symbol'] }🔄 {direction }.last_close {direction } ma7 {direction }")
+                    send_telegram_message(
+                        f"🔍 *{p['symbol']} 포지션 체크*\n"
+                        f"   ├ 방향: `{direction.upper()}`\n"
+                        f"   ├ 현재가: `{round(last_close, 4)}`\n"
+                        f"   └ MA7: `{round(ma7, 4)}`"
+)
     
                     if should_exit:
                         msg = (

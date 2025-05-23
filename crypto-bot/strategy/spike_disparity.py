@@ -118,7 +118,12 @@ def check_volume_spike_disparity(symbol):
                             "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
                         }
                         auto_trade_from_signal(signal)
-                
+            else:
+                send_telegram_message(
+                                f"💡 *{symbol}* 5봉 모멘텀 xx 포착\n"
+                                f"   ├ green_count: `{green_count}`\n"
+                                f"   └ above_ma_count: `{above_ma_count}`"
+                            )
                 
                 
         if not issues:

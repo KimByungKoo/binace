@@ -186,40 +186,34 @@ def monitor_trailing_stop():
                     
                     
                     # 익절 조건 판단 전에 필터링
-                    if d1 / ma7 * 100 < 1:
-                        send_telegram_message(
-                        f"⛔ *  {symbol} 익절 무시: 추세선 거리 좁음*\n"
-                        f"   ├ MA7: `{round(ma7, 4)}` / MA20: `{round(ma20, 4)}`\n"
-                        f"   ├ D1: `{round(d1, 6)}` → `{round(d1 / ma7 * 100, 3)}%`\n"
-                        f"   └ 이유: 1% 미만 추세 간격"
-                         )
-                        continue  # 익절 판단 건너뜀
+                    if d1 / ma7 * 100 > 1:
                         
-                    if d2 > d1:
-                        exit_price = last_close
-                        reason = "📈 확장이격 감지 → 현재가 익절"
-                    elif d2 < d1:
-                        exit_price = ma7
-                        reason = "🔄 정상추세 유지 → MA7 익절"
-                    else:
-                        exit_price = ma20
-                        reason = "⚖️ 불확실 → MA20 익절"
-
-                    profit_pct = ((exit_price - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - exit_price) / entry_price * 100)
-
-                    send_telegram_message(
-                        f"🎯 *익절 조건 감지: {symbol}*\n"
-                        f"   ├ 방향     : `{direction.upper()}`\n"
-                        f"   ├ 현재가   : `{round(last_close, 4)}`\n"
-                        f"   ├ MA7      : `{round(ma7, 4)}`\n"
-                        f"   ├ MA20     : `{round(ma20, 4)}`\n"
-                        f"   ├ D1       : `{round(d1, 4)}` / D2: `{round(d2, 4)}`\n"
-                        f"   ├ 익절가   : `{round(exit_price, 4)}`\n"
-                        f"   ├ 수익률   : `{round(profit_pct, 2)}%`\n"
-                        f"   └ 사유     : {reason}"
-                    )
-                    close_position(symbol, qty, "short" if direction == "long" else "long")
-                    continue
+                        
+                        if d2 > d1:
+                            exit_price = last_close
+                            reason = "📈 확장이격 감지 → 현재가 익절"
+                        elif d2 < d1:
+                            exit_price = ma7
+                            reason = "🔄 정상추세 유지 → MA7 익절"
+                        else:
+                            exit_price = ma20
+                            reason = "⚖️ 불확실 → MA20 익절"
+    
+                        profit_pct = ((exit_price - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - exit_price) / entry_price * 100)
+    
+                        send_telegram_message(
+                            f"🎯 *익절 조건 감지: {symbol}*\n"
+                            f"   ├ 방향     : `{direction.upper()}`\n"
+                            f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                            f"   ├ MA7      : `{round(ma7, 4)}`\n"
+                            f"   ├ MA20     : `{round(ma20, 4)}`\n"
+                            f"   ├ D1       : `{round(d1, 4)}` / D2: `{round(d2, 4)}`\n"
+                            f"   ├ 익절가   : `{round(exit_price, 4)}`\n"
+                            f"   ├ 수익률   : `{round(profit_pct, 2)}%`\n"
+                            f"   └ 사유     : {reason}"
+                        )
+                        close_position(symbol, qty, "short" if direction == "long" else "long")
+                        continue
 
                 # === 기본 3분봉 MA7 감시 ===
                 df_3m = get_1m_klines(symbol, interval="3m", limit=20)

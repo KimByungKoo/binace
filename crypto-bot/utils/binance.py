@@ -18,17 +18,28 @@ client = Client(API_KEY, API_SECRET)
 
 
 def has_open_position(symbol):
-    send_telegram_message(f"[{symbol}] position")
-    positions = client.futures_account()['positions']
-    positions = client.futures_account()['positions']
-    send_telegram_message(f"🔍 포지션 수: {len(positions)}")
+    try:
+        send_telegram_message(f"🔎 [{symbol}] 포지션 확인 시작")
 
-    for p in positions:
-        send_telegram_message(f"[{p['symbol']}] position")
-        send_telegram_message(f"[{float(p['positionAmt'])}] position")
-        if p['symbol'] == symbol.upper() and float(p['positionAmt']) != 0:
-            return True
-    return False
+        positions = client.futures_account()['positions']
+        send_telegram_message(f"📦 총 포지션 수: {len(positions)}")
+
+        for p in positions:
+            sym = p['symbol']
+            amt = float(p['positionAmt'])
+            if amt != 0:
+                send_telegram_message(f"🧾 {sym} 보유 중 수량: {amt}")
+            if sym == symbol.upper() and amt != 0:
+                send_telegram_message(f"✅ [{symbol}] 이미 포지션 보유 중")
+                return True
+
+        send_telegram_message(f"❌ [{symbol}] 포지션 없음")
+        return False
+
+    except Exception as e:
+        send_telegram_message(f"💥 포지션 조회 실패: {symbol} → {e}")
+        return False
+        
 
 def get_1m_klines(symbol, interval='1m', limit=120):
     try:

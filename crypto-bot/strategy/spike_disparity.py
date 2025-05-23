@@ -116,6 +116,7 @@ def check_volume_spike_disparity(symbol):
                     if has_open_position(symbol):
                         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 자동 진입 생략")
                     else:
+                        send_telegram_message("55555")
                         signal = {
                             "symbol": symbol,
                             "direction": direction,
@@ -125,6 +126,8 @@ def check_volume_spike_disparity(symbol):
                         }
                         auto_trade_from_signal(signal)
                 
+                else:
+                    send_telegram_message("tttttt")
             else:
                 send_telegram_message(
                     f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n"

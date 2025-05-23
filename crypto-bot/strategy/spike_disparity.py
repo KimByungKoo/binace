@@ -95,8 +95,8 @@ def check_volume_spike_disparity(symbol):
                 if vrange <  median_disparity:
                     issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
 
-        print("DEBUG: auto_execute =", cfg.get("auto_execute", True))
-        send_telegram_message(f"💡 auto_execute: *{cfg.get('auto_execute', True)}*")
+        #print("DEBUG: auto_execute =", cfg.get("auto_execute", True))
+        #send_telegram_message(f"💡 auto_execute: *{cfg.get('auto_execute', True)}*")
 
         if "five_green_ma5" in cfg["checks"]:
             df['ma5'] = df['close'].rolling(5).mean()
@@ -112,23 +112,18 @@ def check_volume_spike_disparity(symbol):
                     f"   └ 현재가: `{latest_price}`"
                 )
                 
-                if cfg.get("auto_execute", True):
-                    if has_open_position(symbol):
-                        send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 자동 진입 생략")
-                    else:
-                        send_telegram_message("55555")
-                        signal = {
-                            "symbol": symbol,
-                            "direction": direction,
-                            "price": latest_price,
-                            "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
-                            "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
-                        }
-                        auto_trade_from_signal(signal)
                 
-                else:
-                    send_telegram_message("tttttt")
-            else:
+                send_telegram_message("55555")
+                signal = {
+                                "symbol": symbol,
+                                "direction": direction,
+                                "price": latest_price,
+                                "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
+                                "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
+                            }
+                auto_trade_from_signal(signal)
+                
+             else:
                 send_telegram_message(
                     f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n"
                     f"   ├ green_count: `{green_count}`\n"

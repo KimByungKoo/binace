@@ -99,29 +99,37 @@ def auto_trade_from_signal(signal):
     
     
 def monitor_trailing_stop():
+    send_telegram_message("🔄 트레일링 스탑 감시 시작")
+
     while True:
-        
-        for symbol, pos in list(active_positions.items()):
-            try:
+        try:
+            positions = client.futures_account()['positions']
+            for p in positions:
+                symbol = p['symbol']
+                amt = float(p['positionAmt'])
+                if amt == 0:
+                    continue  # 포지션 없는 심볼은 스킵
+
+                direction = "long" if amt > 0 else "short"
+                qty = abs(amt)
+
+                # 최근 3봉 가져오기
                 df = get_klines(symbol, interval="3m", limit=3)
-                send_telegram_message(f"👀감시중 📉 {df.empty}")
-                if df.empty:
+                if df.empty or 'close' not in df.columns:
                     continue
-                    
-                send_telegram_message(f"👀감시중 📉 {symbol}")
+
                 last_close = float(df['close'].iloc[-1])
                 ma_line = df['close'].rolling(3).mean().iloc[-1]
-                
-                if pos['direction'] == 'long' and last_close < ma_line:
-                    send_telegram_message(f"📉 {symbol} 롱 이탈: {last_close} < MA({round(ma_line,2)}) → 청산")
-                    close_position(symbol, pos['qty'], "short")
-                    active_positions.pop(symbol)
 
-                elif pos['direction'] == 'short' and last_close > ma_line:
-                    send_telegram_message(f"📈 {symbol} 숏 이탈: {last_close} > MA({round(ma_line,2)}) → 청산")
-                    close_position(symbol, pos['qty'], "long")
-                    active_positions.pop(symbol)
+                if direction == 'long' and last_close < ma_line:
+                    send_telegram_message(f"📉 {symbol} 롱 MA3 이탈 → 청산")
+                    close_position(symbol, qty, "short")
 
-            except Exception as e:
-                send_telegram_message(f"❌ {symbol} 감시 에러: {e}")
+                elif direction == 'short' and last_close > ma_line:
+                    send_telegram_message(f"📈 {symbol} 숏 MA3 이탈 → 청산")
+                    close_position(symbol, qty, "long")
+
+        except Exception as e:
+            send_telegram_message(f"💥 트레일링 스탑 오류: {e}")
+
         time.sleep(60)

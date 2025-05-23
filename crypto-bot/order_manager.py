@@ -111,52 +111,52 @@ def monitor_trailing_stop():
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
-                if amt == 0 :
-                    continue
+                if amt != 0 :
+                    
                 #if entry_price == 0:
                     #continue
                 
                 
-                send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
-
-                direction = "long" if amt > 0 else "short"
-                qty = abs(amt)
-
-                df = get_klines(symbol, interval="3m", limit=20)
-                send_telegram_message(f" {p['symbol'] }🔄 333(3분봉 기준)")
-                if df.empty or 'close' not in df.columns:
-                    continue
-                    
-                send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
-
-                df['ma7'] = df['close'].rolling(window=7).mean()
-                last_close = float(df['close'].iloc[-1])
-                ma7 = df['ma7'].iloc[-1]
-                now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-
-                if pd.isna(ma7):
-                    continue
-                send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
-
-                profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
-
-                should_exit = (
-                    direction == 'long' and last_close < ma7 or
-                    direction == 'short' and last_close > ma7
-                )
-
-                if should_exit:
-                    msg = (
-                        f"📉 *{symbol} {direction.upper()} MA7 이탈 감지!*\n"
-                        f"   ├ 현재가 : `{round(last_close, 4)}`\n"
-                        f"   ├ MA7    : `{round(ma7, 4)}`\n"
-                        f"   ├ 진입가 : `{round(entry_price, 4)}`\n"
-                        f"   ├ 수익률 : `{round(profit_pct, 2)}%`\n"
-                        f"   └ 시각   : `{now_time}`"
+                    send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
+    
+                    direction = "long" if amt > 0 else "short"
+                    qty = abs(amt)
+    
+                    df = get_klines(symbol, interval="3m", limit=20)
+                    send_telegram_message(f" {p['symbol'] }🔄 333(3분봉 기준)")
+                    if df.empty or 'close' not in df.columns:
+                        continue
+                        
+                    send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
+    
+                    df['ma7'] = df['close'].rolling(window=7).mean()
+                    last_close = float(df['close'].iloc[-1])
+                    ma7 = df['ma7'].iloc[-1]
+                    now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    
+                    if pd.isna(ma7):
+                        continue
+                    send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
+    
+                    profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
+    
+                    should_exit = (
+                        direction == 'long' and last_close < ma7 or
+                        direction == 'short' and last_close > ma7
                     )
-                    send_telegram_message(msg)
-
-                    close_position(symbol, qty, "short" if direction == "long" else "long")
+    
+                    if should_exit:
+                        msg = (
+                            f"📉 *{symbol} {direction.upper()} MA7 이탈 감지!*\n"
+                            f"   ├ 현재가 : `{round(last_close, 4)}`\n"
+                            f"   ├ MA7    : `{round(ma7, 4)}`\n"
+                            f"   ├ 진입가 : `{round(entry_price, 4)}`\n"
+                            f"   ├ 수익률 : `{round(profit_pct, 2)}%`\n"
+                            f"   └ 시각   : `{now_time}`"
+                        )
+                        send_telegram_message(msg)
+    
+                        close_position(symbol, qty, "short" if direction == "long" else "long")
 
         except Exception as e:
             send_telegram_message(f"💥 트레일링 감시 중 오류: {e}")

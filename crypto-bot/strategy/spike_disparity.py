@@ -4,6 +4,8 @@ import time
 from config import SPIKE_CONFIG as cfg
 from order_manager import auto_trade_from_signal
 
+import pandas as pd
+
 def check_volume_spike_disparity(symbol):
     issues = []  # 실패 이유 리스트
 
@@ -154,6 +156,14 @@ def check_volume_spike_disparity(symbol):
                     "\n".join([f"   ├ {r}" for r in reason])
                 )
 
+
+        if "close_above_ma7" in cfg["checks"]:
+            df['ma7'] = df['close'].rolling(7).mean()
+            if pd.isna(df['ma7'].iloc[-1]):
+                issues.append("MA7 계산 불가")
+            elif latest_price < df['ma7'].iloc[-1]:
+                issues.append("❌ 현재가가 MA7 아래")
+
         if not issues:
             return {
                 'symbol': symbol,
@@ -175,6 +185,56 @@ def check_volume_spike_disparity(symbol):
         if str(e) != "중단" and cfg.get("notify_on_error", True):
             send_telegram_message(f"💥 [{symbol}] 예외 발생: {str(e)}")
         return None, []
+
+
+def get_top_disparity_symbols(n=5):
+    symbols = get_top_symbols()  # 유동성 좋은 종목 중에서만
+    results = []
+
+    for symbol in symbols:
+        try:
+            df = get_1m_klines(symbol, interval="1m", limit=20)
+            if df.empty or 'close' not in df.columns:
+                continue
+
+            df['ma7'] = df['close'].rolling(7).mean()
+            last_close = df['close'].iloc[-2]  # 전봉 기준
+            ma7 = df['ma7'].iloc[-2]
+
+            if pd.isna(ma7) or ma7 == 0:
+                continue
+
+            disparity = abs((last_close - ma7) / ma7) * 100
+            results.append({
+                "symbol": symbol,
+                "close": last_close,
+                "ma7": ma7,
+                "disparity": disparity
+            })
+        except Exception as e:
+            continue
+
+    sorted_list = sorted(results, key=lambda x: x['disparity'], reverse=True)
+    return sorted_list[:n]
+
+
+def report_top_1m_disparities():
+    top_disparities = get_top_disparity_symbols(5)
+
+    if not top_disparities:
+        send_telegram_message("⚠️ 1분봉 이격도 TOP5 분석 실패 or 데이터 부족")
+        return
+
+    msg = "📊 *1분봉 MA7 이격도 TOP5*\n\n"
+    for item in top_disparities:
+        msg += (
+            f"*{item['symbol']}*\n"
+            f"   ├ 현재가: `{round(item['close'], 4)}`\n"
+            f"   ├ MA7   : `{round(item['ma7'], 4)}`\n"
+            f"   └ 이격도: `{round(item['disparity'], 2)}%`\n\n"
+        )
+
+    send_telegram_message(msg)
 
 # 수동 리포트 호출용
 def report_spike_disparity():
@@ -247,4 +307,5 @@ def spike_watcher_loop():
     send_telegram_message(f"😀 spike_watcher_loop")
     while True:
         report_spike_disparity()
+        report_top_1m_disparities()
         time.sleep(60)  # 1분 주기

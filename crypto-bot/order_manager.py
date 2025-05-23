@@ -84,11 +84,9 @@ def auto_trade_from_signal(signal):
             "stop_loss": sl,
             "qty": qty
         }
-        send_telegram_message(
-            f"🚀 *진입 완료 {symbol} {direction.upper()}*
-             ├ 진입가: `{price}`
-             ├ TP: `{tp}` | SL: `{sl}`"
-        )
+        send_telegram_message(f"""🚀 *진입 완료 {symbol} {direction.upper()}*
+                       ├ 진입가: `{price}`
+                       ├ TP: `{tp}` | SL: `{sl}`""")
     else:
         send_telegram_message(f"💥 {symbol} 진입 실패")
 

@@ -160,7 +160,7 @@ def check_volume_spike_disparity(symbol):
 # 수동 리포트 호출용
 def report_spike_disparity():
     try:
-        symbols = get_top_symbols(20)
+        symbols = get_top_symbols(cfg["top_n"])
         msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
         found = False
         

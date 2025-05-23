@@ -17,6 +17,7 @@ client = Client(API_KEY, API_SECRET)
 
 
 def has_open_position(symbol):
+    print(f"[{symbol}] ")
     positions = client.futures_account()['positions']
     for p in positions:
         if p['symbol'] == symbol.upper() and float(p['positionAmt']) != 0:

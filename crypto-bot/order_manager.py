@@ -79,7 +79,7 @@ def auto_trade_from_signal(signal):
         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 진입 생략")
         return
         
-    send_telegram_message("9999")
+    
 
     qty = 100 / price  # $100 진입 기준 수량
     
@@ -100,11 +100,14 @@ def auto_trade_from_signal(signal):
     
 def monitor_trailing_stop():
     while True:
+        
         for symbol, pos in list(active_positions.items()):
             try:
                 df = get_klines(symbol, interval="3m", limit=3)
                 if df.empty:
                     continue
+                    
+                send_telegram_message(f"👀감시중 📉 {symbol}")
                 last_close = float(df['close'].iloc[-1])
                 ma_line = df['close'].rolling(3).mean().iloc[-1]
                 

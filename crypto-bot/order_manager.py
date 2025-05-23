@@ -149,14 +149,14 @@ def monitor_trailing_stop():
                             direction == 'short' and last_close > ma7
                         )
 
-                        send_telegram_message(
-                            f"🔍 *{symbol} 포지션 체크 (1분봉 기준)*\n"
-                            f"   ├ 방향     : `{direction.upper()}`\n"
-                            f"   ├ 현재가   : `{round(last_close, 4)}`\n"
-                            f"   ├ MA7      : `{round(ma7, 4)}`\n"
-                            f"   ├ 과열 감지: `✅`\n"
-                            f"   └ 감시 기준: `1분봉`"
-                        )
+                        # send_telegram_message(
+                        #     f"🔍 *{symbol} 포지션 체크 (1분봉 기준)*\n"
+                        #     f"   ├ 방향     : `{direction.upper()}`\n"
+                        #     f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                        #     f"   ├ MA7      : `{round(ma7, 4)}`\n"
+                        #     f"   ├ 과열 감지: `✅`\n"
+                        #     f"   └ 감시 기준: `1분봉`"
+                        # )
 
                         if should_exit:
                             profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
@@ -237,13 +237,13 @@ def monitor_trailing_stop():
                     direction == 'short' and last_close_3m > ma7_3m
                 )
 
-                send_telegram_message(
-                    f"🔍 *{symbol} 포지션 체크 (3분봉 기준)*\n"
-                    f"   ├ 방향     : `{direction.upper()}`\n"
-                    f"   ├ 현재가   : `{round(last_close_3m, 4)}`\n"
-                    f"   ├ MA7      : `{round(ma7_3m, 4)}`\n"
-                    f"   └ 감시 기준: `3분봉`"
-                )
+                # send_telegram_message(
+                #     f"🔍 *{symbol} 포지션 체크 (3분봉 기준)*\n"
+                #     f"   ├ 방향     : `{direction.upper()}`\n"
+                #     f"   ├ 현재가   : `{round(last_close_3m, 4)}`\n"
+                #     f"   ├ MA7      : `{round(ma7_3m, 4)}`\n"
+                #     f"   └ 감시 기준: `3분봉`"
+                # )
 
                 if should_exit:
                     profit_pct = ((last_close_3m - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close_3m) / entry_price * 100)

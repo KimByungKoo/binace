@@ -50,12 +50,10 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
             reduceOnly=True
         )
 
-        send_telegram_message(
-                f"🚀 *진입 완료: {symbol} ({side.upper()})*\n"
-                f"   ├ 수량: `{quantity}`\n"
-                f"   ├ 진입가(시장): `{round(entry_price, 4)}`\n"
-                f"   └ 익절가(TP): `{round(tp_price, 4)}`"
-            )
+        send_telegram_message(f"""🚀 *진입 완료: {symbol} ({side.upper()})*
+                                       ├ 수량: `{quantity}`
+                                       ├ 진입가(시장): `{round(entry_price, 4)}`
+                                       └ 익절가(TP): `{round(tp_price, 4)}`""")
             
     except Exception as e:
         send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")

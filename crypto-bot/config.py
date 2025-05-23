@@ -33,7 +33,7 @@ SPIKE_CONFIG = {
     "notify_on_spike_fail": True,
     "notify_on_disparity_fail": True,
     "notify_on_price_slope_fail":True,
-    "notify_on_error": False,   
+    "notify_on_error": True,   
 
     "auto_execute": True
 

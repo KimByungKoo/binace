@@ -81,12 +81,12 @@ def auto_trade_from_signal(signal):
         
     
 
-    qty = 100 / price  # $100 진입 기준 수량
+    qty = 200 / price  # $100 진입 기준 수량
     
-    set_leverage(symbol, 10)  # 선택적으로 레버리지 설정 추가
-    send_telegram_message("aasa")
+    set_leverage(symbol, 20)  # 선택적으로 레버리지 설정 추가
+    
     place_order(symbol, direction, qty, price, tp)
-    send_telegram_message("bbb")
+    
     
     active_positions[symbol] = {
         "direction": direction,
@@ -105,6 +105,7 @@ def monitor_trailing_stop():
         try:
             positions = client.futures_account()['positions']
             for p in positions:
+                send_telegram_message(f"🔄 트레일링 스탑 감시 시작{p['symbol']}")
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 if amt == 0:

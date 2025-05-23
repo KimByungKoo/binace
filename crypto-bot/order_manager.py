@@ -60,20 +60,20 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
         send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")
 
 def auto_trade_from_signal(signal):
-    send_telegram_message("666")
+   
     symbol = signal.get("symbol")
     direction = signal.get("direction")
     price = signal.get("price")
     tp = signal.get("take_profit")
     sl = signal.get("stop_loss")
     
-    send_telegram_message("777")
+  
 
     if not symbol or not direction or not price:
         send_telegram_message("⚠️ 진입 실패: signal 정보 불완전")
         return
         
-    send_telegram_message("888")
+    
 
     if has_open_position(symbol):
         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 진입 생략")
@@ -104,6 +104,7 @@ def monitor_trailing_stop():
         for symbol, pos in list(active_positions.items()):
             try:
                 df = get_klines(symbol, interval="3m", limit=3)
+                send_telegram_message(f"👀감시중 📉 {df.empty}")
                 if df.empty:
                     continue
                     

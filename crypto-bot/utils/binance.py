@@ -21,6 +21,8 @@ def has_open_position(symbol):
     send_telegram_message(f"[{symbol}] position")
     positions = client.futures_account()['positions']
     for p in positions:
+        send_telegram_message(f"[{p['symbol']}] position")
+        send_telegram_message(f"[{float(p['positionAmt'])}] position")
         if p['symbol'] == symbol.upper() and float(p['positionAmt']) != 0:
             return True
     return False

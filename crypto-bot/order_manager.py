@@ -50,7 +50,7 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
             side=Client.SIDE_SELL if side == "long" else Client.SIDE_BUY,
             type=Client.ORDER_TYPE_LIMIT,
             quantity=quantity,
-            price=round(tp_price, 2),
+            #price=round(tp_price, 2),
             timeInForce="GTC",
             reduceOnly=True
         )
@@ -58,7 +58,7 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
         send_telegram_message(f"""🚀 *진입 완료: {symbol} ({side.upper()})*
                                        ├ 수량: `{quantity}`
                                        ├ 진입가(시장): `{round(entry_price, 4)}`
-                                       └ 익절가(TP): `{round(tp_price, 4)}`""")
+                                       └ """)
             
     except Exception as e:
         send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")

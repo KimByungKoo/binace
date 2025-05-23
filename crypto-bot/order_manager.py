@@ -3,7 +3,7 @@ import os
 from binance.client import Client
 from utils.telegram import send_telegram_message
 from dotenv import load_dotenv
-from utils.binance import has_open_positio
+from utils.binance import has_open_position
 
 load_dotenv()
 

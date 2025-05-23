@@ -107,20 +107,24 @@ def monitor_trailing_stop():
         try:
             positions = client.futures_account()['positions']
             for p in positions:
+                send_telegram_message(f" {p['symbol'] }🔄 111(3분봉 기준)")
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
                 if amt == 0 or entry_price == 0:
                     continue
                     
-                send_telegram_message(f" {p['symbol'] }🔄 MA7 기준 트레일링 스탑 감시 시작 (3분봉 기준)")
+                send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
 
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
                 df = get_klines(symbol, interval="3m", limit=20)
+                send_telegram_message(f" {p['symbol'] }🔄 333(3분봉 기준)")
                 if df.empty or 'close' not in df.columns:
                     continue
+                    
+                send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
 
                 df['ma7'] = df['close'].rolling(window=7).mean()
                 last_close = float(df['close'].iloc[-1])
@@ -129,6 +133,7 @@ def monitor_trailing_stop():
 
                 if pd.isna(ma7):
                     continue
+                send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
 
                 profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
 

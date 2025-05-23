@@ -10,6 +10,8 @@ API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 client = Client(API_KEY, API_SECRET)
 
+active_positions = {}  # 심볼별 포지션 정보
+
 def set_leverage(symbol, leverage):
     try:
         client.futures_change_leverage(symbol=symbol, leverage=leverage)
@@ -59,19 +61,59 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
         send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")
 
 def auto_trade_from_signal(signal):
-    symbol = signal["symbol"]
-    direction = signal["direction"]
-    entry_price = signal["price"]
-    tp_price = signal["take_profit"]
-    sl_price = signal["stop_loss"]
+    symbol = signal.get("symbol")
+    direction = signal.get("direction")
+    price = signal.get("price")
+    tp = signal.get("take_profit")
+    sl = signal.get("stop_loss")
 
-    diff = abs(entry_price - sl_price)
-    loss_pct = diff / entry_price
-    leverage = int(1 / (loss_pct + 0.005))
+    if not symbol or not direction or not price:
+        send_telegram_message("⚠️ 진입 실패: signal 정보 불완전")
+        return
 
-    set_leverage(symbol, leverage)
+    if has_open_position(symbol):
+        send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 진입 생략")
+        return
 
-    margin_usdt = 10
-    qty = round(margin_usdt * leverage / entry_price, 3)
+    qty = 100 / price  # $100 진입 기준 수량
+    order_result = place_market_order(symbol, direction, qty)
+    if order_result:
+        active_positions[symbol] = {
+            "direction": direction,
+            "entry_price": price,
+            "entry_time": datetime.utcnow(),
+            "take_profit": tp,
+            "stop_loss": sl,
+            "qty": qty
+        }
+        send_telegram_message(
+            f"🚀 *진입 완료 {symbol} {direction.upper()}*
+             ├ 진입가: `{price}`
+             ├ TP: `{tp}` | SL: `{sl}`"
+        )
+    else:
+        send_telegram_message(f"💥 {symbol} 진입 실패")
 
-    place_order(symbol, direction, qty, entry_price, tp_price)
+def monitor_trailing_stop():
+    while True:
+        for symbol, pos in list(active_positions.items()):
+            try:
+                df = get_klines(symbol, interval="3m", limit=3)
+                if df.empty:
+                    continue
+                last_close = float(df['close'].iloc[-1])
+                ma_line = df['close'].rolling(3).mean().iloc[-1]
+                
+                if pos['direction'] == 'long' and last_close < ma_line:
+                    send_telegram_message(f"📉 {symbol} 롱 이탈: {last_close} < MA({round(ma_line,2)}) → 청산")
+                    close_position(symbol, pos['qty'], "short")
+                    active_positions.pop(symbol)
+
+                elif pos['direction'] == 'short' and last_close > ma_line:
+                    send_telegram_message(f"📈 {symbol} 숏 이탈: {last_close} > MA({round(ma_line,2)}) → 청산")
+                    close_position(symbol, pos['qty'], "long")
+                    active_positions.pop(symbol)
+
+            except Exception as e:
+                send_telegram_message(f"❌ {symbol} 감시 에러: {e}")
+        time.sleep(60)

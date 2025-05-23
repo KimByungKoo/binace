@@ -3,7 +3,7 @@ import os
 from binance.client import Client
 from utils.telegram import send_telegram_message
 from dotenv import load_dotenv
-from utils.binance import has_open_position
+from utils.binance import has_open_position,get_1m_klines
 
 load_dotenv()
 
@@ -122,7 +122,7 @@ def monitor_trailing_stop():
                     direction = "long" if amt > 0 else "short"
                     qty = abs(amt)
     
-                    df = get_klines(symbol, interval="3m", limit=20)
+                    df = get_1m_klines(symbol, interval="3m", limit=20)
                     send_telegram_message(f" {p['symbol'] }🔄 333(3분봉 기준)")
                     if df.empty or 'close' not in df.columns:
                         continue

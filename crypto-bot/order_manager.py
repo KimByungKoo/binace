@@ -121,7 +121,7 @@ def monitor_trailing_stop():
                     #continue
                 
                 
-                    send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
+                    #send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
     
                     direction = "long" if amt > 0 else "short"
                     qty = abs(amt)
@@ -131,7 +131,7 @@ def monitor_trailing_stop():
                     if df.empty or 'close' not in df.columns:
                         continue
                         
-                    send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
+                    #send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
     
                     df['ma7'] = df['close'].rolling(window=7).mean()
                     last_close = float(df['close'].iloc[-1])
@@ -140,7 +140,7 @@ def monitor_trailing_stop():
     
                     if pd.isna(ma7):
                         continue
-                    send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
+                    #send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
     
                     profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
     

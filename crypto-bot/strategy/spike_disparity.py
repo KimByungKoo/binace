@@ -104,7 +104,13 @@ def check_volume_spike_disparity(symbol):
             green_count = (recent_rows['close'] > recent_rows['open']).sum()
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
 
-            if (green_count == 5 and above_ma_count == 5) or (green_count == 0 and above_ma_count == 0):
+            # 각 봉의 변화율 계산 (고가-저가 기준)
+            volatilities = ((recent_rows['high'] - recent_rows['low']) / recent_rows['low']) * 100
+            volatility_exceeds = (volatilities >= 1).sum()
+        
+    
+
+            if ((green_count == 5 and above_ma_count == 5) or (green_count == 0 and above_ma_count == 0)) and volatility_exceeds == 0:
                 direction = "long" if green_count == 5 else "short"
                 send_telegram_message(
                     f"💡 *{symbol}* 5봉 모멘텀 포착\n"

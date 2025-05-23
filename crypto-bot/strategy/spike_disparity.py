@@ -112,7 +112,6 @@ def check_volume_spike_disparity(symbol):
                     f"   └ 현재가: `{latest_price}`"
                 )
                 
-                
                 send_telegram_message("55555")
                 signal = {
                                 "symbol": symbol,
@@ -123,7 +122,7 @@ def check_volume_spike_disparity(symbol):
                             }
                 auto_trade_from_signal(signal)
                 
-             else:
+            else:
                 send_telegram_message(
                     f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n"
                     f"   ├ green_count: `{green_count}`\n"

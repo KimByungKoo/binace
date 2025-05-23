@@ -105,12 +105,15 @@ def monitor_trailing_stop():
         try:
             positions = client.futures_account()['positions']
             for p in positions:
-                send_telegram_message(f"🔄 트레일링 스탑 감시 시작{p['symbol']}")
+                
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 if amt == 0:
                     continue  # 포지션 없는 심볼은 스킵
 
+
+                send_telegram_message(f"🔄 트레일링 스탑 감시 시작{p['symbol']}")
+                
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 

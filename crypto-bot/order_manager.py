@@ -113,8 +113,8 @@ def monitor_trailing_stop():
                 entry_price = float(p['entryPrice'])
                 if amt == 0 :
                     continue
-                if entry_price == 0:
-                    continue
+                #if entry_price == 0:
+                    #continue
                 
                 
                 send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")

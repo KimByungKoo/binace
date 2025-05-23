@@ -165,3 +165,17 @@ def monitor_trailing_stop():
             send_telegram_message(f"💥 트레일링 감시 중 오류: {e}")
 
         time.sleep(60)
+        
+        
+def close_position(symbol, qty, reverse_direction):
+    try:
+        client.futures_create_order(
+            symbol=symbol,
+            side=Client.SIDE_SELL if reverse_direction == "short" else Client.SIDE_BUY,
+            type=Client.ORDER_TYPE_MARKET,
+            quantity=round_qty(symbol, qty),
+            reduceOnly=True
+        )
+        send_telegram_message(f"💸 포지션 종료 완료: {symbol} {reverse_direction.upper()} {qty}")
+    except Exception as e:
+        send_telegram_message(f"⚠️ 포지션 종료 실패: {symbol} → {e}")

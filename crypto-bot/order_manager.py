@@ -107,9 +107,9 @@ from datetime import datetime
 volatile_state = set()  # 과열 발생 후 감시 대상
 
 def monitor_trailing_stop():
-    send_telegram_message("🔄 트레일링 스탑 감시 시작 (1분 과열 우선 + 3분 MA7 기본)")
+    send_telegram_message("🔄 트레일링 스탑 감시 시작 (1분 과열 우선 + 3분 MA7 기본 + 동적 익절 조건)")
 
-    volatile_state = set()  # 과열 발생 후 감시 대상
+    volatile_state = set()
 
     while True:
         try:
@@ -125,45 +125,46 @@ def monitor_trailing_stop():
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
-                # === 1분봉 과열 체크 ===
-                df_1m = get_1m_klines(symbol, interval="1m", limit=7)
+                # === 1분봉 과열 감지 ===
+                df_1m = get_1m_klines(symbol, interval="1m", limit=30)
                 if df_1m.empty or 'high' not in df_1m.columns or 'low' not in df_1m.columns:
                     continue
 
                 df_1m['range_pct'] = (df_1m['high'] - df_1m['low']) / df_1m['low'] * 100
                 is_volatile = (df_1m['range_pct'] >= 1).any()
-
-                df_1m['ma7'] = df_1m['close'].rolling(7).mean()
-                last_close_1m = df_1m['close'].iloc[-1]
-                ma7_1m = df_1m['ma7'].iloc[-1]
-
                 if is_volatile:
                     volatile_state.add(symbol)
 
+                df_1m['ma7'] = df_1m['close'].rolling(7).mean()
+                df_1m['ma20'] = df_1m['close'].rolling(20).mean()
+
+                last_close = df_1m['close'].iloc[-1]
+                ma7 = df_1m['ma7'].iloc[-1]
+                ma20 = df_1m['ma20'].iloc[-1]
+
                 if symbol in volatile_state:
-                    if pd.notna(ma7_1m):
+                    if pd.notna(ma7):
                         should_exit = (
-                            direction == 'long' and last_close_1m < ma7_1m or
-                            direction == 'short' and last_close_1m > ma7_1m
+                            direction == 'long' and last_close < ma7 or
+                            direction == 'short' and last_close > ma7
                         )
 
-                        # ✅ 상태 리포트
                         send_telegram_message(
                             f"🔍 *{symbol} 포지션 체크 (1분봉 기준)*\n"
                             f"   ├ 방향     : `{direction.upper()}`\n"
-                            f"   ├ 현재가   : `{round(last_close_1m, 4)}`\n"
-                            f"   ├ MA7      : `{round(ma7_1m, 4)}`\n"
+                            f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                            f"   ├ MA7      : `{round(ma7, 4)}`\n"
                             f"   ├ 과열 감지: `✅`\n"
                             f"   └ 감시 기준: `1분봉`"
                         )
 
                         if should_exit:
-                            profit_pct = ((last_close_1m - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close_1m) / entry_price * 100)
+                            profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
                             now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
                             send_telegram_message(
                                 f"🔥 *{symbol} 1분봉 과열+MA7 이탈 청산!*\n"
-                                f"   ├ 현재가 : `{round(last_close_1m, 4)}`\n"
-                                f"   ├ MA7    : `{round(ma7_1m, 4)}`\n"
+                                f"   ├ 현재가 : `{round(last_close, 4)}`\n"
+                                f"   ├ MA7    : `{round(ma7, 4)}`\n"
                                 f"   ├ 진입가 : `{round(entry_price, 4)}`\n"
                                 f"   ├ 수익률 : `{round(profit_pct, 2)}%`\n"
                                 f"   └ 시각   : `{now_time}`"
@@ -171,6 +172,37 @@ def monitor_trailing_stop():
                             close_position(symbol, qty, "short" if direction == "long" else "long")
                             volatile_state.remove(symbol)
                         continue
+
+                # === 동적 익절 조건 평가 (1분봉 기준)
+                d1 = abs(ma7 - ma20)
+                d2 = abs(last_close - ma7)
+
+                if pd.notna(ma7) and pd.notna(ma20):
+                    if d2 > d1:
+                        exit_price = last_close
+                        reason = "📈 확장이격 감지 → 현재가 익절"
+                    elif d2 < d1:
+                        exit_price = ma7
+                        reason = "🔄 정상추세 유지 → MA7 익절"
+                    else:
+                        exit_price = ma20
+                        reason = "⚖️ 불확실 → MA20 익절"
+
+                    profit_pct = ((exit_price - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - exit_price) / entry_price * 100)
+
+                    send_telegram_message(
+                        f"🎯 *익절 조건 감지: {symbol}*\n"
+                        f"   ├ 방향     : `{direction.upper()}`\n"
+                        f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                        f"   ├ MA7      : `{round(ma7, 4)}`\n"
+                        f"   ├ MA20     : `{round(ma20, 4)}`\n"
+                        f"   ├ D1       : `{round(d1, 4)}` / D2: `{round(d2, 4)}`\n"
+                        f"   ├ 익절가   : `{round(exit_price, 4)}`\n"
+                        f"   ├ 수익률   : `{round(profit_pct, 2)}%`\n"
+                        f"   └ 사유     : {reason}"
+                    )
+                    close_position(symbol, qty, "short" if direction == "long" else "long")
+                    continue
 
                 # === 기본 3분봉 MA7 감시 ===
                 df_3m = get_1m_klines(symbol, interval="3m", limit=20)
@@ -180,6 +212,7 @@ def monitor_trailing_stop():
                 df_3m['ma7'] = df_3m['close'].rolling(7).mean()
                 last_close_3m = df_3m['close'].iloc[-1]
                 ma7_3m = df_3m['ma7'].iloc[-1]
+
                 if pd.isna(ma7_3m):
                     continue
 
@@ -188,13 +221,11 @@ def monitor_trailing_stop():
                     direction == 'short' and last_close_3m > ma7_3m
                 )
 
-                # ✅ 상태 리포트
                 send_telegram_message(
                     f"🔍 *{symbol} 포지션 체크 (3분봉 기준)*\n"
                     f"   ├ 방향     : `{direction.upper()}`\n"
                     f"   ├ 현재가   : `{round(last_close_3m, 4)}`\n"
                     f"   ├ MA7      : `{round(ma7_3m, 4)}`\n"
-                    f"   ├ 과열 감지: `❌`\n"
                     f"   └ 감시 기준: `3분봉`"
                 )
 

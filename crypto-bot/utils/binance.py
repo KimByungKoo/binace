@@ -9,12 +9,11 @@ import os
 
 load_dotenv()
 
-
-
-
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+API_KEY = os.getenv("BINANCE_API_KEY")
+API_SECRET = os.getenv("BINANCE_API_SECRET")
 client = Client(API_KEY, API_SECRET)
+
+
 
 
 def has_open_position(symbol):

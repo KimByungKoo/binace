@@ -104,74 +104,84 @@ def auto_trade_from_signal(signal):
     
 from datetime import datetime
 
+volatile_state = set()  # 과열 발생 후 감시 대상
+
 def monitor_trailing_stop():
-    send_telegram_message("🔄 MA7 기준 트레일링 스탑 감시 시작 (3분봉 기준)")
+    send_telegram_message("🔄 트레일링 스탑 감시 시작")
 
     while True:
         try:
             positions = client.futures_account()['positions']
             for p in positions:
-                #send_telegram_message(f" {p['symbol'] }🔄 {float(p['positionAmt']) }. {float(p['entryPrice']) }111(3분봉 기준)")
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
-                if amt != 0 :
-                    
-                #if entry_price == 0:
-                    #continue
-                
-                
-                    #send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
-    
-                    direction = "long" if amt > 0 else "short"
-                    qty = abs(amt)
-    
-                    df = get_1m_klines(symbol, interval="3m", limit=20)
-                    #send_telegram_message(f" {p['symbol'] }🔄 333(3분봉 기준)")
-                    if df.empty or 'close' not in df.columns:
-                        continue
-                        
-                    #send_telegram_message(f" {p['symbol'] }🔄 444(3분봉 기준)")
-    
-                    df['ma7'] = df['close'].rolling(window=7).mean()
-                    last_close = float(df['close'].iloc[-1])
-                    ma7 = df['ma7'].iloc[-1]
-                    now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-    
-                    if pd.isna(ma7):
-                        continue
-                    #send_telegram_message(f" {p['symbol'] }🔄 555(3분봉 기준)")
-    
-                    profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
-    
-                    should_exit = (
-                        direction == 'long' and last_close < ma7 or
-                        direction == 'short' and last_close > ma7
-                    )
-                    send_telegram_message(
-                        f"🔍 *{p['symbol']} 포지션 체크*\n"
-                        f"   ├ 방향: `{direction.upper()}`\n"
-                        f"   ├ 현재가: `{round(last_close, 4)}`\n"
-                        f"   └ MA7: `{round(ma7, 4)}`"
-)
-    
-                    if should_exit:
-                        msg = (
-                            f"📉 *{symbol} {direction.upper()} MA7 이탈 감지!*\n"
-                            f"   ├ 현재가 : `{round(last_close, 4)}`\n"
-                            f"   ├ MA7    : `{round(ma7, 4)}`\n"
-                            f"   ├ 진입가 : `{round(entry_price, 4)}`\n"
-                            f"   ├ 수익률 : `{round(profit_pct, 2)}%`\n"
-                            f"   └ 시각   : `{now_time}`"
+                if amt == 0 or entry_price == 0:
+                    continue
+
+                direction = "long" if amt > 0 else "short"
+                qty = abs(amt)
+
+                # === 1분봉 과열 체크 ===
+                df_1m = get_1m_klines(symbol, interval="1m", limit=7)
+                df_1m['range_pct'] = (df_1m['high'] - df_1m['low']) / df_1m['low'] * 100
+                is_volatile = (df_1m['range_pct'] >= 1).any()
+
+                # === MA7 (1분 기준) 이탈 감시 ===
+                df_1m['ma7'] = df_1m['close'].rolling(7).mean()
+                last_close_1m = df_1m['close'].iloc[-1]
+                ma7_1m = df_1m['ma7'].iloc[-1]
+
+                if is_volatile:
+                    volatile_state.add(symbol)
+
+                if symbol in volatile_state:
+                    if pd.notna(ma7_1m):
+                        should_exit = (
+                            direction == 'long' and last_close_1m < ma7_1m or
+                            direction == 'short' and last_close_1m > ma7_1m
                         )
-                        send_telegram_message(msg)
-    
-                        close_position(symbol, qty, "short" if direction == "long" else "long")
+                        if should_exit:
+                            profit_pct = ((last_close_1m - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close_1m) / entry_price * 100)
+                            send_telegram_message(
+                                f"🔥 *{symbol} 1분봉 과열+MA7 이탈 청산!*\n"
+                                f"   ├ 현재가: `{round(last_close_1m, 4)}`\n"
+                                f"   ├ MA7: `{round(ma7_1m, 4)}`\n"
+                                f"   ├ 수익률: `{round(profit_pct, 2)}%`\n"
+                                f"   └ 트리거: 1분봉 기준"
+                            )
+                            close_position(symbol, qty, "short" if direction == "long" else "long")
+                            volatile_state.remove(symbol)
+                        continue  # 1분봉 감시한 경우 3분봉 생략
+
+                # === 기본 3분봉 MA7 이탈 ===
+                df_3m = get_1m_klines(symbol, interval="3m", limit=20)
+                df_3m['ma7'] = df_3m['close'].rolling(7).mean()
+                last_close_3m = df_3m['close'].iloc[-1]
+                ma7_3m = df_3m['ma7'].iloc[-1]
+
+                if pd.isna(ma7_3m):
+                    continue
+
+                should_exit = (
+                    direction == 'long' and last_close_3m < ma7_3m or
+                    direction == 'short' and last_close_3m > ma7_3m
+                )
+
+                if should_exit:
+                    profit_pct = ((last_close_3m - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close_3m) / entry_price * 100)
+                    send_telegram_message(
+                        f"📉 *{symbol} 3분봉 MA7 이탈 청산!*\n"
+                        f"   ├ 현재가: `{round(last_close_3m, 4)}`\n"
+                        f"   ├ MA7: `{round(ma7_3m, 4)}`\n"
+                        f"   ├ 수익률: `{round(profit_pct, 2)}%`\n"
+                        f"   └ 트리거: 3분봉 기준"
+                    )
+                    close_position(symbol, qty, "short" if direction == "long" else "long")
 
         except Exception as e:
             send_telegram_message(f"💥 트레일링 감시 중 오류: {e}")
 
-        print(111)
         time.sleep(60)
         
         

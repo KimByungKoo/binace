@@ -103,7 +103,8 @@ def check_volume_spike_disparity(symbol):
             df['ma20'] = df['close'].rolling(20).mean()
             df['ma30'] = df['close'].rolling(30).mean()
 
-            recent_rows = df.iloc[-5:]
+            # recent_rows = df.iloc[-5:]
+            recent_rows = df.iloc[-6:-1]  # <-- 1봉 전까지 5개 봉
             green_count = (recent_rows['close'] > recent_rows['open']).sum()
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
 

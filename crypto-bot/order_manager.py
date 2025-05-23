@@ -107,13 +107,16 @@ def monitor_trailing_stop():
         try:
             positions = client.futures_account()['positions']
             for p in positions:
-                send_telegram_message(f" {p['symbol'] }🔄 {float(p['positionAmt']) }. {float(p['entryPrice']) }111(3분봉 기준)")
+                #send_telegram_message(f" {p['symbol'] }🔄 {float(p['positionAmt']) }. {float(p['entryPrice']) }111(3분봉 기준)")
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
-                if amt == 0 or entry_price == 0:
+                if amt == 0 :
                     continue
-                    
+                if entry_price == 0:
+                    continue
+                
+                
                 send_telegram_message(f" {p['symbol'] }🔄 222(3분봉 기준)")
 
                 direction = "long" if amt > 0 else "short"

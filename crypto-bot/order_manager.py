@@ -5,6 +5,7 @@ from utils.telegram import send_telegram_message
 from dotenv import load_dotenv
 from utils.binance import has_open_position,get_1m_klines
 import pandas as pd
+import time
 
 
 

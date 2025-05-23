@@ -18,10 +18,10 @@ client = Client(API_KEY, API_SECRET)
 
 def has_open_position(symbol):
     try:
-        send_telegram_message(f"🔎 [{symbol}] 포지션 확인 시작")
+        #send_telegram_message(f"🔎 [{symbol}] 포지션 확인 시작")
 
         positions = client.futures_account()['positions']
-        send_telegram_message(f"📦 총 포지션 수: {len(positions)}")
+        #send_telegram_message(f"📦 총 포지션 수: {len(positions)}")
 
         for p in positions:
             sym = p['symbol']

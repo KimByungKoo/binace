@@ -61,10 +61,32 @@ def get_1m_klines(symbol, interval='1m', limit=120):
         print(f"[{symbol}] 1분봉 데이터 불러오기 실패: {e}")
         return pd.DataFrame()
       
-def get_top_symbols(n=20):
+# def get_top_symbols(n=20):
+#     try:
+#         tickers = client.futures_ticker()
+#         info = client.futures_exchange_info()
+#         tradable_symbols = set()
+#         for s in info['symbols']:
+#             if (s['contractType'] == 'PERPETUAL' and
+#                 s['quoteAsset'] == 'USDT' and
+#                 not s['symbol'].endswith('DOWN') and
+#                 s['status'] == 'TRADING'):
+#                 tradable_symbols.add(s['symbol'])
+#         usdt_tickers = [t for t in tickers if t['symbol'] in tradable_symbols]
+#         sorted_tickers = sorted(usdt_tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
+#         return [t['symbol'] for t in sorted_tickers[:n]]
+#     except Exception as e:
+#         print("시총 순위 불러오기 실패:", e)
+#         return []
+def get_top_symbols(n=20, direction="up"):
+    """
+    상승률 기준으로 상위 종목 가져오기
+    direction: 'up' → 상승률 높은 순 / 'down' → 하락률 높은 순
+    """
     try:
         tickers = client.futures_ticker()
         info = client.futures_exchange_info()
+
         tradable_symbols = set()
         for s in info['symbols']:
             if (s['contractType'] == 'PERPETUAL' and
@@ -72,12 +94,19 @@ def get_top_symbols(n=20):
                 not s['symbol'].endswith('DOWN') and
                 s['status'] == 'TRADING'):
                 tradable_symbols.add(s['symbol'])
-        usdt_tickers = [t for t in tickers if t['symbol'] in tradable_symbols]
-        sorted_tickers = sorted(usdt_tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
-        return [t['symbol'] for t in sorted_tickers[:n]]
+
+        filtered = [t for t in tickers if t['symbol'] in tradable_symbols]
+
+        for t in filtered:
+            t['change_pct'] = float(t['priceChangePercent'])
+
+        sorted_list = sorted(filtered, key=lambda x: x['change_pct'], reverse=(direction=="up"))
+        return [t['symbol'] for t in sorted_list[:n]]
+
     except Exception as e:
-        print("시총 순위 불러오기 실패:", e)
+        print("상승률 순위 불러오기 실패:", e)
         return []
+    
 
 def check_ma365_proximity_with_slope(symbol, price_thresh=0.002, slope_thresh=0.0005):
     try:

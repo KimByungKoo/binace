@@ -150,14 +150,14 @@ def monitor_trailing_stop():
                             direction == 'short' and last_close > ma7
                         )
 
-                        # send_telegram_message(
-                        #     f"🔍 *{symbol} 포지션 체크 (1분봉 기준)*\n"
-                        #     f"   ├ 방향     : `{direction.upper()}`\n"
-                        #     f"   ├ 현재가   : `{round(last_close, 4)}`\n"
-                        #     f"   ├ MA7      : `{round(ma7, 4)}`\n"
-                        #     f"   ├ 과열 감지: `✅`\n"
-                        #     f"   └ 감시 기준: `1분봉`"
-                        # )
+                        send_telegram_message(
+                             f"🔍 *{symbol} 포지션 체크 (1분봉 기준)*\n"
+                             f"   ├ 방향     : `{direction.upper()}`\n"
+                             f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                             f"   ├ MA7      : `{round(ma7, 4)}`\n"
+                             f"   ├ 과열 감지: `✅`\n"
+                             f"   └ 감시 기준: `1분봉`"
+                         )
 
                         if should_exit:
                             profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
@@ -187,12 +187,12 @@ def monitor_trailing_stop():
                     
                     # 익절 조건 판단 전에 필터링
                     if d1 / ma7 * 100 < 1:
-                        # send_telegram_message(
-                        #     f"⛔ *  {symbol} 익절 무시: 추세선 거리 좁음*\n"
-                        #     f"   ├ MA7: `{round(ma7, 4)}` / MA20: `{round(ma20, 4)}`\n"
-                        #     f"   ├ D1: `{round(d1, 6)}` → `{round(d1 / ma7 * 100, 3)}%`\n"
-                        #     f"   └ 이유: 1% 미만 추세 간격"
-                        # )
+                        send_telegram_message(
+                        f"⛔ *  {symbol} 익절 무시: 추세선 거리 좁음*\n"
+                        f"   ├ MA7: `{round(ma7, 4)}` / MA20: `{round(ma20, 4)}`\n"
+                        f"   ├ D1: `{round(d1, 6)}` → `{round(d1 / ma7 * 100, 3)}%`\n"
+                        f"   └ 이유: 1% 미만 추세 간격"
+                         )
                         continue  # 익절 판단 건너뜀
                         
                     if d2 > d1:

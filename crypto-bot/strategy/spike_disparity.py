@@ -112,7 +112,7 @@ def check_volume_spike_disparity(symbol):
                     f"   └ 현재가: `{latest_price}`"
                 )
                 
-                send_telegram_message("55555")
+                
                 signal = {
                                 "symbol": symbol,
                                 "direction": direction,

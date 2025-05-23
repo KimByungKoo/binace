@@ -79,10 +79,6 @@ def get_1m_klines(symbol, interval='1m', limit=120):
 #         print("시총 순위 불러오기 실패:", e)
 #         return []
 def get_top_symbols(n=20, direction="up"):
-    """
-    상승률 기준으로 상위 종목 가져오기
-    direction: 'up' → 상승률 높은 순 / 'down' → 하락률 높은 순
-    """
     try:
         tickers = client.futures_ticker()
         info = client.futures_exchange_info()
@@ -95,16 +91,21 @@ def get_top_symbols(n=20, direction="up"):
                 s['status'] == 'TRADING'):
                 tradable_symbols.add(s['symbol'])
 
-        filtered = [t for t in tickers if t['symbol'] in tradable_symbols]
+        usdt_tickers = [
+            t for t in tickers
+            if t['symbol'] in tradable_symbols
+        ]
 
-        for t in filtered:
-            t['change_pct'] = float(t['priceChangePercent'])
+        sorted_tickers = sorted(
+            usdt_tickers,
+            key=lambda x: float(x['quoteVolume']),
+            reverse=True
+        )
 
-        sorted_list = sorted(filtered, key=lambda x: x['change_pct'], reverse=(direction=="up"))
-        return [t['symbol'] for t in sorted_list[:n]]
+        return [t['symbol'] for t in sorted_tickers[:n]]
 
     except Exception as e:
-        print("상승률 순위 불러오기 실패:", e)
+        print("거래금액 순위 가져오기 실패:", e)
         return []
     
 

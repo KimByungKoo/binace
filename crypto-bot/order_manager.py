@@ -99,41 +99,42 @@ def auto_trade_from_signal(signal):
     
     
 def monitor_trailing_stop():
-    send_telegram_message("🔄 트레일링 스탑 감시 시작")
+    send_telegram_message("🔄 MA7 기준 트레일링 스탑 감시 시작 (3분봉 기준)")
 
     while True:
         try:
             positions = client.futures_account()['positions']
             for p in positions:
-                
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 if amt == 0:
-                    continue  # 포지션 없는 심볼은 스킵
+                    continue  # 포지션 없는 건 스킵
 
-
-                send_telegram_message(f"🔄 트레일링 스탑 감시 시작{p['symbol']}")
-                
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
-                # 최근 3봉 가져오기
-                df = get_klines(symbol, interval="3m", limit=3)
+                # ✅ 3분봉 기준 20개 봉 (충분한 MA 계산용)
+                df = get_klines(symbol, interval="3m", limit=20)
                 if df.empty or 'close' not in df.columns:
                     continue
 
-                last_close = float(df['close'].iloc[-1])
-                ma_line = df['close'].rolling(3).mean().iloc[-1]
+                df['ma7'] = df['close'].rolling(window=7).mean()
+                last_close = df['close'].iloc[-1]
+                ma7 = df['ma7'].iloc[-1]
 
-                if direction == 'long' and last_close < ma_line:
-                    send_telegram_message(f"📉 {symbol} 롱 MA3 이탈 → 청산")
+                # 예외 처리: MA7이 계산 안된 경우
+                if pd.isna(ma7):
+                    continue
+
+                if direction == 'long' and last_close < ma7:
+                    send_telegram_message(f"📉 *{symbol} 롱 포지션 MA7 하향 이탈* → `{round(last_close,4)} < {round(ma7,4)}` → 청산")
                     close_position(symbol, qty, "short")
 
-                elif direction == 'short' and last_close > ma_line:
-                    send_telegram_message(f"📈 {symbol} 숏 MA3 이탈 → 청산")
+                elif direction == 'short' and last_close > ma7:
+                    send_telegram_message(f"📈 *{symbol} 숏 포지션 MA7 상향 이탈* → `{round(last_close,4)} > {round(ma7,4)}` → 청산")
                     close_position(symbol, qty, "long")
 
         except Exception as e:
-            send_telegram_message(f"💥 트레일링 스탑 오류: {e}")
+            send_telegram_message(f"💥 트레일링 감시 중 오류 발생: {e}")
 
-        time.sleep(60)
+        time.sleep(60)  # 1분마다 체크

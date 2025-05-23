@@ -177,7 +177,11 @@ def monitor_trailing_stop():
                 d1 = abs(ma7 - ma20)
                 d2 = abs(last_close - ma7)
 
-                if pd.notna(ma7) and pd.notna(ma20):
+                if pd.notna(ma7) and pd.notna(ma20)and (
+                                (direction == "long" and last_close > entry_price) or
+                                (direction == "short" and last_close < entry_price)
+                                ):
+                    # 익절 조건: MA7과 MA20의 거리와 현재가의 거리 비교
                     
                     
                     # 익절 조건 판단 전에 필터링

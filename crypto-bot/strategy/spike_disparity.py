@@ -100,39 +100,57 @@ def check_volume_spike_disparity(symbol):
 
         if "five_green_ma5" in cfg["checks"]:
             df['ma5'] = df['close'].rolling(5).mean()
+            df['ma20'] = df['close'].rolling(20).mean()
+            df['ma30'] = df['close'].rolling(30).mean()
+
             recent_rows = df.iloc[-5:]
             green_count = (recent_rows['close'] > recent_rows['open']).sum()
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
 
-            # 각 봉의 변화율 계산 (고가-저가 기준)
+            # 각 봉의 고저 변동률 계산
             volatilities = ((recent_rows['high'] - recent_rows['low']) / recent_rows['low']) * 100
             volatility_exceeds = (volatilities >= 1).sum()
-        
-    
 
-            if ((green_count == 5 and above_ma_count == 5) or (green_count == 0 and above_ma_count == 0)) and volatility_exceeds == 0:
+            # 정배열 / 역배열 확인
+            is_bullish_alignment = df['ma5'].iloc[-1] > df['ma20'].iloc[-1] > df['ma30'].iloc[-1]
+            is_bearish_alignment = df['ma5'].iloc[-1] < df['ma20'].iloc[-1] < df['ma30'].iloc[-1]
+
+            # 진입 조건
+            if ((green_count == 5 and above_ma_count == 5 and is_bullish_alignment) or
+                (green_count == 0 and above_ma_count == 0 and is_bearish_alignment)) and volatility_exceeds == 0:
+
                 direction = "long" if green_count == 5 else "short"
                 send_telegram_message(
-                    f"💡 *{symbol}* 5봉 모멘텀 포착\n"
+                    f"💡 *{symbol}* 5봉 모멘텀 + 정배열 포착\n"
                     f"   ├ 방향: `{direction.upper()}`\n"
                     f"   └ 현재가: `{latest_price}`"
                 )
-                
-                
+
                 signal = {
-                                "symbol": symbol,
-                                "direction": direction,
-                                "price": latest_price,
-                                "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
-                                "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
-                            }
+                    "symbol": symbol,
+                    "direction": direction,
+                    "price": latest_price,
+                    "take_profit": latest_price * (1.02 if direction == "long" else 0.98),
+                    "stop_loss": latest_price * (0.99 if direction == "long" else 1.01)
+                }
                 auto_trade_from_signal(signal)
-                
+
             else:
+                reason = []
+                if green_count != 5 and green_count != 0:
+                    reason.append(f"green_count: {green_count}")
+                if above_ma_count != 5 and above_ma_count != 0:
+                    reason.append(f"above_ma_count: {above_ma_count}")
+                if volatility_exceeds > 0:
+                    reason.append(f"과열봉 수: {volatility_exceeds}")
+                if green_count == 5 and not is_bullish_alignment:
+                    reason.append("정배열 아님")
+                if green_count == 0 and not is_bearish_alignment:
+                    reason.append("역배열 아님")
+
                 send_telegram_message(
-                    f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n"
-                    f"   ├ green_count: `{green_count}`\n"
-                    f"   └ above_ma_count: `{above_ma_count}`"
+                    f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n" +
+                    "\n".join([f"   ├ {r}" for r in reason])
                 )
 
         if not issues:

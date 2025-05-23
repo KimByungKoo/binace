@@ -138,9 +138,10 @@ def monitor_trailing_stop():
                 df_1m['ma7'] = df_1m['close'].rolling(7).mean()
                 df_1m['ma20'] = df_1m['close'].rolling(20).mean()
 
-                last_close = df_1m['close'].iloc[-1]
-                ma7 = df_1m['ma7'].iloc[-1]
-                ma20 = df_1m['ma20'].iloc[-1]
+                # 1분 과열 → 전봉 종가
+                last_close = df_1m['close'].iloc[-2]
+                ma7 = df_1m['ma7'].iloc[-2]
+                ma20 = df_1m['ma20'].iloc[-2]
 
                 if symbol in volatile_state:
                     if pd.notna(ma7):
@@ -226,8 +227,9 @@ def monitor_trailing_stop():
                     continue
 
                 df_3m['ma7'] = df_3m['close'].rolling(7).mean()
-                last_close_3m = df_3m['close'].iloc[-1]
-                ma7_3m = df_3m['ma7'].iloc[-1]
+                # 3분 감시도 전봉 기준
+                last_close_3m = df_3m['close'].iloc[-2]
+                ma7_3m = df_3m['ma7'].iloc[-2]
 
                 if pd.isna(ma7_3m):
                     continue

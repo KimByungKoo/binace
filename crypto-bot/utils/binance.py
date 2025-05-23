@@ -1,5 +1,6 @@
 from binance.client import Client
 import pandas as pd
+from utils.telegram import send_telegram_message
 
 from dotenv import load_dotenv
 import requests
@@ -17,7 +18,7 @@ client = Client(API_KEY, API_SECRET)
 
 
 def has_open_position(symbol):
-    print(f"[{symbol}] ")
+    send_telegram_message(f"[{symbol}] position")
     positions = client.futures_account()['positions']
     for p in positions:
         if p['symbol'] == symbol.upper() and float(p['positionAmt']) != 0:

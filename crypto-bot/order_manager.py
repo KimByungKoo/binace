@@ -166,6 +166,7 @@ def monitor_trailing_stop():
         except Exception as e:
             send_telegram_message(f"💥 트레일링 감시 중 오류: {e}")
 
+        print(111)
         time.sleep(60)
         
         

@@ -26,8 +26,8 @@ def has_open_position(symbol):
         for p in positions:
             sym = p['symbol']
             amt = float(p['positionAmt'])
-            if amt != 0:
-                send_telegram_message(f"🧾 {sym} 보유 중 수량: {amt}")
+            #if amt != 0:
+                #send_telegram_message(f"🧾 {sym} 보유 중 수량: {amt}")
             if sym == symbol.upper() and amt != 0:
                 send_telegram_message(f"✅ [{symbol}] 이미 포지션 보유 중")
                 return True

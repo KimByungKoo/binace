@@ -8,6 +8,10 @@ def check_volume_spike_disparity(symbol):
     issues = []  # 실패 이유 리스트
 
     try:
+        if not symbol:
+            issues.append("❌ symbol 값이 없음")
+            raise Exception("중단")
+
         df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["limit"])
         if df.empty or 'volume' not in df.columns:
             issues.append("❌ 데이터프레임 비어 있음 or volume 누락")
@@ -26,6 +30,7 @@ def check_volume_spike_disparity(symbol):
             issues.append(f"📉 거래량 스파이크 없음 (최근 {cfg['lookback']}봉 기준)")
 
         latest = df.iloc[-1]
+        latest_price = latest['close']
         disparity = (latest['close'] / latest['ma']) * 100
 
         if "disparity" in cfg["checks"]:
@@ -76,9 +81,8 @@ def check_volume_spike_disparity(symbol):
         vrange = (hi - lo) / lo * 100
         if vrange > median_disparity*cfg['volatility_multiplier']:
             send_telegram_message(f"📊 {symbol}  {round(vrange,2)}>{round(median_disparity*cfg['volatility_multiplier'], 2)} : 전봉값 > 중간값*3 %")
-                
+
         if "volatility" in cfg["checks"]:
-            
             if len(df) < cfg["price_lookback"] + 1:
                 issues.append("봉 수 부족")
             else:
@@ -88,24 +92,22 @@ def check_volume_spike_disparity(symbol):
                     issues.append("롱인데 시작가가 MA5 아래")
                 elif direction == "short" and current_start > current_ma:
                     issues.append("숏인데 시작가가 MA5 위")
-
                 if vrange <  median_disparity:
                     issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
-
-
 
         if "five_green_ma5" in cfg["checks"]:
             df['ma5'] = df['close'].rolling(5).mean()
             recent_rows = df.iloc[-5:]
             green_count = (recent_rows['close'] > recent_rows['open']).sum()
             above_ma_count = (recent_rows['close'] > recent_rows['ma5']).sum()
-            if  (green_count == 5 and above_ma_count == 5) or  (green_count == 0 and above_ma_count == 0):
-                send_telegram_message(
-                                f"💡 *{symbol}* 5봉 모멘텀 포착\n"
-                                f"   ├ 방향: `{direction.upper()}`\n"
-                                f"   └ 현재가: `{latest_price}`"
-                            )
 
+            if (green_count == 5 and above_ma_count == 5) or (green_count == 0 and above_ma_count == 0):
+                direction = "long" if green_count == 5 else "short"
+                send_telegram_message(
+                    f"💡 *{symbol}* 5봉 모멘텀 포착\n"
+                    f"   ├ 방향: `{direction.upper()}`\n"
+                    f"   └ 현재가: `{latest_price}`"
+                )
                 if cfg.get("auto_execute", False):
                     if has_open_position(symbol):
                         send_telegram_message(f"⛔ {symbol} 이미 보유 중 → 자동 진입 생략")
@@ -120,12 +122,11 @@ def check_volume_spike_disparity(symbol):
                         auto_trade_from_signal(signal)
             else:
                 send_telegram_message(
-                                f"💡 *{symbol}* 5봉 모멘텀 xx 포착\n"
-                                f"   ├ green_count: `{green_count}`\n"
-                                f"   └ above_ma_count: `{above_ma_count}`"
-                            )
-                
-                
+                    f"💡 *{symbol}* 5봉 모멘텀 조건 미달\n"
+                    f"   ├ green_count: `{green_count}`\n"
+                    f"   └ above_ma_count: `{above_ma_count}`"
+                )
+
         if not issues:
             return {
                 'symbol': symbol,

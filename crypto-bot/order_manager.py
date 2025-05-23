@@ -4,6 +4,9 @@ from binance.client import Client
 from utils.telegram import send_telegram_message
 from dotenv import load_dotenv
 from utils.binance import has_open_position,get_1m_klines
+import pandas as pd
+
+
 
 load_dotenv()
 
@@ -107,7 +110,7 @@ def monitor_trailing_stop():
         try:
             positions = client.futures_account()['positions']
             for p in positions:
-                send_telegram_message(f" {p['symbol'] }🔄 {float(p['positionAmt']) }. {float(p['entryPrice']) }111(3분봉 기준)")
+                #send_telegram_message(f" {p['symbol'] }🔄 {float(p['positionAmt']) }. {float(p['entryPrice']) }111(3분봉 기준)")
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])

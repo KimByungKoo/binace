@@ -147,6 +147,7 @@ def monitor_trailing_stop():
                         direction == 'long' and last_close < ma7 or
                         direction == 'short' and last_close > ma7
                     )
+                    send_telegram_message(f" {p['symbol'] }🔄 {direction }.last_close {direction } ma7 {direction }")
     
                     if should_exit:
                         msg = (

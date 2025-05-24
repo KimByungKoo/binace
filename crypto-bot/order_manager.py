@@ -10,7 +10,7 @@ import math
 from datetime import datetime, timedelta
 
 load_dotenv()
-
+a
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 client = Client(API_KEY, API_SECRET)
@@ -348,7 +348,7 @@ def monitor_fixed_profit_loss_exit():
 
                 now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
-                if pnl >= 1:
+                if pnl >= 2:
                     send_telegram_message(
                         f"🟢 *익절 청산: {symbol}*\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"
@@ -359,7 +359,7 @@ def monitor_fixed_profit_loss_exit():
                     )
                     close_position(symbol, qty, "short" if direction == "long" else "long")
 
-                elif pnl <= -0.5:
+                elif pnl <= -2:
                     send_telegram_message(
                         f"🔴 *손절 청산: {symbol}*\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"

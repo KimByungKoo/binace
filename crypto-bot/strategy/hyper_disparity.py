@@ -315,7 +315,7 @@ def get_top5_consecutive_green(threshold=0.5):
                         msg += f"*{symbol}* → `{count}연속봉`, 변화율: `{change}%`\n"
                     send_telegram_message(msg)
                 else:
-                    send_telegram_message("😑 조건에 맞는 종목이 없습니다.")
+                    print("😑 조건에 맞는 종목이 없습니다.")
             except Exception as e:
                 send_telegram_message(f"💥 report_top_5m_changers 오류: {e}")
 

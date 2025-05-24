@@ -332,7 +332,7 @@ def monitor_fixed_profit_loss_exit():
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
 
-                if amt == 0 or entry_price == 0:
+                if amt == 0 :
                     continue
 
                 direction = "long" if amt > 0 else "short"

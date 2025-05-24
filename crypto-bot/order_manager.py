@@ -260,20 +260,7 @@ def monitor_trailing_stop():
         time.sleep(6)
 
 
-
-import time
-from datetime import datetime
-import pandas as pd
-from utils.telegram import send_telegram_message
-from utils.binance import get_1m_klines
-from order_manager import close_position
-from binance.client import Client
-import os
-
-# 환경 변수 또는 .env로부터 키 불러오기
-API_KEY = os.getenv("BINANCE_API_KEY")
-API_SECRET = os.getenv("BINANCE_API_SECRET")
-client = Client(API_KEY, API_SECRET)
+  
 
 def monitor_ma7_touch_exit():
     send_telegram_message("📉 MA7 터치 청산 감시 시작 (바이낸스 실시간 포지션 기준, 1분봉)")

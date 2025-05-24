@@ -55,34 +55,30 @@ def get_top_disparity_symbols(n=1):
         return []
 
 
+from datetime import datetime, timedelta
+
+last_entry_time = {}
+
 def check_and_enter_hyper_disparity():
     while True:
         try:
             targets = get_top_disparity_symbols()
+            now = datetime.utcnow()
+
             for symbol, price, ma7, disparity in targets:
                 if has_open_position(symbol):
                     continue
 
-                # MA7보다 위에 있으면 short / 아래면 long → 되돌림 노림
-                direction = "short" if price > ma7 else "long"
-
-
-                send_telegram_message(
-                    f"⚡ *하이퍼 진입 시그널 체크* → {symbol}\n"
-                    f"   ├ 방향: `{direction}`\n"
-                    f"   ├ 현재가: `{round(price, 4)}`\n"
-                    f"   ├ MA7: `{round(ma7, 4)}`\n"
-                    f"   ├ 이격: `{round(disparity, 2)}%`\n"
-                    
-                )
-
-                # 5% 이상 이격 아니면 스킵
-                if disparity < 1:
+                # 최근 진입 기록이 있고, 60초 안 지났으면 스킵
+                last_time = last_entry_time.get(symbol)
+                if last_time and (now - last_time) < timedelta(seconds=60):
                     continue
 
-                
+                # 5% 이상 이격 아니면 스킵
+                if disparity < 5:
+                    continue
 
-                # 목표가 = 되돌림 방향 / 손절 = 확산 방향
+                direction = "short" if price > ma7 else "long"
                 tp = price * (0.995 if direction == "short" else 1.005)
                 sl = price * (1.005 if direction == "short" else 0.995)
 
@@ -104,11 +100,12 @@ def check_and_enter_hyper_disparity():
                 )
 
                 auto_trade_from_signal(signal)
+                last_entry_time[symbol] = now  # 진입 시간 기록
 
         except Exception as e:
             send_telegram_message(f"💥 하이퍼 진입 오류: {e}")
 
-        time.sleep( 2)
+        time.sleep(2)
 
 def monitor_hyper_disparity_exit():
     send_telegram_message("🔄 하이퍼 스캘핑 MA7 기반 익절/손절 감시 시작")

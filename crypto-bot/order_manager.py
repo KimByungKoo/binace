@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from utils.binance import has_open_position,get_1m_klines
 import pandas as pd
 import time
-
+import math
 from datetime import datetime, timedelta
 
 load_dotenv()

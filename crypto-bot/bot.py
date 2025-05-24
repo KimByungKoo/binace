@@ -20,10 +20,13 @@ if __name__ == "__main__":
     # 15분봉 MA90 이격도 감시 (자동 알림)
     # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
-    # threading.Thread(target=spike_watcher_loop, daemon=True).start()
+ 
+    #threading.Thread(target=spike_watcher_loop, daemon=True).start()
+
     
-    threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()
+    #threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()
     
+
     # threading.Thread(target=monitor_trailing_stop, daemon=True).start()
     threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
 

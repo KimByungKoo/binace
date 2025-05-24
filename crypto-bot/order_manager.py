@@ -322,8 +322,7 @@ def monitor_ma7_touch_exit():
         time.sleep(5)
 
 def monitor_fixed_profit_loss_exit():
-    
-    send_telegram_message("🎯 $2 익절 / 2 손절 기준 실시간 청산 시작")
+    send_telegram_message("🎯 $2 익절 / 손절 + 진입봉 기준 실시간 청산 시작")
 
     while True:
         try:
@@ -333,39 +332,53 @@ def monitor_fixed_profit_loss_exit():
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
 
-                if amt == 0 :
+                if amt == 0:
                     continue
 
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
-                df = get_1m_klines(symbol, interval="1m", limit=1)
-                if df.empty or 'close' not in df.columns:
+                df = get_1m_klines(symbol, interval="1m", limit=2)
+                if df.empty or 'close' not in df.columns or len(df) < 2:
                     continue
 
                 last_price = df['close'].iloc[-1]
+                prev_open = df['open'].iloc[-2]
+                prev_high = df['high'].iloc[-2]
+                prev_low = df['low'].iloc[-2]
                 pnl = (last_price - entry_price) * qty if direction == "long" else (entry_price - last_price) * qty
 
                 now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
+                should_exit = False
+                reason = ""
+
+                # 👉 고정 손익 기준
                 if pnl >= 2:
+                    should_exit = True
+                    reason = f"🟢 *익절 기준 ($2 이상)* → ${round(pnl,2)}"
+
+                elif pnl <= -2:
+                    should_exit = True
+                    reason = f"🔴 *손절 기준 (-$2 이하)* → ${round(pnl,2)}"
+
+                # 👉 진입 봉 기반 손절 조건
+                elif direction == "long" and last_price < prev_low:
+                    should_exit = True
+                    reason = f"🔻 *진입봉 최저 이탈 (롱)* → {round(last_price,4)} < {round(prev_low,4)}"
+
+                elif direction == "short" and last_price > prev_high:
+                    should_exit = True
+                    reason = f"🔺 *진입봉 최고 돌파 (숏)* → {round(last_price,4)} > {round(prev_high,4)}"
+
+                if should_exit:
                     send_telegram_message(
-                        f"🟢 *익절 청산: {symbol}*\n"
+                        f"{reason}\n"
+                        f"   ├ 종목     : `{symbol}`\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"
                         f"   ├ 현재가   : `{round(last_price, 4)}`\n"
                         f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
                         f"   ├ 수익금   : `${round(pnl, 2)}`\n"
-                        f"   └ 시각     : `{now_time}`"
-                    )
-                    close_position(symbol, qty, "short" if direction == "long" else "long")
-
-                elif pnl <= -2:
-                    send_telegram_message(
-                        f"🔴 *손절 청산: {symbol}*\n"
-                        f"   ├ 방향     : `{direction.upper()}`\n"
-                        f"   ├ 현재가   : `{round(last_price, 4)}`\n"
-                        f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
-                        f"   ├ 손실금   : `${round(pnl, 2)}`\n"
                         f"   └ 시각     : `{now_time}`"
                     )
                     close_position(symbol, qty, "short" if direction == "long" else "long")

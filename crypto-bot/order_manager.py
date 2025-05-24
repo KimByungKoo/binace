@@ -7,7 +7,7 @@ from utils.binance import has_open_position,get_1m_klines
 import pandas as pd
 import time
 
-
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -263,7 +263,7 @@ def monitor_trailing_stop():
   
 
 def monitor_ma7_touch_exit():
-    send_telegram_message("📉 MA7 터치 청산 감시 시작 (바이낸스 실시간 포지션 기준, 1분봉)")
+    send_telegram_message("📉 MA7 터치 청산 감시 시작 (진입봉은 무시)")
 
     while True:
         try:
@@ -286,6 +286,12 @@ def monitor_ma7_touch_exit():
                 df['ma7'] = df['close'].rolling(7).mean()
                 last_close = df['close'].iloc[-1]
                 ma7 = df['ma7'].iloc[-1]
+                last_time = df['timestamp'].iloc[-1]  # 이게 현재 봉 시작 시각
+
+                # 진입 시각보다 현재 봉이 지나갔는지 확인
+                entry_time = datetime.utcfromtimestamp(int(p['updateTime']) / 1000)  # futures_account()['positions']의 updateTime 사용
+                if entry_time.replace(second=0, microsecond=0) >= last_time.replace(second=0, microsecond=0):
+                    continue  # 진입봉이면 청산 무시
 
                 if pd.isna(ma7):
                     continue
@@ -300,8 +306,7 @@ def monitor_ma7_touch_exit():
                     profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
 
                     send_telegram_message(
-                        f"🚨 *{symbol} MA7 터치 청산 감지!*\n"
-                        f"   ├ 방향     : `{direction.upper()}`\n"
+                        f"🚨 *{symbol} MA7 터치 청산 (1분봉)*\n"
                         f"   ├ 현재가   : `{round(last_close, 4)}`\n"
                         f"   ├ MA7      : `{round(ma7, 4)}`\n"
                         f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
@@ -313,7 +318,7 @@ def monitor_ma7_touch_exit():
         except Exception as e:
             send_telegram_message(f"💥 MA7 터치 청산 오류: {e}")
 
-        time.sleep(5)  # 주기: 30초 간격 확인
+        time.sleep(5)
 
 def close_position(symbol, qty, reverse_direction):
     try:

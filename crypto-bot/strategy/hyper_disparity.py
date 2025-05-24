@@ -108,7 +108,7 @@ def check_and_enter_hyper_disparity():
         except Exception as e:
             send_telegram_message(f"💥 하이퍼 진입 오류: {e}")
 
-        time.sleep(cfg.get("entry_interval", 2))
+        time.sleep( 2)
 
 def monitor_hyper_disparity_exit():
     send_telegram_message("🔄 하이퍼 스캘핑 MA7 기반 익절/손절 감시 시작")

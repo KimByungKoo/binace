@@ -323,6 +323,8 @@ def monitor_ma7_touch_exit():
 
 from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+
 def monitor_fixed_profit_loss_exit():
     send_telegram_message("🎯 $2 익절 / 손절 + 진입봉 이후부터 감시 시작")
 
@@ -340,10 +342,10 @@ def monitor_fixed_profit_loss_exit():
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
-                # 진입 후 60초(1분) 지나야 감시 시작
-                entry_time = parse_iso_timestamp(p.get('updateTime'))  # ← 예: '2024-06-12T12:34:00Z'
+                # ✅ Binance의 updateTime은 ms 단위 timestamp
+                entry_time = datetime.utcfromtimestamp(p['updateTime'] / 1000)
                 if datetime.utcnow() - entry_time < timedelta(minutes=1):
-                    continue  # 아직 감시 시작 안 함
+                    continue
 
                 df = get_1m_klines(symbol, interval="1m", limit=2)
                 if df.empty or 'close' not in df.columns or len(df) < 2:
@@ -391,7 +393,7 @@ def monitor_fixed_profit_loss_exit():
             send_telegram_message(f"💥 청산 감시 오류: {e}")
 
         time.sleep(2)
-        
+
 def close_position(symbol, quantity, side):
     try:
         # 남은 잔량까지 모두 정리 (precision mismatch 대비)

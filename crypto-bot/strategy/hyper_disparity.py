@@ -63,12 +63,24 @@ def check_and_enter_hyper_disparity():
                 if has_open_position(symbol):
                     continue
 
+                # MA7보다 위에 있으면 short / 아래면 long → 되돌림 노림
+                direction = "short" if price > ma7 else "long"
+
+
+                send_telegram_message(
+                    f"⚡ *하이퍼 진입 시그널 체크* → {symbol}\n"
+                    f"   ├ 방향: `{direction}`\n"
+                    f"   ├ 현재가: `{round(price, 4)}`\n"
+                    f"   ├ MA7: `{round(ma7, 4)}`\n"
+                    f"   ├ 이격: `{round(disparity, 2)}%`\n"
+                    
+                )
+
                 # 5% 이상 이격 아니면 스킵
                 if disparity < 1:
                     continue
 
-                # MA7보다 위에 있으면 short / 아래면 long → 되돌림 노림
-                direction = "short" if price > ma7 else "long"
+                
 
                 # 목표가 = 되돌림 방향 / 손절 = 확산 방향
                 tp = price * (0.995 if direction == "short" else 1.005)
@@ -96,7 +108,7 @@ def check_and_enter_hyper_disparity():
         except Exception as e:
             send_telegram_message(f"💥 하이퍼 진입 오류: {e}")
 
-        time.sleep(cfg.get("entry_interval", 60))
+        time.sleep(cfg.get("entry_interval", 2))
 
 def monitor_hyper_disparity_exit():
     send_telegram_message("🔄 하이퍼 스캘핑 MA7 기반 익절/손절 감시 시작")

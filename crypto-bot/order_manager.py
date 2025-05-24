@@ -86,9 +86,9 @@ def auto_trade_from_signal(signal):
         
     
 
-    qty = 200 / price  # $100 진입 기준 수량
+    qty = 400 / price  # $100 진입 기준 수량
     
-    set_leverage(symbol, 20)  # 선택적으로 레버리지 설정 추가
+    set_leverage(symbol, 30)  # 선택적으로 레버리지 설정 추가
     
     place_order(symbol, direction, qty, price, tp)
     

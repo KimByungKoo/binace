@@ -61,6 +61,7 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
                                        └ """)
             
     except Exception as e:
+        print(f"주문 실패: {symbol} {side.upper()} → {e}")
         # send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")
 
 def auto_trade_from_signal(signal):

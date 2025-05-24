@@ -64,7 +64,7 @@ def check_and_enter_hyper_disparity():
                     continue
 
                 # 5% 이상 이격 아니면 스킵
-                if disparity < 0.05:
+                if disparity < 1:
                     continue
 
                 # MA7보다 위에 있으면 short / 아래면 long → 되돌림 노림

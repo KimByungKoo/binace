@@ -374,15 +374,28 @@ def monitor_fixed_profit_loss_exit():
 
         time.sleep(5)
 
-def close_position(symbol, qty, reverse_direction):
+def close_position(symbol, quantity, side):
     try:
+        # 남은 잔량까지 모두 정리 (precision mismatch 대비)
+        info = client.futures_exchange_info()
+        for s in info['symbols']:
+            if s['symbol'] == symbol:
+                for f in s['filters']:
+                    if f['filterType'] == 'LOT_SIZE':
+                        step_size = float(f['stepSize'])
+                        precision = int(round(-1 * math.log(step_size, 10)))
+                        quantity = round(quantity, precision)
+                        break
+
+        # 시장가 청산
         client.futures_create_order(
             symbol=symbol,
-            side=Client.SIDE_SELL if reverse_direction == "short" else Client.SIDE_BUY,
+            side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
             type=Client.ORDER_TYPE_MARKET,
-            quantity=round_qty(symbol, qty),
+            quantity=quantity,
             reduceOnly=True
         )
-        send_telegram_message(f"💸 포지션 종료 완료: {symbol} {reverse_direction.upper()} {qty}")
+        send_telegram_message(f"✅ {symbol} {side.upper()} 포지션 청산 완료 (수량: {quantity})")
+
     except Exception as e:
-        send_telegram_message(f"⚠️ 포지션 종료 실패: {symbol} → {e}")
+        send_telegram_message(f"❌ {symbol} 청산 실패: {e}")

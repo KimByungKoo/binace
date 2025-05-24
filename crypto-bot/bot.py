@@ -5,7 +5,7 @@ from strategy.spike_disparity import spike_watcher_loop
 from position_monitor import position_watcher_loop
 #from strategy.disparity_monitor import run_disparity_monitor
 import threading
-from order_manager import monitor_trailing_stop,monitor_ma7_touch_exit
+from order_manager import monitor_trailing_stop,monitor_ma7_touch_exit,monitor_fixed_profit_loss_exit
 
 from strategy.hyper_disparity import check_and_enter_hyper_disparity
 
@@ -28,7 +28,9 @@ if __name__ == "__main__":
     
 
     # threading.Thread(target=monitor_trailing_stop, daemon=True).start()
-    threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
+    # threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
+    threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
+    
 
     
     # 텔레그램 명령 대기 (/ma90 등)

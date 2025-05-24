@@ -278,9 +278,11 @@ def get_top5_consecutive_green(threshold=0.5):
                         results.append((symbol, count, round(change_pct, 2)))
 
                         # === 자동 주문 ===
-                         
-                        direction_str = "long" if direction else "short"
-                        # direction_str = "short" if direction else "long"
+
+                        if count <5:
+                            direction_str = "long" if direction else "short"
+                        else :
+                            direction_str = "short" if direction else "long"
                         price = end_price
                         tp = price * (1.01 if direction_str == "long" else 0.99)
                         sl = price * (0.99 if direction_str == "long" else 1.01)

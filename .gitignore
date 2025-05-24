@@ -1,1 +1,6 @@
 crypto-bot/.env
+crypto-bot/__pycache__/config.cpython-311.pyc
+crypto-bot/__pycache__/order_manager.cpython-311.pyc
+crypto-bot/strategy/__pycache__/hyper_disparity.cpython-311.pyc
+crypto-bot/strategy/__pycache__/spike_disparity.cpython-311.pyc
+crypto-bot/utils/__pycache__/binance.cpython-311.pyc

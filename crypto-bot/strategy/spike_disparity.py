@@ -1,4 +1,4 @@
-from utils.binance import get_top_symbols, get_1m_klines
+from utils.binance import get_top_symbols, get_1m_klines,client
 from utils.telegram import send_telegram_message
 import time
 from config import SPIKE_CONFIG as cfg
@@ -279,6 +279,40 @@ def report_spike_disparity():
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
 
+
+def get_15m_ma90_disparity_symbols():
+    """
+    15분봉 기준 MA90 대비 이격도 102% 초과 or 98% 미만 종목 필터링
+    Returns: list of (symbol, price, ma90, disparity_pct)
+    """
+    try:
+        tickers = client.futures_ticker()
+        symbols = [t['symbol'] for t in tickers if t['symbol'].endswith("USDT") and "DOWN" not in t['symbol'] and "UP" not in t['symbol']]
+
+        result = []
+        for symbol in symbols:
+            try:
+                df = get_1m_klines(symbol, interval="15m", limit=100)
+                df['ma90'] = df['close'].rolling(90).mean()
+                ma90 = df['ma90'].iloc[-1]
+                price = df['close'].iloc[-1]
+
+                if pd.isna(ma90) or ma90 == 0:
+                    continue
+
+                disparity = (price / ma90) * 100
+
+                if disparity > 102 or disparity < 98:
+                    result.append((symbol, round(price, 4), round(ma90, 4), round(disparity, 2)))
+            except Exception as e:
+                print(f"❌ {symbol} 처리 실패: {e}")
+                continue
+
+        return result
+
+    except Exception as e:
+        send_telegram_message(f"💥 15분봉 MA90 이격도 분석 실패: {e}")
+        return []
 
 def check_disparity(symbol):
     df = get_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 5)

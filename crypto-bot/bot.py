@@ -7,7 +7,7 @@ from position_monitor import position_watcher_loop
 import threading
 from order_manager import monitor_trailing_stop,monitor_ma7_touch_exit,monitor_fixed_profit_loss_exit
 
-from strategy.hyper_disparity import check_and_enter_hyper_disparity
+from strategy.hyper_disparity import check_and_enter_hyper_disparity,report_top_5m_changers,get_top5_consecutive_green
 
 if __name__ == "__main__":
     #!/bin/bash
@@ -24,12 +24,15 @@ if __name__ == "__main__":
     #threading.Thread(target=spike_watcher_loop, daemon=True).start()
 
     
-    threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()
+    # threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()
     
+    # threading.Thread(target=report_top_5m_changers, daemon=True).start()
+    threading.Thread(target=get_top5_consecutive_green, daemon=True).start()
 
-    # threading.Thread(target=monitor_trailing_stop, daemon=True).start()
+
+    threading.Thread(target=monitor_trailing_stop, daemon=True).start()
     # threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
-    threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
+    # threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
     
 
     

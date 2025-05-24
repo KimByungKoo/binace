@@ -40,9 +40,9 @@ def check_and_enter_hyper_disparity():
                 if has_open_position(symbol):
                     continue
 
-                direction = "long" if price > ma7 else "short"
-                tp = price * (1.005 if direction == "long" else 0.995)
-                sl = price * (0.995 if direction == "long" else 1.005)
+                direction = "short" if price > ma7 else "long"  # 반대 방향
+                tp = price * (0.995 if direction == "short" else 1.005)  # 목표가: 수렴 쪽
+                sl = price * (1.005 if direction == "short" else 0.995)  # 손절가: 확산 쪽  
 
                 signal = {
                     "symbol": symbol,

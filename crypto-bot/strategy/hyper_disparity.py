@@ -240,7 +240,7 @@ def get_top5_consecutive_green(threshold=0.5):
     while True:
             try:
       
-                symbols = get_active_symbols(100)
+                symbols = get_top_symbols(50)
                 results = []
 
                 for symbol in symbols:

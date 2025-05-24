@@ -40,9 +40,9 @@ def check_and_enter_hyper_disparity():
                 if has_open_position(symbol):
                     continue
 
-                direction = "short" if price > ma7 else "long"  # 반대 방향
-                tp = price * (0.995 if direction == "short" else 1.005)  # 목표가: 수렴 쪽
-                sl = price * (1.005 if direction == "short" else 0.995)  # 손절가: 확산 쪽  
+                direction = "long" if price > ma7 else "short"  # 가격이 MA7 위 → long / 아래 → short
+                tp = price * (1.005 if direction == "long" else 0.995)  # 목표가는 더 벌어지는 방향
+                sl = price * (0.995 if direction == "long" else 1.005)  # 손절가는 되돌림 방향
 
                 signal = {
                     "symbol": symbol,
@@ -108,4 +108,4 @@ def monitor_hyper_disparity_exit():
         except Exception as e:
             send_telegram_message(f"💥 하이퍼 청산 오류: {e}")
 
-        time.sleep(5)
+        time.sleep(2)

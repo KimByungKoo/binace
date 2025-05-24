@@ -108,4 +108,4 @@ def monitor_hyper_disparity_exit():
         except Exception as e:
             send_telegram_message(f"💥 하이퍼 청산 오류: {e}")
 
-        time.sleep(5)
+        time.sleep(2)

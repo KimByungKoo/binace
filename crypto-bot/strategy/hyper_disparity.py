@@ -4,7 +4,7 @@ from datetime import datetime
 from utils.telegram import send_telegram_message
 from utils.binance import get_1m_klines, client,has_open_position
 from order_manager import close_position, auto_trade_from_signal
-from config import HYPER_DISPARITY_CONFIG as cfg
+from config import SPIKE_CONFIG as cfg
 
 def get_top_disparity_symbols(n=1):
     try:

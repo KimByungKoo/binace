@@ -258,7 +258,76 @@ def monitor_trailing_stop():
             send_telegram_message(f"💥 트레일링 감시 중 오류: {e}")
 
         time.sleep(6)
-        
+
+
+
+import time
+from datetime import datetime
+import pandas as pd
+from utils.telegram import send_telegram_message
+from utils.binance import get_1m_klines
+from order_manager import close_position
+from binance.client import Client
+import os
+
+# 환경 변수 또는 .env로부터 키 불러오기
+API_KEY = os.getenv("BINANCE_API_KEY")
+API_SECRET = os.getenv("BINANCE_API_SECRET")
+client = Client(API_KEY, API_SECRET)
+
+def monitor_ma7_touch_exit():
+    send_telegram_message("📉 MA7 터치 청산 감시 시작 (바이낸스 실시간 포지션 기준, 1분봉)")
+
+    while True:
+        try:
+            positions = client.futures_account()['positions']
+            for p in positions:
+                symbol = p['symbol']
+                amt = float(p['positionAmt'])
+                entry_price = float(p['entryPrice'])
+
+                if amt == 0 or entry_price == 0:
+                    continue
+
+                direction = "long" if amt > 0 else "short"
+                qty = abs(amt)
+
+                df = get_1m_klines(symbol, interval="1m", limit=20)
+                if df.empty or 'close' not in df.columns:
+                    continue
+
+                df['ma7'] = df['close'].rolling(7).mean()
+                last_close = df['close'].iloc[-1]
+                ma7 = df['ma7'].iloc[-1]
+
+                if pd.isna(ma7):
+                    continue
+
+                should_exit = (
+                    direction == "long" and last_close <= ma7 or
+                    direction == "short" and last_close >= ma7
+                )
+
+                if should_exit:
+                    now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                    profit_pct = ((last_close - entry_price) / entry_price * 100) if direction == "long" else ((entry_price - last_close) / entry_price * 100)
+
+                    send_telegram_message(
+                        f"🚨 *{symbol} MA7 터치 청산 감지!*\n"
+                        f"   ├ 방향     : `{direction.upper()}`\n"
+                        f"   ├ 현재가   : `{round(last_close, 4)}`\n"
+                        f"   ├ MA7      : `{round(ma7, 4)}`\n"
+                        f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
+                        f"   ├ 수익률   : `{round(profit_pct, 2)}%`\n"
+                        f"   └ 시각     : `{now_time}`"
+                    )
+                    close_position(symbol, qty, "short" if direction == "long" else "long")
+
+        except Exception as e:
+            send_telegram_message(f"💥 MA7 터치 청산 오류: {e}")
+
+        time.sleep(5)  # 주기: 30초 간격 확인
+
 def close_position(symbol, qty, reverse_direction):
     try:
         client.futures_create_order(

@@ -258,7 +258,7 @@ def get_top5_consecutive_green(threshold=0.5):
                             else:
                                 break
 
-                        if count < 2:
+                        if count < 4:
                             continue
 
                         # 변화율 체크

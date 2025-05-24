@@ -10,7 +10,7 @@ import math
 from datetime import datetime, timedelta
 
 load_dotenv()
-a
+
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 client = Client(API_KEY, API_SECRET)

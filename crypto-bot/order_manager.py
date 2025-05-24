@@ -322,7 +322,7 @@ def monitor_ma7_touch_exit():
 
 def monitor_fixed_profit_loss_exit():
     
-    send_telegram_message("🎯 $0.5 익절 / $1 손절 기준 실시간 청산 시작")
+    send_telegram_message("🎯 $0.5 익절 / 0.5 손절 기준 실시간 청산 시작")
 
     while True:
         try:
@@ -358,7 +358,7 @@ def monitor_fixed_profit_loss_exit():
                     )
                     close_position(symbol, qty, "short" if direction == "long" else "long")
 
-                elif pnl <= -1:
+                elif pnl <= -0.5:
                     send_telegram_message(
                         f"🔴 *손절 청산: {symbol}*\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"

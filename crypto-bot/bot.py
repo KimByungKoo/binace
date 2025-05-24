@@ -30,9 +30,9 @@ if __name__ == "__main__":
     threading.Thread(target=get_top5_consecutive_green, daemon=True).start()
 
 
-    threading.Thread(target=monitor_trailing_stop, daemon=True).start()
+    # threading.Thread(target=monitor_trailing_stop, daemon=True).start()
     # threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
-    # threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
+    threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
     
 
     

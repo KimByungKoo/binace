@@ -323,7 +323,7 @@ def monitor_ma7_touch_exit():
 
 def monitor_fixed_profit_loss_exit():
     
-    send_telegram_message("🎯 $1 익절 / 1 손절 기준 실시간 청산 시작")
+    send_telegram_message("🎯 $2 익절 / 2 손절 기준 실시간 청산 시작")
 
     while True:
         try:

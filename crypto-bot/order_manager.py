@@ -86,7 +86,7 @@ def auto_trade_from_signal(signal):
         
     
 
-    qty = 400 / price  # $100 진입 기준 수량
+    qty = 500 / price  # $100 진입 기준 수량
     
     set_leverage(symbol, 30)  # 선택적으로 레버리지 설정 추가
     
@@ -323,7 +323,7 @@ def monitor_ma7_touch_exit():
 
 def monitor_fixed_profit_loss_exit():
     
-    send_telegram_message("🎯 $0.5 익절 / 0.5 손절 기준 실시간 청산 시작")
+    send_telegram_message("🎯 $1 익절 / 1 손절 기준 실시간 청산 시작")
 
     while True:
         try:
@@ -348,7 +348,7 @@ def monitor_fixed_profit_loss_exit():
 
                 now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
-                if pnl >= 0.5:
+                if pnl >= 1:
                     send_telegram_message(
                         f"🟢 *익절 청산: {symbol}*\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"

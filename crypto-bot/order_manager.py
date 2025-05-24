@@ -361,7 +361,7 @@ def monitor_fixed_profit_loss_exit():
                 should_exit = False
                 reason = ""
 
-                if pnl >= 2:
+                if pnl >= 0.5:
                     should_exit = True
                     reason = f"🟢 *익절 청산 ($2 이상)* → ${round(pnl,2)}"
 

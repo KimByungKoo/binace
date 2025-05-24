@@ -258,7 +258,7 @@ def get_top5_consecutive_green(threshold=0.5):
                             else:
                                 break
 
-                        if count < 6:
+                        if count < 3:
                             continue
 
                         # 변화율 체크
@@ -272,7 +272,7 @@ def get_top5_consecutive_green(threshold=0.5):
                         prev_bodies = df['body'].iloc[-count:-1]
                         avg_body = prev_bodies.mean()
                         curr_body = df['body'].iloc[-1]
-                        if curr_body < avg_body * 1.5:
+                        if curr_body < avg_body * 1.8:
                             continue
 
                         results.append((symbol, count, round(change_pct, 2)))

@@ -74,11 +74,25 @@ def check_and_enter_hyper_disparity():
                 if last_time and (now - last_time) < timedelta(seconds=60):
                     continue
 
+
+                direction = "short" if price > ma7 else "long"
+
+                send_telegram_message(
+                                    f"⚡ *하이퍼 진입 시그널* → {symbol}\n"
+                                    f"   ├ 방향: `{direction}`\n"
+                                    f"   ├ 현재가: `{round(price, 4)}`\n"
+                                    f"   ├ MA7: `{round(ma7, 4)}`\n"
+                                    f"   ├ 이격: `{round(disparity, 2)}%`\n"
+                                  
+                                )
+
+
+
                 # 1% 이상 이격 아니면 스킵
                 if disparity < 1:
                     continue
 
-                direction = "short" if price > ma7 else "long"
+                
                 tp = price * (0.995 if direction == "short" else 1.005)
                 sl = price * (1.005 if direction == "short" else 0.995)
 

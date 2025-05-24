@@ -306,6 +306,7 @@ def get_top5_consecutive_green(threshold=0.5):
                         )
 
                         auto_trade_from_signal(signal)
+                        break  # 한 종목에서 하나의 시그널만 처리
 
                     except Exception as e:
                         send_telegram_message(f"💥 {symbol} 처리 실패: {e}")

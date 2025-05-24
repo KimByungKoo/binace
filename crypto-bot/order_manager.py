@@ -359,7 +359,7 @@ def monitor_fixed_profit_loss_exit():
                     )
                     close_position(symbol, qty, "short" if direction == "long" else "long")
 
-                elif pnl <= -0.5:
+                elif pnl <= -1:
                     send_telegram_message(
                         f"🔴 *손절 청산: {symbol}*\n"
                         f"   ├ 방향     : `{direction.upper()}`\n"

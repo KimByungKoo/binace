@@ -74,8 +74,8 @@ def check_and_enter_hyper_disparity():
                 if last_time and (now - last_time) < timedelta(seconds=60):
                     continue
 
-                # 5% 이상 이격 아니면 스킵
-                if disparity < 5:
+                # 1% 이상 이격 아니면 스킵
+                if disparity < 1:
                     continue
 
                 direction = "short" if price > ma7 else "long"

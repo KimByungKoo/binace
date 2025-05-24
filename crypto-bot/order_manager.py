@@ -372,7 +372,7 @@ def monitor_fixed_profit_loss_exit():
         except Exception as e:
             send_telegram_message(f"💥 청산 감시 오류: {e}")
 
-        time.sleep(5)
+        time.sleep(2)
 
 def close_position(symbol, quantity, side):
     try:

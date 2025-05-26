@@ -452,10 +452,16 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 def report_spike():
     try:
         symbols = get_top_symbols(cfg["top_n"])
+        send_telegram_message(f"✅ 가져온 심볼: {symbols}")
+
+        if not symbols:
+            send_telegram_message("❌ 심볼 리스트 비어있음 → 루프 진입 안 함")
+            return
         msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
         found = False
         
         for symbol in symbols:
+            send_telegram_message(f"➡️ check_reverse_spike_condition 호출: {symbol}")
             output = check_reverse_spike_condition(symbol, True)
         
             if output is None:

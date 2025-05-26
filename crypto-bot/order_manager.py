@@ -326,7 +326,7 @@ from datetime import datetime, timedelta
 from datetime import datetime, timedelta
 
 def monitor_fixed_profit_loss_exit():
-    send_telegram_message("🎯 $2 익절 / 손절 + 진입봉 이후부터 감시 시작")
+    send_telegram_message("🎯 수익/손실 퍼센트 기준 실시간 청산 감시 시작")
 
     while True:
         try:
@@ -342,7 +342,7 @@ def monitor_fixed_profit_loss_exit():
                 direction = "long" if amt > 0 else "short"
                 qty = abs(amt)
 
-                # ✅ Binance의 updateTime은 ms 단위 timestamp
+                # 진입 직후 1분은 제외
                 entry_time = datetime.utcfromtimestamp(p['updateTime'] / 1000)
                 if datetime.utcnow() - entry_time < timedelta(minutes=1):
                     continue
@@ -356,18 +356,20 @@ def monitor_fixed_profit_loss_exit():
                 prev_low = df['low'].iloc[-2]
 
                 pnl = (last_price - entry_price) * qty if direction == "long" else (entry_price - last_price) * qty
+                pos_value = entry_price * qty
+                pnl_pct = (pnl / pos_value) * 100
                 now_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
 
                 should_exit = False
                 reason = ""
 
-                if pnl >= 0.3:
+                if pnl_pct >= cfg["min_profit_pct"]:
                     should_exit = True
-                    reason = f"🟢 *익절 청산 ($2 이상)* → ${round(pnl,2)}"
+                    reason = f"🟢 *익절 청산 ({round(pnl_pct,2)}%)*"
 
-                elif pnl <= -1:
+                elif pnl_pct <= -cfg["max_loss_pct"]:
                     should_exit = True
-                    reason = f"🔴 *손절 청산 (-$2 이하)* → ${round(pnl,2)}"
+                    reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
 
                 elif direction == "long" and last_price < prev_low:
                     should_exit = True
@@ -384,7 +386,7 @@ def monitor_fixed_profit_loss_exit():
                         f"   ├ 방향     : `{direction.upper()}`\n"
                         f"   ├ 현재가   : `{round(last_price, 4)}`\n"
                         f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
-                        f"   ├ 수익금   : `${round(pnl, 2)}`\n"
+                        f"   ├ 수익금   : `${round(pnl, 2)}` ({round(pnl_pct, 2)}%)\n"
                         f"   └ 시각     : `{now_time}`"
                     )
                     close_position(symbol, qty, "short" if direction == "long" else "long")

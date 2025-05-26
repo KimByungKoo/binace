@@ -325,14 +325,28 @@ def monitor_ma7_touch_exit():
 
 from datetime import datetime, timedelta
 
-from datetime import datetime, timedelta
+import time
+from requests.exceptions import ReadTimeout
+
+def safe_futures_account():
+    try:
+        return client.futures_account()
+    except ReadTimeout:
+        send_telegram_message("⚠️ Binance 요청 시간 초과. 3초 후 재시도 중...")
+        time.sleep(3)
+        return client.futures_account()
+    except Exception as e:
+        send_telegram_message(f"💥 계정 조회 실패: {e}")
+        return None
 
 def monitor_fixed_profit_loss_exit():
     send_telegram_message("🎯 수익/손실 퍼센트 기준 실시간 청산 감시 시작")
 
     while True:
         try:
-            positions = client.futures_account()['positions']
+            positions = safe_futures_account()
+            if positions is None:
+                continue
             for p in positions:
                 symbol = p['symbol']
                 amt = float(p['positionAmt'])

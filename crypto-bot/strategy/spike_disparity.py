@@ -442,7 +442,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             auto_trade_from_signal(signal)
             return signal, []
         else:
-            send_telegram_message(f"44444")
+            send_telegram_message(f"5555")
             if test_mode:
                 msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
                 send_telegram_message("\n".join(msg_lines))

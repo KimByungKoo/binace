@@ -344,9 +344,10 @@ def monitor_fixed_profit_loss_exit():
 
     while True:
         try:
-                positions = client.futures_account()
+            positions = client.futures_account()['positions']
+            for p in positions:
             
-                #symbol = p['symbol']
+                symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
 

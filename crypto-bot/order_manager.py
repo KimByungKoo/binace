@@ -386,13 +386,13 @@ def monitor_fixed_profit_loss_exit():
                     should_exit = True
                     reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
 
-                elif direction == "long" and last_price < prev_low:
-                    should_exit = True
-                    reason = f"📉 진입봉 최저가 이탈 (롱)"
+                #elif direction == "long" and last_price < prev_low:
+                    #should_exit = True
+                    #reason = f"📉 진입봉 최저가 이탈 (롱)"
 
-                elif direction == "short" and last_price > prev_high:
-                    should_exit = True
-                    reason = f"📈 진입봉 최고가 돌파 (숏)"
+                #elif direction == "short" and last_price > prev_high:
+                    #should_exit = True
+                    #reason = f"📈 진입봉 최고가 돌파 (숏)"
 
                 if should_exit:
                     send_telegram_message(

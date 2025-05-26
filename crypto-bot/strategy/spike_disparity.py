@@ -546,10 +546,7 @@ def report_spike():
                     f"   ├ 볼륨    : `{result['volume']}` / MA: `{result['volume_ma']}`\n"
                     f"   └ 전략    : `이격 + 스파이크 반대매매`"
                 )
-        #else:
-            #send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
-        #else:
-            #send_telegram_message("🙅‍♂️ 예측 조건을 만족하는 종목이 없습니다. (볼륨 + 이격도 기준)")
+     
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 

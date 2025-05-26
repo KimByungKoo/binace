@@ -463,9 +463,12 @@ def report_spike():
         
         send_telegram_message(f"✅ 가져온 심볼: {1}")
         for symbol in symbols:
-            send_telegram_message(f"➡️ check_reverse_spike_condition 호출: {symbol}")
-            output = check_reverse_spike_condition(symbol, True)
-        
+            try:
+                send_telegram_message(f"➡️ check 호출 시도: {symbol}")
+                output = check_reverse_spike_condition(symbol, True)
+                send_telegram_message(f"✅ check 결과: {output}")
+            except Exception as e:
+                send_telegram_message(f"💥 check 내부 예외: {symbol} → {e}")
             if output is None:
                 send_telegram_message(f"⛔ {symbol} → 결과 없음 (output is None)")
                 continue

@@ -520,4 +520,4 @@ def spike_watcher_loop():
         report_spike()
         #report_spike_disparity()
         #report_top_1m_disparities()
-        time.sleep(60)  # 1분 주기
+        time.sleep(10)  # 1분 주기

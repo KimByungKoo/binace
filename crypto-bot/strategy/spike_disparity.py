@@ -466,7 +466,7 @@ def report_spike():
             result, issues = check_reverse_spike_condition(symbol, test_mode=True)
 
             if result is None and not issues:
-                send_telegram_message(f"⛔ {symbol} → 결과 없음 (result=None, issues=None)")
+                print(f"⛔ {symbol} → 결과 없음 (result=None, issues=None)")
             elif result is None:
                 send_telegram_message(f"⚠️ {symbol} → 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues]))
             else:

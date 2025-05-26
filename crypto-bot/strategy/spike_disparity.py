@@ -5,7 +5,7 @@ from config import SPIKE_CONFIG as cfg
 from order_manager import auto_trade_from_signal
 
 import pandas as pd
-a
+
 def check_volume_spike_disparity(symbol):
     issues = []  # 실패 이유 리스트
 
@@ -97,9 +97,7 @@ def check_volume_spike_disparity(symbol):
                 if vrange <  median_disparity:
                     issues.append(f"변동폭 부족: {round(vrange,2)}% < {median_disparity}%")
 
-        #print("DEBUG: auto_execute =", cfg.get("auto_execute", True))
-        #send_telegram_message(f"💡 auto_execute: *{cfg.get('auto_execute', True)}*")
-
+        
         if "five_green_ma5" in cfg["checks"]:
             df['ma5'] = df['close'].rolling(5).mean()
             df['ma20'] = df['close'].rolling(20).mean()
@@ -371,9 +369,14 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         df['ma30'] = df['close'].rolling(30).mean()
         df['ma60'] = df['close'].rolling(60).mean()
         df['volume_ma'] = df['volume'].rolling(cfg["vol_ma_window"]).mean()
+        # 거래량 기준선 계산
+        df['volume_ema'] = df['volume'].ewm(span=cfg["vol_ma_window"]).mean()
+        df['volume_std'] = df['volume'].rolling(cfg["vol_ma_window"]).std()
+
         df.dropna(inplace=True)
 
         latest = df.iloc[-1]
+        
         price = latest['close']
         open_price = latest['open']
         ma7 = latest['ma7']
@@ -382,27 +385,44 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         ma30 = latest['ma30']
         ma60 = latest['ma60']
 
+        
         # 거래량 스파이크
         volume = latest['volume']
         volume_ma = latest['volume_ma']
         required_volume = volume_ma * cfg["spike_multiplier"]
         
+        # print(f"DEBUG: {symbol} 최근 데이터: {latest}")
         
-        # 거래량 기준선 계산
-        df['volume_ema'] = df['volume'].ewm(span=cfg["vol_ma_window"]).mean()
-        df['volume_std'] = df['volume'].rolling(cfg["vol_ma_window"]).std()
+        
         
         ema = latest['volume_ema']
+        
         std = latest['volume_std']
+        
         threshold = ema + std * cfg["spike_std_multiplier"]
         
+        # print(f"DEBUG: {symbol} 거래량 기준선: {threshold}, 현재 거래량: {latest['volume']}")
+        # print(f"DEBUG: {symbol} 거래량 기준선: {latest['volume']} < {threshold}")
         if latest['volume'] < threshold:
+            
             issues.append(
                 f"❌ 거래량 스파이크 아님\n"
                 f"   ├ 현재 거래량   : `{round(latest['volume'], 2)}`\n"
                 f"   ├ 기준치       : `{round(threshold, 2)}` (EMA+STD)"
             )
 
+        else:
+            print(f"😇😇😇😌😌: {symbol} 거래량 스파이크 감지됨")
+            send_telegram_message(
+                f"✅ 거래량 스파이크 감지\n"
+                f"   ├ {symbol} \n"
+                f"   ├ 현재 거래량   : `{round(latest['volume'], 2)}`\n"
+                f"   ├ EMA 기준선   : `{round(ema, 2)}`\n"
+                f"   ├ STD x {cfg['spike_std_multiplier']} : `{round(std * cfg['spike_std_multiplier'], 2)}`\n"
+                f"   └ 기준치       : `{round(threshold, 2)}`"
+            )
+
+        
         #if volume < required_volume:
             #issues.append(
                 #f"❌ 거래량 스파이크 아님 "
@@ -467,11 +487,11 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 f"   ├ 현재가: `{round(price, 4)}`\n"
                 f"   ├ 이격률: `{round(disparity, 2)}%`\n"
                 f"   ├ 거래량: `{round(latest['volume'], 2)}` vs MA: `{round(latest['volume_ma'], 2)}`\n"
-                f"   └ MA배열: {'정배열' if ma_bullish else '역배열'}"
+                # f"   └ MA배열: {'정배열' if ma_bullish else '역배열'}"
             )
             send_telegram_message(msg)
 
-            auto_trade_from_signal(signal)
+            # auto_trade_from_signal(signal)
             return signal, []
 
         # 실패한 경우
@@ -504,9 +524,9 @@ def report_spike():
 
             if result is None and not issues:
                 send_telegram_message(f"⛔ {symbol} → 결과 없음 (result=None, issues=None)")
-            elif result is None:
-                if len(issues) < 6:
-                    send_telegram_message(f"⚠️ {symbol} → 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues]))
+            # elif result is None:
+            #     if len(issues) < 6:
+            #         send_telegram_message(f"⚠️ {symbol} → 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues]))
             #else:
                 #send_telegram_message(f"✅ {symbol} 조건 만족")
         
@@ -533,32 +553,7 @@ def report_spike():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
-def is_volume_spike(df):
-    """
-    거래량 스파이크 여부 판단
-    기준:
-    - 최근 거래량이 EMA 기준치보다 크고
-    - EMA + 표준편차를 초과하는 경우
-    """
-    df['volume_ema'] = df['volume'].ewm(span=cfg["vol_ma_window"]).mean()
-    df['volume_std'] = df['volume'].rolling(cfg["vol_ma_window"]).std()
 
-    latest = df.iloc[-1]
-    ema = latest['volume_ema']
-    std = latest['volume_std']
-    current_volume = latest['volume']
-
-    threshold = ema + std * cfg["spike_std_multiplier"]
-
-    send_telegram_message(
-        f"📊 거래량 분석\n"
-        f"   ├ 현재 거래량     : `{round(current_volume, 2)}`\n"
-        f"   ├ EMA 기준선     : `{round(ema, 2)}`\n"
-        f"   ├ 표준편차 x {cfg['spike_std_multiplier']} : `{round(std * cfg['spike_std_multiplier'], 2)}`\n"
-        f"   └ 최종 기준치    : `{round(threshold, 2)}`"
-    )
-
-    return current_volume > threshold
 
 # 자동 감시 루프
 def spike_watcher_loop():

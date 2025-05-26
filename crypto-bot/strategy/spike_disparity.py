@@ -360,7 +360,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
     try:
         send_telegram_message(f"check_reverse_spike_condition{symbol}")
-        df = get_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
+        df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
         if df.empty or 'volume' not in df.columns:
             issues.append("❌ 데이터 비어있음 또는 거래량 없음")
             raise Exception("중단")

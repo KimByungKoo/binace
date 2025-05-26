@@ -339,6 +339,7 @@ def check_disparity(symbol):
     
 
 
+
 def check_reverse_spike_condition(symbol, test_mode=True):
     """
     과매수/과매도 상황을 역추세로 판단하여 매매 신호 생성 및 자동 매수 수행.
@@ -356,17 +357,15 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     - 손절 1.0%
     """
     issues = []
-    try:
-        #send_telegram_message(f"111111 {test_mode}")
-        #send_telegram_message(f"test_mode {test_mode} what")
-        df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
-        if df.empty or 'volume' not in df.columns:
-            if test_mode:
-                send_telegram_message(f"❌ {symbol} 데이터 비어있음 또는 거래량 없음")
-            return None, []
-            
-        #send_telegram_message(f"222222{df}")
 
+    try:
+        send_telegram_message(f"check_reverse_spike_condition{symbol}")
+        df = get_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
+        if df.empty or 'volume' not in df.columns:
+            issues.append("❌ 데이터 비어있음 또는 거래량 없음")
+            raise Exception("중단")
+
+        # 이동평균선 계산
         df['ma7'] = df['close'].rolling(7).mean()
         df['ma20'] = df['close'].rolling(20).mean()
         df['ma30'] = df['close'].rolling(30).mean()
@@ -379,43 +378,32 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         open_price = latest['open']
         ma7 = latest['ma7']
 
-        msg_lines = [f"🧪 [{symbol}] 역스파이크 테스트 결과"]
-
         # 거래량 스파이크
-        volume_spike = latest['volume'] > latest['volume_ma'] * cfg["spike_multiplier"]
-        msg_lines.append(
-            f"   {'✅' if volume_spike else '❌'} 거래량: {round(latest['volume'], 2)} / MA * {cfg['spike_multiplier']} = {round(latest['volume_ma'] * cfg['spike_multiplier'], 2)}"
-        )
+        if latest['volume'] < latest['volume_ma'] * cfg["spike_multiplier"]:
+            issues.append("❌ 거래량 스파이크 아님")
 
         # MA7 이격 조건
         disparity = abs(open_price - ma7) / ma7 * 100
-        disparity_ok = disparity >= cfg["min_disparity_pct"]
-        msg_lines.append(
-            f"   {'✅' if disparity_ok else '❌'} MA7 이격률: {round(disparity, 2)}% (기준: {cfg['min_disparity_pct']}%)"
-        )
+        if disparity < cfg["min_disparity_pct"]:
+            issues.append(f"❌ MA7 이격률 부족 ({round(disparity, 2)}%)")
 
         # 캔들 색상
         candle = "green" if price > open_price else "red"
-        candle_position_ok = (candle == "green" and open_price >= ma7) or (candle == "red" and open_price <= ma7)
-        msg_lines.append(
-            f"   {'✅' if candle_position_ok else '❌'} 캔들/시가 위치: {candle.upper()} / 시가 {round(open_price, 4)} vs MA7 {round(ma7, 4)}"
-        )
+        if candle == "green" and open_price < ma7:
+            issues.append("❌ 양봉인데 MA7 아래 시가")
+        elif candle == "red" and open_price > ma7:
+            issues.append("❌ 음봉인데 MA7 위 시가")
 
         # MA 배열
         ma_bullish = latest['ma7'] > latest['ma20'] > latest['ma30'] > latest['ma60']
         ma_bearish = latest['ma7'] < latest['ma20'] < latest['ma30'] < latest['ma60']
-        ma_ok = ma_bullish or ma_bearish
-        msg_lines.append(
-            f"   {'✅' if ma_ok else '❌'} MA 배열: {'정배열' if ma_bullish else '역배열' if ma_bearish else '불충족'}"
-        )
 
         direction = "short" if ma_bullish else "long" if ma_bearish else None
+        if not direction:
+            issues.append("❌ MA 정배열/역배열 아님")
 
-        send_telegram_message(f"33333. {msg_lines}")
-
-        if volume_spike and disparity_ok and candle_position_ok and direction:
-            
-            send_telegram_message(f"44444")
+        # 조건 통과
+        if not issues and direction:
             if has_open_position(symbol):
                 if test_mode:
                     send_telegram_message(f"⛔ {symbol} 이미 포지션 보유 중 → 스킵")
@@ -436,29 +424,29 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 "pass": True
             }
 
-            if test_mode:
-                msg_lines.append(f"   ✅ 모든 조건 충족 → 진입 가능 ({direction.upper()})")
-                send_telegram_message("\n".join(msg_lines))
+            msg = (
+                f"✅ *{symbol} 역스파이크 진입 조건 충족*\n"
+                f"   ├ 방향: `{direction.upper()}`\n"
+                f"   ├ 현재가: `{round(price, 4)}`\n"
+                f"   ├ 이격률: `{round(disparity, 2)}%`\n"
+                f"   ├ 거래량: `{round(latest['volume'], 2)}` vs MA: `{round(latest['volume_ma'], 2)}`\n"
+                f"   └ MA배열: {'정배열' if ma_bullish else '역배열'}"
+            )
+            send_telegram_message(msg)
 
             auto_trade_from_signal(signal)
             return signal, []
-        else:
-            #send_telegram_message(f"5555")
-            #send_telegram_message(f"test_mode {test_mode}")
-            
-            msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
-            send_telegram_message("\n".join(msg_lines))
-                
-                
-            if test_mode:
-                msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
-                send_telegram_message("\n".join(msg_lines))
-            return None, msg_lines
+
+        # 실패한 경우
+        if test_mode and issues:
+            msg = f"⚠️ [{symbol}] 역스파이크 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues])
+            send_telegram_message(msg)
+
+        return None, issues if issues else []
 
     except Exception as e:
-        send_telegram_message(f"💥 예외 발생 in {symbol}: {e}")
+        send_telegram_message(f"💥387 [{symbol}] 예외 발생: {e}")
         return None, []
-            
         
         
 def report_spike():

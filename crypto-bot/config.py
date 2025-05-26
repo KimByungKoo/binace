@@ -23,8 +23,8 @@ SPIKE_CONFIG = {
     "reverse_trade": True,      # 반대방향 진입 여부
 
 
-    "rsi_period": 14,
-    "rsi_threshold": 10,
+    "rsi_period":7,
+    "rsi_threshold": 20,
 
     # 가격 기울기
     "price_lookback": 5,

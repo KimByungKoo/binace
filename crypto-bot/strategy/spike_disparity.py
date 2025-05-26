@@ -451,11 +451,16 @@ def report_spike():
         found = False
         
         for symbol in symbols:
-            output = check_reverse_spike_condition(symbol)
-            if not output:
+            result, issues = check_reverse_spike_condition(symbol,True)
+            if not result:
                 continue
             
-            result ,issues= output
+            if not result:
+                if  issues:
+                    msg = f"⚠️ [{symbol}] 조건 미달:\n" + "\n".join([f"   ├ {i}" for i in issues])
+                    send_telegram_message(msg)
+                
+            
             if result.get("pass"):
                 send_telegram_message(
                     f"🔁 *{result['symbol']} 역추세 진입 조건 충족*\n"

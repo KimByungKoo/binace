@@ -410,7 +410,11 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         direction = "short" if ma_bullish else "long" if ma_bearish else None
 
+        send_telegram_message(f"33333")
+
         if volume_spike and disparity_ok and candle_position_ok and direction:
+            
+            send_telegram_message(f"44444")
             if has_open_position(symbol):
                 if test_mode:
                     send_telegram_message(f"⛔ {symbol} 이미 포지션 보유 중 → 스킵")
@@ -438,6 +442,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             auto_trade_from_signal(signal)
             return signal, []
         else:
+            send_telegram_message(f"44444")
             if test_mode:
                 msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
                 send_telegram_message("\n".join(msg_lines))

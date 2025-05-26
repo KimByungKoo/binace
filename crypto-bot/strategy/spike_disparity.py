@@ -6,6 +6,8 @@ from order_manager import auto_trade_from_signal
 
 import pandas as pd
 
+
+
 def check_volume_spike_disparity(symbol):
     issues = [] 
 
@@ -451,6 +453,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             f"   ├ RSI: `{round(latest_rsi, 2)}`\n"
             f"   ├ 기준: `기간 {cfg['rsi_period']} / 임계치 {cfg['rsi_threshold']}`\n"
         )
+        print(f"DEBUG: {symbol} RSI: {latest_rsi}, 기준: {cfg['rsi_threshold']}")
         if latest_rsi < cfg["rsi_threshold"]:
             msg += f"   └ 📉 *과매도 감지* → `{round(latest_rsi, 2)} < {cfg['rsi_threshold']}`"
             send_telegram_message(msg)

@@ -1,6 +1,6 @@
-python-binance
-pandas
-requests
-python-dotenv
-websocket-client
-pandas_ta
+numpy==1.24.4          # 최신 버전은 NaN import 안 됨
+pandas>=1.3.0          # pandas_ta 요구사항
+pandas_ta==0.3.14b0    # 현재 너가 쓰는 기술
+python-dotenv>=1.0.0
+websocket-client>=1.5.1
+binance-futures-connector>=3.0.0

@@ -9,6 +9,8 @@ import time
 import math
 from datetime import datetime, timedelta
 
+from config import SPIKE_CONFIG as cfg
+
 load_dotenv()
 
 API_KEY = os.getenv("BINANCE_API_KEY")

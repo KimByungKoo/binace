@@ -356,7 +356,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     - 손절 1.0%
     """
     issues = []
-    print(f"RETURNING: {symbol} → result=None, issues={issues}")
+    
 
     try:
         send_telegram_message(f"check_reverse_spike_condition{symbol}")
@@ -442,6 +442,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             msg = f"⚠️ [{symbol}] 역스파이크 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues])
             send_telegram_message(msg)
 
+        send_telegram_message(f"RETURNING: {symbol} → result=None, issues={issues}")
         return None, issues if issues else []
 
     except Exception as e:

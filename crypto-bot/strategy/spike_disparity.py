@@ -434,7 +434,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             )
             send_telegram_message(msg)
 
-            auto_trade_from_signal(signal)
+            #auto_trade_from_signal(signal)
             return signal, []
 
         # 실패한 경우

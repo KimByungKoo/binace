@@ -356,7 +356,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     - 손절 1.0%
     """
     issues = []
-    
+    send_telegram_message(f"✅ 함수 진입됨: {symbol}")
 
     try:
         send_telegram_message(f"check_reverse_spike_condition{symbol}")

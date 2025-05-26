@@ -16,7 +16,7 @@ SPIKE_CONFIG = {
     
     
     "volume_spike_multiplier": 1.8,
-    "min_disparity_pct": 0.1,
+    "min_disparity_pct": 0.2,
     "ma_periods": [7, 20, 30, 60],
     "require_alignment": True,  # 정배열/역배열 필터링 유무
     "reverse_trade": True,      # 반대방향 진입 여부

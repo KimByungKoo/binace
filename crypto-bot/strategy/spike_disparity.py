@@ -428,7 +428,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 f"   ├ 현재 거래량   : `{round(latest['volume'], 2)}`\n"
                 f"   ├ 기준치       : `{round(threshold, 2)}` (EMA+STD)"
             )
-"""
+        """
         else:
             print(f"😇😇😇😌😌: {symbol} 거래량 스파이크 감지됨")
             send_telegram_message(
@@ -439,7 +439,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 f"   ├ STD x {cfg['spike_std_multiplier']} : `{round(std * cfg['spike_std_multiplier'], 2)}`\n"
                 f"   └ 기준치       : `{round(threshold, 2)}`"
             )
-"""
+        """
         # RSI 추가 계산
         
         df['rsi'] = ta.rsi(df['close'], length=7)

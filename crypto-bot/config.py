@@ -13,7 +13,8 @@ SPIKE_CONFIG = {
     "top_n": 50    ,                 # 검사할 종목 
     
     "volatility_multiplier": 2.0,    # 과거 평균 변동률의 N배 이상이어야 spike로 인정
-    
+     "spike_std_multiplier": 2.5,
+    "min_disparity_pct": 0.3,
     
     "volume_spike_multiplier": 1.2,
     "min_disparity_pct": 0.2,

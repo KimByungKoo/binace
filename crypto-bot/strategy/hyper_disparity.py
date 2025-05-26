@@ -6,7 +6,7 @@ from utils.telegram import send_telegram_message
 from utils.binance import get_1m_klines, client, has_open_position, get_top_symbols
 from order_manager import close_position, auto_trade_from_signal
 
-a
+
 def get_top_disparity_symbols(n=1):
     """
     가장 이격도가 큰 심볼 n개를 반환하는 함수 (1분봉 기준 MA7과의 괴리율 기준)

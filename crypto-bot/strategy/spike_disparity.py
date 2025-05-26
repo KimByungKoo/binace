@@ -356,6 +356,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     - 손절 1.0%
     """
     issues = []
+    print(f"RETURNING: {symbol} → result=None, issues={issues}")
 
     try:
         send_telegram_message(f"check_reverse_spike_condition{symbol}")
@@ -469,7 +470,7 @@ def report_spike():
                 send_telegram_message(f"✅ check 결과: {output}")
             except Exception as e:
                 send_telegram_message(f"💥 check 내부 예외: {symbol} → {e}")
-            if output is None:
+            if not output or output[0] is None:
                 send_telegram_message(f"⛔ {symbol} → 결과 없음 (output is None)")
                 continue
         

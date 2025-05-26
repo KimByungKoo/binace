@@ -467,7 +467,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 "direction": 'short',
                 "price": price,
             
-                "disparity": round(disparity, 2),
+              
                 "volume": round(latest['volume'], 2),
                 "volume_ma": round(latest['volume_ma'], 2),
                 "pass": True
@@ -481,7 +481,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 "direction": 'long',
                 "price": price,
             
-                "disparity": round(disparity, 2),
+               
                 "volume": round(latest['volume'], 2),
                 "volume_ma": round(latest['volume_ma'], 2),
                 "pass": True

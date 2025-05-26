@@ -411,7 +411,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         direction = "short" if ma_bullish else "long" if ma_bearish else None
 
-        #send_telegram_message(f"33333. {direction}")
+        send_telegram_message(f"33333. {msg_lines}")
 
         if volume_spike and disparity_ok and candle_position_ok and direction:
             

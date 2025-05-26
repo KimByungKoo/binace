@@ -483,7 +483,7 @@ def report_spike():
             if result is None and not issues:
                 send_telegram_message(f"⛔ {symbol} → 결과 없음 (result=None, issues=None)")
             elif result is None:
-                if len(issues) < 2:
+                if len(issues) < 3:
                     send_telegram_message(f"⚠️ {symbol} → 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues]))
             #else:
                 #send_telegram_message(f"✅ {symbol} 조건 만족")

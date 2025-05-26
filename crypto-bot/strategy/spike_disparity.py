@@ -336,7 +336,19 @@ def check_disparity(symbol):
     
     
 
+def calculate_rsi(df, period=7):
+    delta = df['close'].diff()
 
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
 
 def check_reverse_spike_condition(symbol, test_mode=True):
     """
@@ -421,6 +433,27 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 f"   ├ STD x {cfg['spike_std_multiplier']} : `{round(std * cfg['spike_std_multiplier'], 2)}`\n"
                 f"   └ 기준치       : `{round(threshold, 2)}`"
             )
+
+        # RSI 추가 계산
+        df['rsi'] = calculate_rsi(df, period=cfg["rsi_period"])
+
+        # 최신 RSI 가져오기
+        latest_rsi = df['rsi'].iloc[-1]
+
+        msg = (
+            f"📊 *{symbol} RSI 상태 보고*\n"
+            f"   ├ RSI: `{round(latest_rsi, 2)}`\n"
+            f"   ├ 기준: `기간 {cfg['rsi_period']} / 임계치 {cfg['rsi_threshold']}`\n"
+        )
+        if latest_rsi < cfg["rsi_threshold"]:
+            msg += f"   └ 📉 *과매도 감지* → `{round(latest_rsi, 2)} < {cfg['rsi_threshold']}`"
+            send_telegram_message(msg)
+        elif latest_rsi > (100 - cfg["rsi_threshold"]):
+            msg += f"   └ 📈 *과매수 감지* → `{round(latest_rsi, 2)} > {100 - cfg['rsi_threshold']}`"
+            send_telegram_message(msg)
+        
+
+
 
         
         #if volume < required_volume:

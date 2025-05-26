@@ -454,13 +454,14 @@ def report_spike():
         symbols = get_top_symbols(cfg["top_n"])
         msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
         found = False
-        send_telegram_message(f"💥 [{msg}] ")
+        
         for symbol in symbols:
             output = check_reverse_spike_condition(symbol,True)
             #if not result:
                 #continue
             #if not output:
                 #continue
+            send_telegram_message(f"💥 [{output}] ")
             
             result, issues = output
             

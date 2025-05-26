@@ -15,8 +15,8 @@ SPIKE_CONFIG = {
     "volatility_multiplier": 2.0,    # 과거 평균 변동률의 N배 이상이어야 spike로 인정
     
     
-    "volume_spike_multiplier": 2.5,
-    "min_disparity_pct": 0.3,
+    "volume_spike_multiplier": 2.0,
+    "min_disparity_pct": 0.2,
     "ma_periods": [7, 20, 30, 60],
     "require_alignment": True,  # 정배열/역배열 필터링 유무
     "reverse_trade": True,      # 반대방향 진입 여부

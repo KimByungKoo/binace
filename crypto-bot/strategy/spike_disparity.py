@@ -395,12 +395,23 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             issues.append("❌ 음봉인데 MA7 위 시가")
 
         # MA 배열
-        ma_bullish = latest['ma7'] > latest['ma20'] > latest['ma30'] > latest['ma60']
-        ma_bearish = latest['ma7'] < latest['ma20'] < latest['ma30'] < latest['ma60']
-
-        direction = "short" if ma_bullish else "long" if ma_bearish else None
-        if not direction:
-            issues.append("❌ MA 정배열/역배열 아님")
+        if open_price > ma7:
+            if ma7 > ma20 > ma30 > ma60:
+                direction = "short"  # 과매수니까 숏
+            else:
+                issues.append("❌ 시가 > MA7인데 정배열 아님")
+                direction = None
+        elif open_price < ma7:
+            if ma7 < ma20 < ma30 < ma60:
+                direction = "long"  # 과매도니까 롱
+            else:
+                issues.append("❌ 시가 < MA7인데 역배열 아님")
+                direction = None
+        else:
+            issues.append("❌ 시가와 MA7이 동일 — 애매한 상태")
+            direction = None
+    
+    
 
         # 조건 통과
         if not issues and direction:

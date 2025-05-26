@@ -357,15 +357,15 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     """
     issues = []
     try:
-        send_telegram_message(f"111111 {test_mode}")
-        send_telegram_message(f"test_mode {test_mode} what")
+        #send_telegram_message(f"111111 {test_mode}")
+        #send_telegram_message(f"test_mode {test_mode} what")
         df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
         if df.empty or 'volume' not in df.columns:
             if test_mode:
                 send_telegram_message(f"❌ {symbol} 데이터 비어있음 또는 거래량 없음")
             return None, []
             
-        send_telegram_message(f"222222{df}")
+        #send_telegram_message(f"222222{df}")
 
         df['ma7'] = df['close'].rolling(7).mean()
         df['ma20'] = df['close'].rolling(20).mean()
@@ -411,7 +411,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         direction = "short" if ma_bullish else "long" if ma_bearish else None
 
-        send_telegram_message(f"33333. {direction}")
+        #send_telegram_message(f"33333. {direction}")
 
         if volume_spike and disparity_ok and candle_position_ok and direction:
             
@@ -443,8 +443,8 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             auto_trade_from_signal(signal)
             return signal, []
         else:
-            send_telegram_message(f"5555")
-            send_telegram_message(f"test_mode {test_mode}")
+            #send_telegram_message(f"5555")
+            #send_telegram_message(f"test_mode {test_mode}")
             
             msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
             send_telegram_message("\n".join(msg_lines))

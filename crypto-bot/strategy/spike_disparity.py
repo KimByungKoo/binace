@@ -336,10 +336,92 @@ def check_disparity(symbol):
         }
     return None
     
+    
+
+
+def check_reverse_spike_condition(symbol):
+    try:
+        df = get_1m_klines(symbol, interval='1m', limit=70)
+        if df.empty or len(df) < 61:
+            return {"symbol": symbol, "pass": False, "reason": "봉 수 부족"}
+
+        df['ma7'] = df['close'].rolling(cfg["ma_periods"][0]).mean()
+        df['ma20'] = df['close'].rolling(cfg["ma_periods"][1]).mean()
+        df['ma30'] = df['close'].rolling(cfg["ma_periods"][2]).mean()
+        df['ma60'] = df['close'].rolling(cfg["ma_periods"][3]).mean()
+        df['volume_ma'] = df['volume'].rolling(20).mean()
+
+        latest = df.iloc[-1]
+        ma7 = df['ma7'].iloc[-1]
+        if pd.isna(ma7):
+            return {"symbol": symbol, "pass": False, "reason": "MA 계산 실패"}
+
+        disparity = (latest['open'] - ma7) / ma7 * 100
+        volume_spike = latest['volume'] > df['volume_ma'].iloc[-2] * cfg["volume_spike_multiplier"]
+
+        is_bullish = latest['close'] > latest['open']
+        alignment_ok = True
+
+        if cfg["require_alignment"]:
+            is_bullish_align = df['ma7'].iloc[-1] > df['ma20'].iloc[-1] > df['ma30'].iloc[-1] > df['ma60'].iloc[-1]
+            is_bearish_align = df['ma7'].iloc[-1] < df['ma20'].iloc[-1] < df['ma30'].iloc[-1] < df['ma60'].iloc[-1]
+            alignment_ok = is_bullish_align or is_bearish_align
+
+        if abs(disparity) >= cfg["min_disparity_pct"] and volume_spike and alignment_ok:
+            direction = "short" if latest['open'] > ma7 else "long"  # 기본 방향: 되돌림
+            if not cfg["reverse_trade"]:
+                direction = "long" if latest['open'] > ma7 else "short"
+            return {
+                "symbol": symbol,
+                "pass": True,
+                "direction": direction,
+                "disparity": round(disparity, 2),
+                "volume": latest['volume'],
+                "price": latest['open']
+            }
+        else:
+            return {"symbol": symbol, "pass": False, "reason": "조건 불충족"}
+
+    except Exception as e:
+        return {"symbol": symbol, "pass": False, "error": str(e)}
+        
+        
+        
+def report_spike():
+    try:
+        symbols = get_top_symbols(cfg["top_n"])
+        msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
+        found = False
+        
+        for symbol in symbols:
+            output = check_reverse_spike_condition(symbol)
+            if not output:
+                continue
+            
+            result, issues = output
+            if result.get("pass"):
+                send_telegram_message(
+                    f"🔁 *{result['symbol']} 역추세 진입 조건 충족*\n"
+                    f"   ├ 방향    : `{result['direction'].upper()}`\n"
+                    f"   ├ 현재가  : `{result['price']}`\n"
+                    f"   ├ 이격도  : `{result['disparity']}%`\n"
+                    f"   ├ 볼륨    : `{result['volume']}`\n"
+                    f"   └ 전략    : `이격 + 스파이크 반대매매`"
+                )
+        #else:
+            #send_telegram_message("🔍 조건을 만족하는 종목이 없습니다.")
+        #else:
+            #send_telegram_message("🙅‍♂️ 예측 조건을 만족하는 종목이 없습니다. (볼륨 + 이격도 기준)")
+    except Exception as e:
+        send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
+
+
+
 # 자동 감시 루프
 def spike_watcher_loop():
     send_telegram_message(f"😀 spike_watcher_loop")
     while True:
-        report_spike_disparity()
-        report_top_1m_disparities()
+        report_spike()
+        #report_spike_disparity()
+        #report_top_1m_disparities()
         time.sleep(60)  # 1분 주기

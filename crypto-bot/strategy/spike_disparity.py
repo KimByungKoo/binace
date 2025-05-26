@@ -363,6 +363,8 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             if test_mode:
                 send_telegram_message(f"❌ {symbol} 데이터 비어있음 또는 거래량 없음")
             return None, []
+            
+        send_telegram_message(f"222222")
 
         df['ma7'] = df['close'].rolling(7).mean()
         df['ma20'] = df['close'].rolling(20).mean()

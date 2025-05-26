@@ -365,7 +365,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 send_telegram_message(f"❌ {symbol} 데이터 비어있음 또는 거래량 없음")
             return None, []
             
-        send_telegram_message(f"222222")
+        send_telegram_message(f"222222{df}")
 
         df['ma7'] = df['close'].rolling(7).mean()
         df['ma20'] = df['close'].rolling(20).mean()
@@ -411,7 +411,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         direction = "short" if ma_bullish else "long" if ma_bearish else None
 
-        send_telegram_message(f"33333")
+        send_telegram_message(f"33333. {direction}")
 
         if volume_spike and disparity_ok and candle_position_ok and direction:
             

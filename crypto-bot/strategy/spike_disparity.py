@@ -357,7 +357,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     """
     issues = []
     try:
-        send_telegram_message(f"111111")
+        send_telegram_message(f"111111 {test_mode}")
         send_telegram_message(f"test_mode {test_mode} what")
         df = get_1m_klines(symbol, interval=cfg["interval"], limit=cfg["ma_window"] + 1)
         if df.empty or 'volume' not in df.columns:

@@ -31,13 +31,9 @@ jobs:
             git clone https://github.com/KimByungKoo/binace.git .
           fi
 
-          cd crypto-bot
+          
 
-          # ✅ 가상환경 만들고 requirements 설치
-          # python3 -m venv .venv
-          # source .venv/bin/activate
-          #pip install --upgrade pip
-          #pip install -r requirements.txt
+          
 
 
           pkill -f bot.py || true

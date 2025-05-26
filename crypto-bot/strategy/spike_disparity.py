@@ -459,8 +459,8 @@ def report_spike():
             output = check_reverse_spike_condition(symbol,True)
             #if not result:
                 #continue
-            if not output:
-                continue
+            #if not output:
+                #continue
             
             result, issues = output
             

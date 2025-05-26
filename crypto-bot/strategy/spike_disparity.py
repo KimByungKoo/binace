@@ -441,7 +441,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             msg = f"⚠️ [{symbol}] 역스파이크 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues])
             send_telegram_message(msg)
 
-        return None, issues
+        return None, issues if issues else []
 
     except Exception as e:
         send_telegram_message(f"💥387 [{symbol}] 예외 발생: {e}")
@@ -456,26 +456,20 @@ def report_spike():
         found = False
         
         for symbol in symbols:
-            output = check_reverse_spike_condition(symbol,True)
-            #if not result:
-                #continue
-            #if not output:
-                #continue
-            send_telegram_message(f"678 [{output}] ")
-            
+            output = check_reverse_spike_condition(symbol, True)
+        
             if output is None:
+                send_telegram_message(f"⛔ {symbol} → 결과 없음 (output is None)")
                 continue
-            
+        
             result, issues = output
-            
-            
-            if  issues:
+        
+            if issues:
                 msg = f"⚠️ [{symbol}] 조건 미달:\n" + "\n".join([f"   ├ {i}" for i in issues])
                 send_telegram_message(msg)
                 continue
-                
-            
-            if result and result.get("pass", False):
+        
+            if result and result.get("pass"):
                 send_telegram_message(
                     f"🔁 *{result['symbol']} 역추세 진입 조건 충족*\n"
                     f"   ├ 방향    : `{result['direction'].upper()}`\n"

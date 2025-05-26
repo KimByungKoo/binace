@@ -344,15 +344,8 @@ def monitor_fixed_profit_loss_exit():
 
     while True:
         try:
-            positions = safe_futures_account()
-            if positions is None:
-                continue
-            for p in positions:
-                if isinstance(p, dict) and 'symbol' in p:
-                    symbol = p['symbol']
-                else:
-                    send_telegram_message(f"❌ 포지션 형식 이상함: {p}")
-                    continue
+                positions = client.futures_account()
+            
                 #symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])

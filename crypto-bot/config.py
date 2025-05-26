@@ -6,7 +6,7 @@ SPIKE_CONFIG = {
     "disparity_threshold": 105.0,     # 105% 이
     "limit": 150,                   # 데이터 몇 개 가져올지
     "vol_ma_window": 10,            # 거래량 평균 구간
-    "spike_multiplier": 2,          # 스파이크 배수
+    "spike_multiplier": 1.5,          # 스파이크 배수
     "disparity_ma": 90,             # 이격도 기준 MA
     "disparity_thresh": 1.1,          # 몇 % 이상 벗어나야 과이격
     "lookback": 15,                  # 최근 N봉 이내 스파이크 발생해야 인정

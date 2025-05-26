@@ -41,6 +41,10 @@ SPIKE_CONFIG = {
     "notify_on_price_slope_fail":True,
     "notify_on_error": False,   
 
-    "auto_execute": True
+    "auto_execute": True,
+    
+      "min_profit_pct": 0.5,   # 수익 0.5% 이상이면 익절
+    "max_loss_pct": 1.0,     # 손실 1.0% 이하면 손절
+
 
 }

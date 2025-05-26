@@ -2,7 +2,7 @@
 
 SPIKE_CONFIG = {
     "interval": "1m",               # 사용할 분봉
-    "ma_window": 90,
+    "ma_window": 120,
     "disparity_threshold": 105.0,     # 105% 이
     "limit": 150,                   # 데이터 몇 개 가져올지
     "vol_ma_window": 20,            # 거래량 평균 구간
@@ -23,8 +23,8 @@ SPIKE_CONFIG = {
     "reverse_trade": True,      # 반대방향 진입 여부
 
 
-    "rsi_period": 7,
-    "rsi_threshold": 10,
+    "rsi_period":7,
+    "rsi_threshold": 30,
 
     # 가격 기울기
     "price_lookback": 5,

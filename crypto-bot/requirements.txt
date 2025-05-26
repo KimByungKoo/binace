@@ -3,3 +3,4 @@ pandas
 requests
 python-dotenv
 websocket-client
+pandas_ta

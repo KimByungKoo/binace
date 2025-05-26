@@ -335,6 +335,10 @@ def check_disparity(symbol):
     return None
     
     
+# ta 라이브러리는 Wilder 방식이 반영돼 있음
+import pandas_ta as ta
+
+
 
 def calculate_rsi(df, period=7):
     delta = df['close'].diff()
@@ -435,7 +439,9 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             )
 
         # RSI 추가 계산
-        df['rsi'] = calculate_rsi(df, period=cfg["rsi_period"])
+        
+        df['rsi'] = ta.rsi(df['close'], length=7)
+        #df['rsi'] = calculate_rsi(df, period=cfg["rsi_period"])
 
         # 최신 RSI 가져오기
         latest_rsi = df['rsi'].iloc[-1]

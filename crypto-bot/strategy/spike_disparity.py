@@ -377,6 +377,10 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         price = latest['close']
         open_price = latest['open']
         ma7 = latest['ma7']
+        
+        ma20 = latest['ma20']
+        ma30 = latest['ma30']
+        ma60 = latest['ma60']
 
         # 거래량 스파이크
         if latest['volume'] < latest['volume_ma'] * cfg["spike_multiplier"]:

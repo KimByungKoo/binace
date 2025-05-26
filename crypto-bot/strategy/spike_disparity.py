@@ -460,6 +460,8 @@ def report_spike():
         msg = "📈 *볼륨 스파이크 + 이격 과열 감지 리스트*\n\n"
         found = False
         
+        
+        send_telegram_message(f"✅ 가져온 심볼: {1}")
         for symbol in symbols:
             send_telegram_message(f"➡️ check_reverse_spike_condition 호출: {symbol}")
             output = check_reverse_spike_condition(symbol, True)

@@ -384,7 +384,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         # 거래량 스파이크
         if latest['volume'] < latest['volume_ma'] * cfg["spike_multiplier"]:
-            issues.append(f"❌ 거래량 스파이크 아님 { latest['volume'] } < {latest['volume_ma']} * {cfg["spike_multiplier"] }. {latest['volume_ma'] * cfg["spike_multiplier"]}")
+            issues.append(f"❌ 거래량 스파이크 아님 { latest['volume'] } < {latest['volume_ma']} * {cfg['spike_multiplier'] }. {latest['volume_ma'] * cfg['spike_multiplier']}")
 
         # MA7 이격 조건
         disparity = abs(open_price - ma7) / ma7 * 100

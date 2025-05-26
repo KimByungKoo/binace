@@ -448,7 +448,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             if test_mode:
                 msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
                 send_telegram_message("\n".join(msg_lines))
-            return None, []
+            return None, msg_lines
 
     except Exception as e:
         send_telegram_message(f"💥 예외 발생 in {symbol}: {e}")

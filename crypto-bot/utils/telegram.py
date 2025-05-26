@@ -19,6 +19,7 @@ def send_telegram_message(message):
         'parse_mode': 'Markdown'
     }
     try:
+        print("Sending Telegram message:", message)
         requests.post(url, data=data)
     except Exception as e:
         print("Telegram error:", e)

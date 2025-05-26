@@ -348,7 +348,12 @@ def monitor_fixed_profit_loss_exit():
             if positions is None:
                 continue
             for p in positions:
-                symbol = p['symbol']
+                if isinstance(p, dict) and 'symbol' in p:
+                    symbol = p['symbol']
+                else:
+                    send_telegram_message(f"❌ 포지션 형식 이상함: {p}")
+                    continue
+                #symbol = p['symbol']
                 amt = float(p['positionAmt'])
                 entry_price = float(p['entryPrice'])
 

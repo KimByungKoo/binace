@@ -452,13 +452,14 @@ def report_spike():
         
         for symbol in symbols:
             result, issues = check_reverse_spike_condition(symbol,True)
-            if not result:
-                continue
+            #if not result:
+                #continue
             
             if not result:
                 if  issues:
                     msg = f"⚠️ [{symbol}] 조건 미달:\n" + "\n".join([f"   ├ {i}" for i in issues])
                     send_telegram_message(msg)
+                    continue
                 
             
             if result.get("pass"):

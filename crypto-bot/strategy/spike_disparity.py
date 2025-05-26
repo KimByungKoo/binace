@@ -415,7 +415,11 @@ def check_reverse_spike_condition(symbol, test_mode=False):
                 "direction": direction,
                 "price": price,
                 "take_profit": tp,
-                "stop_loss": sl
+                "stop_loss": sl,
+                "disparity": round(disparity, 2),
+                "volume": round(latest['volume'], 2),
+                "volume_ma": round(latest['volume_ma'], 2),
+                "pass": True
             }
 
             msg = (
@@ -466,13 +470,13 @@ def report_spike():
                 continue
                 
             
-            if result.get("pass"):
+            if result and result.get("pass", False):
                 send_telegram_message(
                     f"🔁 *{result['symbol']} 역추세 진입 조건 충족*\n"
                     f"   ├ 방향    : `{result['direction'].upper()}`\n"
                     f"   ├ 현재가  : `{result['price']}`\n"
                     f"   ├ 이격도  : `{result['disparity']}%`\n"
-                    f"   ├ 볼륨    : `{result['volume']}`\n"
+                    f"   ├ 볼륨    : `{result['volume']}` / MA: `{result['volume_ma']}`\n"
                     f"   └ 전략    : `이격 + 스파이크 반대매매`"
                 )
         #else:

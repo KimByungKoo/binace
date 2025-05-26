@@ -398,7 +398,7 @@ def report_spike():
             if not output:
                 continue
             
-            result, issues = output
+            result = output
             if result.get("pass"):
                 send_telegram_message(
                     f"🔁 *{result['symbol']} 역추세 진입 조건 충족*\n"

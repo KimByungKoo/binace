@@ -443,6 +443,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             return signal, []
         else:
             send_telegram_message(f"5555")
+            send_telegram_message(f"test_mode {test_mode}")
             if test_mode:
                 msg_lines.append(f"   ❌ 조건 미충족 → 진입 없음")
                 send_telegram_message("\n".join(msg_lines))

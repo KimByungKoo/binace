@@ -339,7 +339,7 @@ def check_disparity(symbol):
     
 
 
-def check_reverse_spike_condition(symbol, test_mode=False):
+def check_reverse_spike_condition(symbol, test_mode=True):
     """
     과매수/과매도 상황을 역추세로 판단하여 매매 신호 생성 및 자동 매수 수행.
 
@@ -382,7 +382,7 @@ def check_reverse_spike_condition(symbol, test_mode=False):
 
         # MA7 이격 조건
         disparity = abs(open_price - ma7) / ma7 * 100
-        if disparity < cfg["disparity_thresh"]:
+        if disparity < cfg["min_disparity_pct"]:
             issues.append(f"❌ MA7 이격률 부족 ({round(disparity, 2)}%)")
 
         # 캔들 색상

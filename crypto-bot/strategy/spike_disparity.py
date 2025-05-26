@@ -387,11 +387,27 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         volume_ma = latest['volume_ma']
         required_volume = volume_ma * cfg["spike_multiplier"]
         
-        if volume < required_volume:
+        
+        # 거래량 기준선 계산
+        df['volume_ema'] = df['volume'].ewm(span=cfg["vol_ma_window"]).mean()
+        df['volume_std'] = df['volume'].rolling(cfg["vol_ma_window"]).std()
+        
+        ema = latest['volume_ema']
+        std = latest['volume_std']
+        threshold = ema + std * cfg["spike_std_multiplier"]
+        
+        if latest['volume'] < threshold:
             issues.append(
-                f"❌ 거래량 스파이크 아님 "
-                f"(현재: {round(volume, 2)}, 기준: {round(required_volume, 2)} / MA: {round(volume_ma, 2)} x {cfg['spike_multiplier']})"
+                f"❌ 거래량 스파이크 아님\n"
+                f"   ├ 현재 거래량   : `{round(latest['volume'], 2)}`\n"
+                f"   ├ 기준치       : `{round(threshold, 2)}` (EMA+STD)"
             )
+
+        #if volume < required_volume:
+            #issues.append(
+                #f"❌ 거래량 스파이크 아님 "
+                #f"(현재: {round(volume, 2)}, 기준: {round(required_volume, 2)} / MA: {round(volume_ma, 2)} x {cfg['spike_multiplier']})"
+            #)
         # MA7 이격 조건
         disparity = abs(open_price - ma7) / ma7 * 100
         if disparity < cfg["min_disparity_pct"]:
@@ -517,7 +533,32 @@ def report_spike():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
+def is_volume_spike(df):
+    """
+    거래량 스파이크 여부 판단
+    기준:
+    - 최근 거래량이 EMA 기준치보다 크고
+    - EMA + 표준편차를 초과하는 경우
+    """
+    df['volume_ema'] = df['volume'].ewm(span=cfg["vol_ma_window"]).mean()
+    df['volume_std'] = df['volume'].rolling(cfg["vol_ma_window"]).std()
 
+    latest = df.iloc[-1]
+    ema = latest['volume_ema']
+    std = latest['volume_std']
+    current_volume = latest['volume']
+
+    threshold = ema + std * cfg["spike_std_multiplier"]
+
+    send_telegram_message(
+        f"📊 거래량 분석\n"
+        f"   ├ 현재 거래량     : `{round(current_volume, 2)}`\n"
+        f"   ├ EMA 기준선     : `{round(ema, 2)}`\n"
+        f"   ├ 표준편차 x {cfg['spike_std_multiplier']} : `{round(std * cfg['spike_std_multiplier'], 2)}`\n"
+        f"   └ 최종 기준치    : `{round(threshold, 2)}`"
+    )
+
+    return current_volume > threshold
 
 # 자동 감시 루프
 def spike_watcher_loop():

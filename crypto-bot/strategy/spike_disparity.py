@@ -338,7 +338,7 @@ def check_disparity(symbol):
     
     
 
-a
+
 def check_reverse_spike_condition(symbol, test_mode=True):
     """
     과매수/과매도 상황을 역추세로 판단하여 매매 신호 생성 및 자동 매수 수행.
@@ -446,7 +446,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
     except Exception as e:
         if test_mode:
             send_telegram_message(f"💥 [{symbol}] 예외 발생: {e}")
-        return None, []
+            return None, []
         
         
 def report_spike():

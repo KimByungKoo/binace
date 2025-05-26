@@ -24,7 +24,7 @@ SPIKE_CONFIG = {
 
 
     "rsi_period":7,
-    "rsi_threshold": 30,
+    "rsi_threshold": 10,
 
     # 가격 기울기
     "price_lookback": 5,

@@ -444,7 +444,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         return None, issues
 
     except Exception as e:
-        send_telegram_message(f"💥 [{symbol}] 예외 발생: {e}")
+        send_telegram_message(f"💥387 [{symbol}] 예외 발생: {e}")
         return None, []
             
         
@@ -461,7 +461,7 @@ def report_spike():
                 #continue
             #if not output:
                 #continue
-            send_telegram_message(f"💥 [{output}] ")
+            send_telegram_message(f"678 [{output}] ")
             
             if output is None:
                 continue

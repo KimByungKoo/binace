@@ -438,9 +438,9 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             return signal, []
 
         # 실패한 경우
-        if test_mode and issues:
-            msg = f"⚠️ [{symbol}] 역스파이크 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues])
-            send_telegram_message(msg)
+        #if test_mode and issues:
+            #msg = f"⚠️ [{symbol}] 역스파이크 조건 미충족:\n" + "\n".join([f"   ├ {i}" for i in issues])
+            #send_telegram_message(msg)
 
         return None, issues if issues else []
 
@@ -474,10 +474,10 @@ def report_spike():
         
             #result, issues = output
         
-            if issues:
-                msg = f"⚠️ [{symbol}] 조건 미달:\n" + "\n".join([f"   ├ {i}" for i in issues])
-                send_telegram_message(msg)
-                continue
+            #if issues:
+                #msg = f"⚠️ [{symbol}] 조건 미달:\n" + "\n".join([f"   ├ {i}" for i in issues])
+                #send_telegram_message(msg)
+                #continue
         
             if result and result.get("pass"):
                 send_telegram_message(

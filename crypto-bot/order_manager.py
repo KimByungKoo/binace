@@ -387,14 +387,24 @@ def monitor_fixed_profit_loss_exit():
                     wt = water_tracker.get(symbol, {"count": 0, "last": None})
                     if wt["count"] < 2:
                         if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=1):
-                            unit_qty = round_qty(symbol, 100 / last_price)
-                            place_market_order(symbol, direction, unit_qty)
+                           unit_qty = round_qty(symbol, 100 / last_price)
 
+                            signal = {
+                                "symbol": symbol,
+                                "direction": direction,
+                                "price": last_price,
+                                "take_profit": last_price * (1.015 if direction == "long" else 0.985),
+                                "stop_loss": last_price * (0.99 if direction == "long" else 1.01),
+                                "qty": unit_qty  # auto_trade_from_signal에서 qty 지원하면 추가
+                            }
+                
+                            auto_trade_from_signal(signal)
+                
                             water_tracker[symbol] = {
                                 "count": wt["count"] + 1,
                                 "last": datetime.utcnow()
                             }
-
+                
                             send_telegram_message(
                                 f"💧 *물타기 {wt['count']+1}/2: {symbol}*\n"
                                 f"   ├ 방향     : `{direction.upper()}`\n"

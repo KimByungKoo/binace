@@ -341,6 +341,51 @@ def safe_futures_account():
         send_telegram_message(f"💥 계정 조회 실패: {e}")
         return None
 
+
+
+def water_trade_from_signal(symbol, price):
+    """
+    현재 포지션과 같은 방향으로 물타기 진입. 
+    $100 고정 금액 기준. 평균 단가 재계산.
+    """
+
+    existing = active_positions.get(symbol)
+    if not existing:
+        send_telegram_message(f"⛔ {symbol} → 기존 포지션 없음 → 물타기 생략")
+        return
+
+    direction = existing["direction"]
+    prev_qty = existing["qty"]
+    prev_price = existing["entry_price"]
+
+    new_qty = 100 / price
+    total_qty = prev_qty + new_qty
+    avg_price = (prev_qty * prev_price + new_qty * price) / total_qty
+
+    # TP/SL 재계산
+    tp = avg_price * (1.015 if direction == "long" else 0.985)
+    sl = avg_price * (0.99 if direction == "long" else 1.01)
+
+    # 주문 전송
+    place_order(symbol, direction, new_qty, price, tp)
+
+    # 포지션 갱신
+    active_positions[symbol] = {
+        "direction": direction,
+        "entry_price": avg_price,
+        "entry_time": datetime.utcnow(),
+        "take_profit": tp,
+        "stop_loss": sl,
+        "qty": total_qty
+    }
+
+    send_telegram_message(
+        f"💧 *물타기: {symbol}*\n"
+        f"   ├ 방향     : `{direction}`\n"
+        f"   ├ 추가 수량: `{round(new_qty, 4)}`\n"
+        f"   ├ 평균 단가: `{round(avg_price, 4)}`\n"
+        f"   └ 총 수량  : `{round(total_qty, 4)}`"
+    )
 # 진입 추적용 딕셔너리
 water_tracker = {}
 def monitor_fixed_profit_loss_exit():
@@ -387,31 +432,8 @@ def monitor_fixed_profit_loss_exit():
                     wt = water_tracker.get(symbol, {"count": 0, "last": None})
                     if wt["count"] < 2:
                         if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=1):
-                           unit_qty = round_qty(symbol, 100 / last_price)
-
-                           signal = {
-                                "symbol": symbol,
-                                "direction": direction,
-                                "price": last_price,
-                                "take_profit": last_price * (1.015 if direction == "long" else 0.985),
-                                "stop_loss": last_price * (0.99 if direction == "long" else 1.01),
-                                "qty": unit_qty  # auto_trade_from_signal에서 qty 지원하면 추가
-                            }
-                
-                           auto_trade_from_signal(signal)
-                
-                           water_tracker[symbol] = {
-                                "count": wt["count"] + 1,
-                                "last": datetime.utcnow()
-                            }
-                
-                           send_telegram_message(
-                                f"💧 *물타기 {wt['count']+1}/2: {symbol}*\n"
-                                f"   ├ 방향     : `{direction.upper()}`\n"
-                                f"   ├ 추가 수량: `{unit_qty}`\n"
-                                f"   ├ 현재가   : `{round(last_price, 4)}`\n"
-                                f"   └ 시각     : `{now_time}`"
-                            )
+                           
+                           water_trade_from_signal(symbol, last_price)
                            continue
 
                 if pnl_pct >= cfg["min_profit_pct"]:

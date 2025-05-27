@@ -77,6 +77,12 @@ def auto_trade_from_signal(signal):
     sl = signal.get("stop_loss")
     
   
+    # 최대 포지션 제한
+    if len(active_positions) >= 5:
+        send_telegram_message(f"⛔ 포지션 제한 초과: 현재 {len(active_positions)}개 보유 중 → {symbol} 진입 생략")
+        return
+    
+    
 
     if not symbol or not direction or not price:
         send_telegram_message("⚠️ 진입 실패: signal 정보 불완전")

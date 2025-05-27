@@ -558,9 +558,9 @@ def check_reverse_spike_condition(symbol, test_mode=True):
                 f"   ├ 거래량: `{round(latest['volume'], 2)}` vs MA: `{round(latest['volume_ma'], 2)}`\n"
                 # f"   └ MA배열: {'정배열' if ma_bullish else '역배열'}"
             )
-            send_telegram_message(msg)
+            # send_telegram_message(msg)
 
-            auto_trade_from_signal(signal)
+            # auto_trade_from_signal(signal)
             return signal, []
 
         # 실패한 경우

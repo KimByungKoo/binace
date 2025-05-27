@@ -339,6 +339,8 @@ def safe_futures_account():
         send_telegram_message(f"💥 계정 조회 실패: {e}")
         return None
 
+# 진입 추적용 딕셔너리
+water_tracker = {}
 def monitor_fixed_profit_loss_exit():
     send_telegram_message("🎯 수익/손실 퍼센트 기준 실시간 청산 감시 시작")
 
@@ -386,6 +388,27 @@ def monitor_fixed_profit_loss_exit():
                     should_exit = True
                     reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
 
+                # 물타기 로직
+                elif pnl_pct <= -cfg["max_loss_pct"]:
+                    wt = water_tracker.get(symbol, {"count": 0, "last": None})
+                    if wt["count"] < 2:
+                        if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=1):
+                            unit_qty = round_qty(symbol, 100 / last_price)
+                            place_market_order(symbol, direction, unit_qty)
+
+                            water_tracker[symbol] = {
+                                "count": wt["count"] + 1,
+                                "last": datetime.utcnow()
+                            }
+
+                            send_telegram_message(
+                                f"💧 *물타기 {wt['count']+1}/2: {symbol}*\n"
+                                f"   ├ 방향     : `{direction.upper()}`\n"
+                                f"   ├ 추가 수량: `{unit_qty}`\n"
+                                f"   ├ 현재가   : `{round(last_price, 4)}`\n"
+                                f"   └ 시각     : `{now_time}`"
+                            )
+                            continue
                 #elif direction == "long" and last_price < prev_low:
                     #should_exit = True
                     #reason = f"📉 진입봉 최저가 이탈 (롱)"

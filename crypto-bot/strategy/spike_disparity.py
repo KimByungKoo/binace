@@ -453,11 +453,12 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             f"   ├ RSI: `{round(latest_rsi, 2)}`\n"
             f"   ├ 기준: `기간 {cfg['rsi_period']} / 임계치 {cfg['rsi_threshold']}`\n"
         )
-        print(f"DEBUG: {symbol} RSI: {latest_rsi}, 기준: {cfg['rsi_threshold']}")
+        # print(f"DEBUG: {symbol} RSI: {latest_rsi}, 기준: {cfg['rsi_threshold']}")
 
         
-       
-
+        if(latest_rsi<10 or latest_rsi>90):
+            test = f"   {symbol} 📉 *RSI 근처 감지* → `{round(latest_rsi, 2)} `"
+            send_telegram_message(test)
         
         if latest_rsi < cfg["rsi_threshold"]:
             msg += f"   └ 📉 *과매도 감지* → `{round(latest_rsi, 2)} < {cfg['rsi_threshold']}`"

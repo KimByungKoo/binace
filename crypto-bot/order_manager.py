@@ -25,6 +25,8 @@ def set_leverage(symbol, leverage):
     except Exception as e:
         send_telegram_message(f"⚠️ 레버리지 설정 실패: {symbol} → {e}")
 
+
+
 def round_qty(symbol, raw_qty):
     info = client.futures_exchange_info()
     for s in info['symbols']:

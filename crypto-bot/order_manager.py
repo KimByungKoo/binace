@@ -389,7 +389,7 @@ def monitor_fixed_profit_loss_exit():
                         if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=1):
                            unit_qty = round_qty(symbol, 100 / last_price)
 
-                            signal = {
+                           signal = {
                                 "symbol": symbol,
                                 "direction": direction,
                                 "price": last_price,
@@ -398,21 +398,21 @@ def monitor_fixed_profit_loss_exit():
                                 "qty": unit_qty  # auto_trade_from_signal에서 qty 지원하면 추가
                             }
                 
-                            auto_trade_from_signal(signal)
+                           auto_trade_from_signal(signal)
                 
-                            water_tracker[symbol] = {
+                           water_tracker[symbol] = {
                                 "count": wt["count"] + 1,
                                 "last": datetime.utcnow()
                             }
                 
-                            send_telegram_message(
+                           send_telegram_message(
                                 f"💧 *물타기 {wt['count']+1}/2: {symbol}*\n"
                                 f"   ├ 방향     : `{direction.upper()}`\n"
                                 f"   ├ 추가 수량: `{unit_qty}`\n"
                                 f"   ├ 현재가   : `{round(last_price, 4)}`\n"
                                 f"   └ 시각     : `{now_time}`"
                             )
-                            continue
+                           continue
 
                 if pnl_pct >= cfg["min_profit_pct"]:
                     should_exit = True

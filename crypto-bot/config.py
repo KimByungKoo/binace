@@ -8,7 +8,7 @@ SPIKE_CONFIG = {
     "vol_ma_window": 20,            # 거래량 평균 구간
     "spike_multiplier": 1.5,          # 스파이크 배수
     "disparity_ma": 90,             # 이격도 기준 MA
-    "disparity_thresh": 1.5,          # 몇 % 이상 벗어나야 과이격
+    "disparity_thresh": 1.9,          # 몇 % 이상 벗어나야 과이격
     "lookback": 15,                  # 최근 N봉 이내 스파이크 발생해야 인정
     "top_n": 50    ,                 # 검사할 종목 
     

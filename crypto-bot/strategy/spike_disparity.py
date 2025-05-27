@@ -530,10 +530,10 @@ def check_reverse_spike_condition(symbol, test_mode=True):
 
         # 조건 통과
         if not issues and direction:
-            if has_open_position(symbol):
-                if test_mode:
-                    send_telegram_message(f"⛔ {symbol} 이미 포지션 보유 중 → 스킵")
-                return None, []
+            #if has_open_position(symbol):
+                #if test_mode:
+                    #send_telegram_message(f"⛔ {symbol} 이미 포지션 보유 중 → 스킵")
+                #return None, []
 
             tp = price * (1.015 if direction == "long" else 0.985)
             sl = price * (0.99 if direction == "long" else 1.01)

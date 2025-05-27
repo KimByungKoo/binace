@@ -6,7 +6,7 @@ from order_manager import auto_trade_from_signal
 
 import pandas as pd
 
-a
+
 
 def check_volume_spike_disparity(symbol):
     issues = [] 
@@ -464,7 +464,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             send_telegram_message(msg)
             signal = {
                 "symbol": symbol,
-                "direction": 'short',
+                "direction": 'long',
                 "price": price,
             
               
@@ -478,7 +478,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
             send_telegram_message(msg)
             signal = {
                 "symbol": symbol,
-                "direction": 'long',
+                "direction": 'short',
                 "price": price,
             
                

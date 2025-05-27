@@ -10,7 +10,7 @@ SPIKE_CONFIG = {
     "disparity_ma": 90,             # 이격도 기준 MA
     "disparity_thresh": 1.9,          # 몇 % 이상 벗어나야 과이격
     "lookback": 15,                  # 최근 N봉 이내 스파이크 발생해야 인정
-    "top_n": 50    ,                 # 검사할 종목 
+    "top_n": 100    ,                 # 검사할 종목 
     
     "volatility_multiplier": 2.0,    # 과거 평균 변동률의 N배 이상이어야 spike로 인정
      "spike_std_multiplier": 2.5,
@@ -47,8 +47,8 @@ SPIKE_CONFIG = {
 
     "auto_execute": True,
     
-      "min_profit_pct": 1.0,   # 수익 0.5% 이상이면 익절
-    "max_loss_pct": 1.0,     # 손실 1.0% 이하면 손절
+      "min_profit_pct": 0.5,   # 수익 0.5% 이상이면 익절
+    "max_loss_pct": 0.5,     # 손실 1.0% 이하면 손절
 
 
 }

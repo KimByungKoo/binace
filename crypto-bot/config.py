@@ -24,7 +24,7 @@ SPIKE_CONFIG = {
 
 
     "rsi_period":7,
-    "rsi_threshold":6,
+    "rsi_threshold":5,
 
     # 가격 기울기
     "price_lookback": 5,
@@ -47,8 +47,8 @@ SPIKE_CONFIG = {
 
     "auto_execute": True,
     
-      "min_profit_pct": 0.5,   # 수익 0.5% 이상이면 익절
-    "max_loss_pct": 0.7,     # 손실 1.0% 이하면 손절
+      "min_profit_pct": 2,   # 수익 0.5% 이상이면 익절
+    "max_loss_pct": 2,     # 손실 1.0% 이하면 손절
 
 
 }

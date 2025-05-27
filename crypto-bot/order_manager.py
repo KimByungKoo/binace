@@ -379,17 +379,9 @@ def monitor_fixed_profit_loss_exit():
 
                 should_exit = False
                 reason = ""
-
-                if pnl_pct >= cfg["min_profit_pct"]:
-                    should_exit = True
-                    reason = f"🟢 *익절 청산 ({round(pnl_pct,2)}%)*"
-
-                elif pnl_pct <= -cfg["max_loss_pct"]:
-                    should_exit = True
-                    reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
-
+                
                 # 물타기 로직
-                elif pnl_pct <= -cfg["max_loss_pct"]:
+                if pnl_pct <= -cfg["max_loss_pct"]:
                     wt = water_tracker.get(symbol, {"count": 0, "last": None})
                     if wt["count"] < 2:
                         if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=1):
@@ -409,6 +401,16 @@ def monitor_fixed_profit_loss_exit():
                                 f"   └ 시각     : `{now_time}`"
                             )
                             continue
+
+                if pnl_pct >= cfg["min_profit_pct"]:
+                    should_exit = True
+                    reason = f"🟢 *익절 청산 ({round(pnl_pct,2)}%)*"
+
+                elif pnl_pct <= -cfg["max_loss_pct"]:
+                    should_exit = True
+                    reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
+
+                
                 #elif direction == "long" and last_price < prev_low:
                     #should_exit = True
                     #reason = f"📉 진입봉 최저가 이탈 (롱)"

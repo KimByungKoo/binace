@@ -418,9 +418,12 @@ def monitor_fixed_profit_loss_exit():
                     should_exit = True
                     reason = f"🟢 *익절 청산 ({round(pnl_pct,2)}%)*"
 
+                # 손절 조건, 최근 물타기 이후 일정 시간 경과한 경우만 실행
                 elif pnl_pct <= -cfg["max_loss_pct"]:
-                    should_exit = True
-                    reason = f"🔴 *손절 청산 ({round(pnl_pct,2)}%)*"
+                    wt = water_tracker.get(symbol, {"count": 0, "last": None})
+                    if not wt["last"] or datetime.utcnow() - wt["last"] > timedelta(minutes=2):
+                        should_exit = True
+                        reason = f"🔴 *손절 청산 ({round(pnl_pct, 2)}%)*"
 
                 
                 #elif direction == "long" and last_price < prev_low:

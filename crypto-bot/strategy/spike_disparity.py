@@ -638,15 +638,15 @@ def get_bb_continuous_touch(symbols, interval="1m", lookback=20, bb_period=66, b
             if df.empty or len(df) < bb_period + lookback:
                 continue
                 
-            alignment = check_ma_alignment(df)
+            #alignment = check_ma_alignment(df)
             
-            if alignment == "bullish":
-                print("📈 정배열 (상승 추세)")
-            elif alignment == "bearish":
-                print("📉 역배열 (하락 추세)")
-            else:
-                print("😐 혼조")
-                continue
+            #if alignment == "bullish":
+                #print("📈 정배열 (상승 추세)")
+            #elif alignment == "bearish":
+                #print("📉 역배열 (하락 추세)")
+            #else:
+                #print("😐 혼조")
+                #continue
 
             df['ma'] = df['close'].rolling(bb_period).mean()
             df['std'] = df['close'].rolling(bb_period).std()
@@ -670,9 +670,9 @@ def get_bb_continuous_touch(symbols, interval="1m", lookback=20, bb_period=66, b
             up_count = count_consecutive(upper_flags)
             low_count = count_consecutive(lower_flags)
 
-            if up_count >= 3:
+            if up_count >= 4:
                 results.append({"symbol": symbol, "type": "upper", "streak": up_count})
-            elif low_count >= 3:
+            elif low_count >= 4:
                 results.append({"symbol": symbol, "type": "lower", "streak": low_count})
 
         except Exception as e:

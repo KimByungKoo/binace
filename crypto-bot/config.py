@@ -48,7 +48,7 @@ SPIKE_CONFIG = {
 
     "auto_execute": True,
     
-      "min_profit_pct": 1.5,   # 수익 0.5% 이상이면 익절
+      "min_profit_pct": 10.5,   # 수익 0.5% 이상이면 익절
     "max_loss_pct": 5.5,     # 손실 1.0% 이하면 손절
 
 

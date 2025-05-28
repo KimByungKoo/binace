@@ -618,7 +618,7 @@ def report_spike():
                     f"   └ 전략    : `이격 + 스파이크 반대매매`"
                 )
     
-        bb_hits = get_bb_touch_symbols(symbols)
+        bb_hits = get_bb_continuous_touch(symbols)
     
         msg = "📊 *Bollinger Band 상/하단 유지 종목 (1분봉 기준)*\n"
         for item in bb_hits:
@@ -629,7 +629,7 @@ def report_spike():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
-def get_bb_touch_symbols(symbols, interval="1m", lookback=10, bb_period=20, bb_std=2):
+def get_bb_continuous_touch(symbols, interval="1m", lookback=20, bb_period=20, bb_std=2):
     results = []
 
     for symbol in symbols:
@@ -643,30 +643,33 @@ def get_bb_touch_symbols(symbols, interval="1m", lookback=10, bb_period=20, bb_s
             df['upper'] = df['ma'] + bb_std * df['std']
             df['lower'] = df['ma'] - bb_std * df['std']
 
-            # 최근 lookback봉 기준으로 3봉 이상 종가가 상단 이상 or 하단 이하
-            last_n = df.iloc[-lookback:]
-            upper_touches = (last_n['close'] >= last_n['upper']).sum()
-            lower_touches = (last_n['close'] <= last_n['lower']).sum()
+            # 최근 10봉 (현재 포함)
+            last_n = df.iloc[-10:]
+            upper_flags = (last_n['close'] >= last_n['upper']).tolist()
+            lower_flags = (last_n['close'] <= last_n['lower']).tolist()
 
-            if upper_touches >= 3:
-                results.append({
-                    "symbol": symbol,
-                    "type": "upper",
-                    "touches": upper_touches
-                })
-            elif lower_touches >= 3:
-                results.append({
-                    "symbol": symbol,
-                    "type": "lower",
-                    "touches": lower_touches
-                })
+            def count_consecutive(touches):
+                count = 0
+                for touched in reversed(touches):  # 현재봉부터 거꾸로
+                    if touched:
+                        count += 1
+                    else:
+                        break
+                return count
+
+            up_count = count_consecutive(upper_flags)
+            low_count = count_consecutive(lower_flags)
+
+            if up_count >= 3:
+                results.append({"symbol": symbol, "type": "upper", "streak": up_count})
+            elif low_count >= 3:
+                results.append({"symbol": symbol, "type": "lower", "streak": low_count})
 
         except Exception as e:
-            send_telegram_message(f"⚠️ BB 감시 실패: {symbol} → {e}")
+            send_telegram_message(f"⚠️ {symbol} BB 연속 감시 실패: {e}")
 
-    # 상단 터치 우선 오름차순 정렬
-    sorted_results = sorted(results, key=lambda x: (x["type"] != "upper", x["touches"]))
-    return sorted_results
+    # 상단 유지 먼저, 연속 개수 오름차순 정렬
+    return sorted(results, key=lambda x: (x['type'] != 'upper', x['streak']))
 
 # 자동 감시 루프
 def spike_watcher_loop():

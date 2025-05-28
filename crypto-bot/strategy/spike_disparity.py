@@ -617,11 +617,56 @@ def report_spike():
                     f"   ├ 볼륨    : `{result['volume']}` / MA: `{result['volume_ma']}`\n"
                     f"   └ 전략    : `이격 + 스파이크 반대매매`"
                 )
-     
+    
+        bb_hits = get_bb_touch_symbols(symbols)
+    
+        msg = "📊 *Bollinger Band 상/하단 유지 종목 (1분봉 기준)*\n"
+        for item in bb_hits:
+            msg += f"   ├ {item['symbol']} → {item['type'].upper()} 유지 {item['touches']}봉\n"
+        
+        send_telegram_message(msg)
+    
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
+def get_bb_touch_symbols(symbols, interval="1m", lookback=10, bb_period=20, bb_std=2):
+    results = []
 
+    for symbol in symbols:
+        try:
+            df = get_1m_klines(symbol, interval=interval, limit=bb_period + lookback)
+            if df.empty or len(df) < bb_period + lookback:
+                continue
+
+            df['ma'] = df['close'].rolling(bb_period).mean()
+            df['std'] = df['close'].rolling(bb_period).std()
+            df['upper'] = df['ma'] + bb_std * df['std']
+            df['lower'] = df['ma'] - bb_std * df['std']
+
+            # 최근 lookback봉 기준으로 3봉 이상 종가가 상단 이상 or 하단 이하
+            last_n = df.iloc[-lookback:]
+            upper_touches = (last_n['close'] >= last_n['upper']).sum()
+            lower_touches = (last_n['close'] <= last_n['lower']).sum()
+
+            if upper_touches >= 3:
+                results.append({
+                    "symbol": symbol,
+                    "type": "upper",
+                    "touches": upper_touches
+                })
+            elif lower_touches >= 3:
+                results.append({
+                    "symbol": symbol,
+                    "type": "lower",
+                    "touches": lower_touches
+                })
+
+        except Exception as e:
+            send_telegram_message(f"⚠️ BB 감시 실패: {symbol} → {e}")
+
+    # 상단 터치 우선 오름차순 정렬
+    sorted_results = sorted(results, key=lambda x: (x["type"] != "upper", x["touches"]))
+    return sorted_results
 
 # 자동 감시 루프
 def spike_watcher_loop():

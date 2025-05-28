@@ -629,7 +629,7 @@ def report_spike():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
-def get_bb_continuous_touch(symbols, interval="1m", lookback=20, bb_period=66, bb_std=2):
+def get_bb_continuous_touch(symbols, interval="3m", lookback=20, bb_period=66, bb_std=2):
     results = []
 
     for symbol in symbols:

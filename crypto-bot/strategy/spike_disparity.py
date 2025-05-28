@@ -456,7 +456,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         print(f"DEBUG: {symbol} RSI: {latest_rsi}, 기준: {cfg['rsi_threshold']}")
 
         
-        if(latest_rsi< cfg["rsi_threshold"]+5 or latest_rsi> cfg["rsi_threshold"]-5):
+        if(latest_rsi< cfg["rsi_threshold"]+5 or latest_rsi> 100-cfg["rsi_threshold"]-5):
             test = f"   {symbol} 📉 *RSI 근처 감지* → `{round(latest_rsi, 2)} `"
             send_telegram_message(test)
             

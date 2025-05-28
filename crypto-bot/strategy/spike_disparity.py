@@ -698,9 +698,9 @@ def check_ma_alignment(df):
     try:
         latest = df.iloc[-1]
         if all(col in latest for col in ['ma7', 'ma20', 'ma30', 'ma60']):
-            if latest['ma7'] > latest['ma20'] > latest['ma30'] > latest['ma60']:
+            if  latest['ma20'] > latest['ma30'] > latest['ma60']:
                 return 'bullish'
-            elif latest['ma7'] < latest['ma20'] < latest['ma30'] < latest['ma60']:
+            elif   latest['ma20'] < latest['ma30'] < latest['ma60']:
                 return 'bearish'
     except Exception as e:
         print(f"❌ MA 정렬 판별 실패: {e}")

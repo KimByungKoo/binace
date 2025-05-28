@@ -629,13 +629,23 @@ def report_spike():
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
 
-def get_bb_continuous_touch(symbols, interval="3m", lookback=20, bb_period=66, bb_std=2):
+def get_bb_continuous_touch(symbols, interval="1m", lookback=20, bb_period=66, bb_std=2):
     results = []
 
     for symbol in symbols:
         try:
             df = get_1m_klines(symbol, interval=interval, limit=bb_period + lookback)
             if df.empty or len(df) < bb_period + lookback:
+                continue
+                
+            alignment = check_ma_alignment(df)
+            
+            if alignment == "bullish":
+                print("📈 정배열 (상승 추세)")
+            elif alignment == "bearish":
+                print("📉 역배열 (하락 추세)")
+            else:
+                print("😐 혼조")
                 continue
 
             df['ma'] = df['close'].rolling(bb_period).mean()
@@ -671,6 +681,32 @@ def get_bb_continuous_touch(symbols, interval="3m", lookback=20, bb_period=66, b
     # 상단 유지 먼저, 연속 개수 오름차순 정렬
     return sorted(results, key=lambda x: (x['type'] != 'upper', x['streak']))
 
+
+def check_ma_alignment(df):
+    """
+    주어진 DataFrame의 마지막 row에서
+    정배열 or 역배열 여부를 판별한다.
+
+    정배열: ma7 > ma20 > ma30 > ma60
+    역배열: ma7 < ma20 < ma30 < ma60
+
+    Returns:
+        - 'bullish' : 정배열 (상승 추세)
+        - 'bearish' : 역배열 (하락 추세)
+        - None      : 어느 쪽도 아님
+    """
+    try:
+        latest = df.iloc[-1]
+        if all(col in latest for col in ['ma7', 'ma20', 'ma30', 'ma60']):
+            if latest['ma7'] > latest['ma20'] > latest['ma30'] > latest['ma60']:
+                return 'bullish'
+            elif latest['ma7'] < latest['ma20'] < latest['ma30'] < latest['ma60']:
+                return 'bearish'
+    except Exception as e:
+        print(f"❌ MA 정렬 판별 실패: {e}")
+    return None
+    
+    
 # 자동 감시 루프
 def spike_watcher_loop():
     send_telegram_message(f"😀 spike_watcher_loop")

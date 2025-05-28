@@ -442,7 +442,7 @@ def check_reverse_spike_condition(symbol, test_mode=True):
         """
         # RSI 추가 계산
         
-        df['rsi'] = ta.rsi(df['close'], length=7)
+        df['rsi'] = ta.rsi(df['close'], length=cfg["rsi_period"])
         #df['rsi'] = calculate_rsi(df, period=cfg["rsi_period"])
 
         # 최신 RSI 가져오기

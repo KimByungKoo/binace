@@ -620,11 +620,11 @@ def report_spike():
     
         bb_hits = get_bb_continuous_touch(symbols)
     
-        msg = "📊 *Bollinger Band 상/하단 유지 종목 (1분봉 기준)*\n"
-        for item in bb_hits:
-            msg += f"   ├ {item['symbol']} → {item['type'].upper()} 유지 {item['touches']}봉\n"
-        
-        send_telegram_message(msg)
+        if bb_hits:
+            msg = "🔍 *BB 상/하단 연속 터치 종목 (1분봉)*\n"
+            for x in bb_hits:
+                msg += f"   ├ {x['symbol']} → `{x['type'].upper()}` {x['streak']}봉 연속\n"
+            send_telegram_message(msg)
     
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")

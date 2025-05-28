@@ -26,7 +26,15 @@ def set_leverage(symbol, leverage):
         send_telegram_message(f"⚠️ 레버리지 설정 실패: {symbol} → {e}")
 
 
-
+def get_open_positions():
+    positions = client.futures_account()['positions']
+    open_symbols = []
+    for p in positions:
+        amt = float(p['positionAmt'])
+        if amt != 0:
+            open_symbols.append(p['symbol'])
+    return open_symbols
+    
 def round_qty(symbol, raw_qty):
     info = client.futures_exchange_info()
     for s in info['symbols']:
@@ -78,12 +86,11 @@ def auto_trade_from_signal(signal):
     
   
     # 최대 포지션 제한
-    if len(active_positions) >= 3:
-        current_symbols = "\n".join([f"   ├ {s}" for s in active_positions.keys()])
+    open_symbols = get_open_positions()
+    if len(open_symbols) >= 3:
         send_telegram_message(
-            f"⛔ 포지션 제한 초과: 현재 {len(active_positions)}개 보유 중\n"
-            f"{current_symbols}\n"
-            f"   └ 진입 생략: `{symbol}`"
+            f"⛔ 포지션 제한 초과: 현재 {len(open_symbols)}개 보유 중 → {symbol} 진입 생략\n"
+            f"   └ 현재 보유 심볼: {', '.join(open_symbols)}"
         )
         return
     

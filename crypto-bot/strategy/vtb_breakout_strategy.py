@@ -61,23 +61,23 @@ def vtb_signal(symbol):
         
         # 조건 체크
         if not all(recent_3['close'] > recent_3['bb_upper']):
-            send_telegram_message(f"❌ {symbol} BB 상단 돌파 실패")
+            print(f"❌ {symbol} BB 상단 돌파 실패")
             return
         
         if latest['ADX'] < CONFIG['adx_thresh']:
-            send_telegram_message(f"❌ {symbol} ADX 부족: {latest['ADX']} < {CONFIG['adx_thresh']}")
+            printe(f"❌ {symbol} ADX 부족: {latest['ADX']} < {CONFIG['adx_thresh']}")
             return
         
         if not (CONFIG['rsi_min'] <= latest['RSI'] <= CONFIG['rsi_max']):
-            send_telegram_message(f"❌ {symbol} RSI 범위 벗어남: {latest['RSI']}")
+            print(f"❌ {symbol} RSI 범위 벗어남: {latest['RSI']}")
             return
         
         if latest['volume'] < latest['volume_ma'] * CONFIG['vol_multiplier']:
-            send_telegram_message(f"❌ {symbol} 거래량 부족: {round(latest['volume'], 2)} vs 평균 {round(latest['volume_ma'], 2)}")
+            print(f"❌ {symbol} 거래량 부족: {round(latest['volume'], 2)} vs 평균 {round(latest['volume_ma'], 2)}")
             return
         
         if not (latest['ma7'] > latest['ma20'] > latest['ma60']):
-            send_telegram_message(f"❌ {symbol} 정배열 조건 불충족: MA7={latest['ma7']}, MA20={latest['ma20']}, MA60={latest['ma60']}")
+            print(f"❌ {symbol} 정배열 조건 불충족: MA7={latest['ma7']}, MA20={latest['ma20']}, MA60={latest['ma60']}")
             return
         
         

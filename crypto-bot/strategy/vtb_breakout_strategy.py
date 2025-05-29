@@ -87,8 +87,7 @@ def vtb_signal(symbol):
         place_order(symbol, "long", qty, entry, tp, sl)
 
         msg = (
-            f"📈 *VTB 진입 시그널: {symbol}*
-"
+            f"📈 *VTB 진입 시그널: {symbol}* "
             f"   ├ 볼밴 3봉 상단 돌파: ✅\n"
             f"   ├ ADX: {round(latest['ADX'], 2)}\n"
             f"   ├ RSI: {round(latest['RSI'], 2)}\n"

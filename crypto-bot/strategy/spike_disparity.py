@@ -767,7 +767,7 @@ def monitor_ma365_breakout():
         
 # 자동 감시 루프
 def spike_watcher_loop():
-    monitor_ma365_breakout()
+    
     send_telegram_message(f"😀 spike_watcher_loop")
     while True:
         report_spike()

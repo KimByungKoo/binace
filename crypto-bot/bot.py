@@ -2,7 +2,7 @@ from strategy.ma365 import monitor_top10_ma365
 from strategy.ma90_disparity import ma90_watcher_loop
 from telegram.commands import telegram_command_listener
 from strategy.spike_disparity import spike_watcher_loop,monitor_ma365_breakout
-from strategy.vtb_breakout_strategy import spike_watcher_loop1
+from strategy.vtb_breakout_strategy import spike_watcher_loop1loop1
 from position_monitor import position_watcher_loop
 #from strategy.disparity_monitor import run_disparity_monitor
 import threading
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
  
-    threading.Thread(target=spike_watcher_loop1, daemon=True).start()
+    threading.Thread(target=spike_watcher_loop1loop1, daemon=True).start()
     threading.Thread(target=spike_watcher_looploop, daemon=True).start()
 
     

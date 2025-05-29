@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from utils.telegram import send_telegram_message
-from utils.binance import get_15m_klines, has_open_position, place_order, set_leverage
+from utils.binance import get_1m_klines, has_open_position, place_order, set_leverage
 from order_manager import auto_trade_from_signal
 
 # === CONFIG ===
@@ -29,7 +29,7 @@ active_positions = {}
 
 def vtb_signal(symbol):
     try:
-        df = get_15m_klines(symbol, limit=100)
+        df = get_1m_klines(symbol, limit=100)
         if df.empty:
             return
 

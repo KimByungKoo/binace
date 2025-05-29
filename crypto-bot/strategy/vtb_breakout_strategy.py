@@ -115,6 +115,29 @@ def vtb_signal(symbol):
 # for sym in get_top_symbols():
 #     vtb_signal(sym)
 
+def report_spike():
+    try:
+        symbols = get_top_symbols(50)
+        #send_telegram_message(f"✅ 가져온 심볼: {symbols}")
+
+        if not symbols:
+            send_telegram_message("❌ 심볼 리스트 비어있음 → 루프 진입 안 함")
+            return
+        
+        
+        
+        #send_telegram_message(f"✅ 가져온 심볼: {1}")
+        for symbol in symbols:
+            vtb_signal(symbol)
+
+           
+            #send_telegram_message(msg)
+    
+    except Exception as e:
+        send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
+
+
+
 
 # 자동 감시 루프
 def spike_watcher_loop():

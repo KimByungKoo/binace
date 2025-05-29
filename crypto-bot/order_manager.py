@@ -103,12 +103,12 @@ def auto_trade_from_signal(signal):
   
     # 최대 포지션 제한
     open_symbols = get_open_positions()
-    if len(open_symbols) >= 3:
-        send_telegram_message(
-            f"⛔ 포지션 제한 초과: 현재 {len(open_symbols)}개 보유 중 → {symbol} 진입 생략\n"
-            f"   └ 현재 보유 심볼: {', '.join(open_symbols)}"
-        )
-        return
+    #if len(open_symbols) >= 3:
+        #send_telegram_message(
+            #f"⛔ 포지션 제한 초과: 현재 {len(open_symbols)}개 보유 중 → {symbol} 진입 생략\n"
+            #f"   └ 현재 보유 심볼: {', '.join(open_symbols)}"
+        #)
+        #return
     
     
 

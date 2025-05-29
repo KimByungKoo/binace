@@ -624,7 +624,8 @@ def report_spike():
             upper_hits = [x for x in bb_hits if x['type'] == 'upper']
             lower_hits = [x for x in bb_hits if x['type'] == 'lower']
         
-            msg = "🔍 *BB 상/하단 연속 터치 종목 (1분봉 기준)*\n"
+            msg = ""
+            #msg += "🔍 *BB 상/하단 연속 터치 종목 (1분봉 기준)*\n"
             msg += f"📈 UPPER({len(upper_hits)}): " + ", ".join([f"{x['symbol']}({x['streak']})" for x in upper_hits]) + "\n"
             msg += f"📉 LOWER({len(lower_hits)}): " + ", ".join([f"{x['symbol']}({x['streak']})" for x in lower_hits]) + "\n\n"
         

@@ -29,7 +29,7 @@ active_positions = {}
 
 def vtb_signal(symbol):
     try:
-        df = get_1m_klines(symbol, limit=100)
+        df = get_1m_klines(symbol,interval='15m',limit=100)
         if df.empty:
             return
 

@@ -114,3 +114,14 @@ def vtb_signal(symbol):
 # 호출 예시:
 # for sym in get_top_symbols():
 #     vtb_signal(sym)
+
+
+# 자동 감시 루프
+def spike_watcher_loop():
+    
+    send_telegram_message(f"😀 spike_loop")
+    while True:
+        report_spike()
+        #report_spike_disparity()
+        #report_top_1m_disparities()
+        time.sleep(10)  # 1분 주기

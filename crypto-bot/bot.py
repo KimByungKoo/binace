@@ -22,7 +22,7 @@ if __name__ == "__main__":
     # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
  
-    threading.Thread(target=spike_watcher_loop1, daemon=True).
+    threading.Thread(target=spike_watcher_loop1, daemon=True).start()
     threading.Thread(target=spike_watcher_looploop, daemon=True).start()
 
     

@@ -632,7 +632,10 @@ def report_spike():
             for x in bb_hits:
                 msg += f"   ├ {x['symbol']} → `{x['type'].upper()}` {x['streak']}봉 연속\n"
         
-            #send_telegram_message(msg)
+            analyze_market_and_get_contrarian_picks(bb_hits, symbols)
+            
+            
+        
     
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")
@@ -764,6 +767,54 @@ def monitor_ma365_breakout():
             send_telegram_message(f"💥 MA365 감시 오류: {e}")
 
         time.sleep(30)
+        
+        
+
+def analyze_market_and_get_contrarian_picks(bb_hits, symbols):
+    upper_symbols = [x['symbol'] for x in bb_hits if x['type'] == 'upper']
+    lower_symbols = [x['symbol'] for x in bb_hits if x['type'] == 'lower']
+
+    def get_change_pct(symbol):
+        df = get_1m_klines(symbol, interval="1m", limit=10)
+        if df.empty or len(df) < 10:
+            return None
+        start = df['open'].iloc[0]
+        end = df['close'].iloc[-1]
+        return ((end - start) / start) * 100
+
+    picks = []
+
+    if len(upper_symbols) >= 3:
+        # 상승장이므로 눌림목 종목 (하락률 높은 것)
+        drop_list = []
+        for sym in symbols:
+            pct = get_change_pct(sym)
+            if pct is not None:
+                drop_list.append((sym, pct))
+        sorted_drops = sorted(drop_list, key=lambda x: x[1])[:3]
+        picks = [{"symbol": sym, "change": round(pct, 2)} for sym, pct in sorted_drops]
+        direction = "📉 눌림목 후보 (상승장)"
+
+    elif len(lower_symbols) >= 3:
+        # 하락장이므로 반등 종목 (상승률 높은 것)
+        rise_list = []
+        for sym in symbols:
+            pct = get_change_pct(sym)
+            if pct is not None:
+                rise_list.append((sym, pct))
+        sorted_rise = sorted(rise_list, key=lambda x: x[1], reverse=True)[:3]
+        picks = [{"symbol": sym, "change": round(pct, 2)} for sym, pct in sorted_rise]
+        direction = "📈 반등 후보 (하락장)"
+
+    else:
+        return None  # 명확한 추세 없음
+
+    msg = f"{direction}\n"
+    for p in picks:
+        msg += f"   ├ {p['symbol']} → `{p['change']}%`\n"
+
+    send_telegram_message(msg)
+    return picks
         
 # 자동 감시 루프
 def spike_watcher_loop():

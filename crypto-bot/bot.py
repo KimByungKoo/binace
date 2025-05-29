@@ -1,7 +1,8 @@
 from strategy.ma365 import monitor_top10_ma365
 from strategy.ma90_disparity import ma90_watcher_loop
 from telegram.commands import telegram_command_listener
-from strategy.spike_disparity import spike_watcher_loop,monitor_ma365_breakout
+#from strategy.spike_disparity import spike_watcher_loop,monitor_ma365_breakout
+from strategy.vtb_breakout_strategy import spike_watcher_loop
 from position_monitor import position_watcher_loop
 #from strategy.disparity_monitor import run_disparity_monitor
 import threading
@@ -30,9 +31,9 @@ if __name__ == "__main__":
     #threading.Thread(target=get_top5_consecutive_green, daemon=True).start()
 
     #monitor_ma365_breakout()
-    threading.Thread(target=monitor_ma365_breakout, daemon=True).start()
+    #threading.Thread(target=monitor_ma365_breakout, daemon=True).start()
     # threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
-    threading.Thread(target=monitor_fixed_profit_loss_exit, daemon=True).start()
+    #threading.Thread(target=vtb_breakout_strategy, daemon=True).start()
     
 
     

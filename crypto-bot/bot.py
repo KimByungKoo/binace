@@ -22,8 +22,8 @@ if __name__ == "__main__":
     # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
  
-    threading.Thread(target=spike_watcher_loop1loop1, daemon=True).start()
-    threading.Thread(target=spike_watcher_looploop, daemon=True).start()
+    threading.Thread(target=spike_watcher_loop1, daemon=True).start()
+    threading.Thread(target=spike_watcher_loop, daemon=True).start()
 
     
     # threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()

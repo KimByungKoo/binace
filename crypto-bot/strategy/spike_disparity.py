@@ -1,4 +1,4 @@
-from utils.binance import get_top_symbols, get_1m_klines,client
+from utils.binance import get_top_symbols, get_1m_klines,client,has_open_position
 from utils.telegram import send_telegram_message
 import time
 from config import SPIKE_CONFIG as cfg

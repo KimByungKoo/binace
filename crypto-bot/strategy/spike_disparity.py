@@ -632,7 +632,7 @@ def report_spike():
             for x in bb_hits:
                 msg += f"   ├ {x['symbol']} → `{x['type'].upper()}` {x['streak']}봉 연속\n"
         
-            send_telegram_message(msg)
+            #send_telegram_message(msg)
     
     except Exception as e:
         send_telegram_message(f"⚠️ 스파이크 예측 리포트 실패: {str(e)}")

@@ -163,7 +163,7 @@ def report_spike():
 
 
 # 자동 감시 루프
-def spike_watcher_loop1loop1():
+def spike_watcher_loop1():
     
     send_telegram_message(f"😀 spike_loop")
     while True:

@@ -4,54 +4,89 @@ import threading
 import json
 import pandas as pd
 import time
+import os
 from collections import deque
+from dotenv import load_dotenv
+from binance.client import Client
+
 from utils.telegram import send_telegram_message
 from order_manager import auto_trade_from_signal
+from utils.binance import get_1m_klines  # 반드시 utils에 있어야 함
 
-# 설정
-WATCH_SYMBOLS = ["btcusdt", "ethusdt", "solusdt"]
-MAXLEN = 300  # 1분봉 300개 정도의 길이 확보
+# === 환경 변수 로딩 (API 키 불러오기) ===
+load_dotenv()
+API_KEY = os.getenv("BINANCE_API_KEY")
+API_SECRET = os.getenv("BINANCE_API_SECRET")
+client = Client(API_KEY, API_SECRET)
+
+# === 설정값 ===
+MAXLEN = 300
 SPIKE_MULTIPLIER = 2.5
-DISPARITY_THRESH = 1.5  # %
+DISPARITY_THRESH = 1.5  # 이격도 임계값 (%)
 
-symbol_data = {sym: deque(maxlen=MAXLEN) for sym in WATCH_SYMBOLS}
-
-# WebSocket 콜백
-# {
-#   "e": "trade",              // Event type
-#   "E": 123456789,            // Event time
-#   "s": "BTCUSDT",            // Symbol
-#   "t": 12345,                // Trade ID
-#   "p": "0.001",              // Price
-#   "q": "100",                // Quantity
-#   "X": "MARKET",             // Market type
-#   "m": true                  // Is the buyer the market maker?
-# }
-def on_message(ws, message):
-
-    #print("[RAW]", message)  # 이걸로 구조 먼저 확인
-    # message = message.decode('utf-8')  # 바이낸스에서 오는 메시지는 UTF-8로 인코딩되어 있음
-    #print("[RAW]", message)
-    # 바이낸스에서 오는 메시지는 JSON 형식이므로 파싱
-   
+# === 시총 상위 종목 불러오기 ===
+def get_top_symbols(n=30):
     try:
-        data = json.loads(message)
+        tickers = client.futures_ticker()
+        info = client.futures_exchange_info()
+        tradable = set()
 
-        #print("[ㅇㅁㅅㅁ]", data)
-        if data.get("e") == "trade":
-            symbol = data["s"].lower()
-            price = float(data["p"])
-            volume = float(data["q"])
-            ts = int(data["T"])
-            symbol_data[symbol].append({
-                "price": price, "volume": volume, "ts": ts
-            })
-        else:
-            print("📭 무시된 메시지 타입:", data.get("e"))
+        for s in info['symbols']:
+            if (s['contractType'] == 'PERPETUAL' and
+                s['quoteAsset'] == 'USDT' and
+                not s['symbol'].endswith('DOWN') and
+                s['status'] == 'TRADING'):
+                tradable.add(s['symbol'])
+
+        usdt_tickers = [t for t in tickers if t['symbol'] in tradable]
+        sorted_by_volume = sorted(usdt_tickers, key=lambda x: float(x['quoteVolume']), reverse=True)
+        return [t['symbol'].lower() for t in sorted_by_volume[:n]]
 
     except Exception as e:
-        print("WebSocket 메시지 처리 에러:", e)
+        send_telegram_message(f"❌ 시총 종목 조회 실패: {e}")
+        return ["btcusdt", "ethusdt", "solusdt"]  # fallback
 
+# === 실시간 감시용 심볼 및 데이터 구조 초기화 ===
+WATCH_SYMBOLS = get_top_symbols()
+symbol_data = {sym: deque(maxlen=MAXLEN) for sym in WATCH_SYMBOLS}
+
+# === 과거 1분봉 데이터로 초기 로딩 ===
+def preload_data(symbols):
+    for sym in symbols:
+        try:
+            df = get_1m_klines(sym.upper(), interval="1m", limit=MAXLEN)
+            # print(f"🔄 {sym} 초기 데이터 로딩 중... ({len(df)}개)")
+            for _, row in df.iterrows():
+                # print(f"  - {sym} 데이터 추가: {row} ")
+                symbol_data[sym].append({
+                    "price": row['close'],
+                    "volume": row['volume'],
+                    "ts": int(pd.to_datetime(row['open']).timestamp() * 1000)
+                })
+            print(f"✅ {sym} 초기 데이터 로딩 완료 ({len(symbol_data[sym])}개)")
+        except Exception as e:
+            print(f"❌ {sym} 초기 데이터 로딩 실패: {e}")
+
+preload_data(WATCH_SYMBOLS)
+
+# === WebSocket 콜백 정의 ===
+def on_message(ws, message):
+    try:
+        data = json.loads(message)
+        if data.get("e") != "trade":
+            return
+
+         
+    
+        symbol = data["s"].lower()
+        price = float(data["p"])
+        volume = float(data["q"])
+        ts = int(data["T"])
+        if symbol in symbol_data:
+            symbol_data[symbol].append({"price": price, "volume": volume, "ts": ts})
+        
+    except Exception as e:
+        print("WebSocket 메시지 처리 에러:", e)
 
 def on_open(ws):
     params = [f"{sym}@trade" for sym in WATCH_SYMBOLS]
@@ -61,32 +96,29 @@ def on_open(ws):
         "id": 1
     }
     ws.send(json.dumps(payload))
-    send_telegram_message("✅ WebSocket 구독 시작")
-
+    send_telegram_message(f"✅ 실시간 스파이크 감시 시작 ({len(WATCH_SYMBOLS)} 종목)")
 
 def on_error(ws, error):
-    send_telegram_message("WebSocket 에러:", error)
-
+    send_telegram_message(f"WebSocket 에러 발생: {error}")
 
 def on_close(ws, *args):
-    send_telegram_message("WebSocket 연결 종료")
+    send_telegram_message("🔌 WebSocket 연결 종료")
 
-# 감시 로직
-
+# === 스파이크 감지 로직 ===
 def spike_checker():
     while True:
         for sym in WATCH_SYMBOLS:
             data = list(symbol_data[sym])
+            print(f"🔄 {sym} 데이터 길이: {len(data)}")
             if len(data) < 30:
                 continue
 
+            print(f"🔄 {sym} 데이터 처리 중... ({len(data)}개)")
             df = pd.DataFrame(data)
             df['minute'] = pd.to_datetime(df['ts'], unit='ms').dt.floor('min')
-            grouped = df.groupby('minute').agg({
-                'price': 'last',
-                'volume': 'sum'
-            }).reset_index()
+            grouped = df.groupby('minute').agg({'price': 'last', 'volume': 'sum'}).reset_index()
 
+            print(f"🔄 {sym} 그룹화 완료: {len(grouped)}개")
             if len(grouped) < 10:
                 continue
 
@@ -101,10 +133,10 @@ def spike_checker():
                 direction = "long" if latest['price'] > latest['ma'] else "short"
 
                 send_telegram_message(
-                    f"💥 *{sym.upper()} 스파이크 발생!*"
-                    f"   ├ 현재가: `{round(latest['price'], 2)}`"
-                    f"   ├ MA: `{round(latest['ma'], 2)}`"
-                    f"   ├ 이격도: `{round(disparity, 2)}%`"
+                    f"💥 *{sym.upper()} 스파이크 발생!*\n"
+                    f"   ├ 현재가: `{round(latest['price'], 2)}`\n"
+                    f"   ├ MA: `{round(latest['ma'], 2)}`\n"
+                    f"   ├ 이격도: `{round(disparity, 2)}%`\n"
                     f"   └ 방향: `{direction.upper()}`"
                 )
 
@@ -119,7 +151,7 @@ def spike_checker():
 
         time.sleep(10)
 
-# 실행
+# === 실행 ===
 if __name__ == "__main__":
     ws_url = "wss://fstream.binance.com/ws"
     ws = websocket.WebSocketApp(
@@ -131,4 +163,3 @@ if __name__ == "__main__":
     )
     threading.Thread(target=spike_checker, daemon=True).start()
     ws.run_forever()
-    send_telegram_message("WebSocket 실행 중...")

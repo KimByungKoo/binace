@@ -10,38 +10,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Setup SSH Key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Deploy via SSH
-      run: |
-        ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-          mkdir -p ~/binace
-          cd ~/binace
-          if [ -d ".git" ]; then
-            git pull origin main
-          else
-            git clone https://github.com/KimByungKoo/binace.git .
-          fi
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            mkdir -p ~/binace
+            cd ~/binace
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/KimByungKoo/binace.git .
+            fi
 
-          
+            
 
-          
-
-
-          pkill -f bot.py || true
-          nohup python3 crypto-bot/bot.py > crypto-bot/bot.log 2>&1 &
-
-          pkill -f realtime_spike_bot.py || true
-          nohup python3 crypto-bot/realtime_spike_bot.py > crypto-bot/realtime_spike_bot.log 2>&1 &
+            
 
 
-        EOF
-   
+            pkill -f bot.py || true
+            # nohup python3 crypto-bot/bot.py > crypto-bot/bot.log 2>&1 &
+
+            pkill -f realtime_spike_bot.py || true
+            nohup python3 crypto-bot/realtime_spike_bot.py > crypto-bot/realtime_spike_bot.log 2>&1 &
+
+
+          EOF

@@ -45,11 +45,11 @@ def round_qty(symbol, raw_qty):
                     return round((raw_qty // step_size) * step_size, 8)
     return round(raw_qty, 3)  # fallback
 
-def place_order(symbol, side, quantity, entry_price, tp_price):
+def place_order(symbol, side, quantity, entry_price, tp_price, sl_price):
     try:
-
         quantity = round_qty(symbol, quantity)
 
+        # 시장가 진입
         client.futures_create_order(
             symbol=symbol,
             side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
@@ -57,23 +57,39 @@ def place_order(symbol, side, quantity, entry_price, tp_price):
             quantity=quantity
         )
 
+        # 익절 (TP)
         client.futures_create_order(
             symbol=symbol,
             side=Client.SIDE_SELL if side == "long" else Client.SIDE_BUY,
-            type=Client.ORDER_TYPE_LIMIT,
-            quantity=quantity,
-            #price=round(tp_price, 2),
-            timeInForce="GTC",
-            reduceOnly=True
+            type=Client.ORDER_TYPE_TAKE_PROFIT_MARKET,
+            stopPrice=round(tp_price, 4),
+            closePosition=True,
+            reduceOnly=True,
+            timeInForce="GTC"
         )
 
-        send_telegram_message(f"""🚀 *진입 완료: {symbol} ({side.upper()})*
-                                       ├ 수량: `{quantity}`
-                                       ├ 진입가(시장): `{round(entry_price, 4)}`
-                                       └ """)
-            
+        # 손절 (SL)
+        client.futures_create_order(
+            symbol=symbol,
+            side=Client.SIDE_SELL if side == "long" else Client.SIDE_BUY,
+            type=Client.ORDER_TYPE_STOP_MARKET,
+            stopPrice=round(sl_price, 4),
+            closePosition=True,
+            reduceOnly=True,
+            timeInForce="GTC"
+        )
+
+        send_telegram_message(
+            f"""✅ *진입 완료: {symbol} ({side.upper()})*\n"""
+            f"""   ├ 수량     : `{quantity}`\n"""
+            f"""   ├ 진입가   : `{round(entry_price, 4)}` (시장가)\n"""
+            f"""   ├ 익절가   : `{round(tp_price, 4)}`\n"""
+            f"""   ├ 손절가   : `{round(sl_price, 4)}`\n"""
+            f"""   └ 시각     : `{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}`"""
+        )
+
     except Exception as e:
-        print(f"주문 실패: {symbol} {side.upper()} → {e}")
+        send_telegram_message(f"💥 주문 실패: `{symbol}` `{side.upper()}` → {e}")
         # send_telegram_message(f"⚠️ 주문 실패: {symbol} {side.upper()} → {e}")
 
 def auto_trade_from_signal(signal):

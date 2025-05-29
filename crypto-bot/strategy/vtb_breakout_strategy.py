@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from utils.telegram import send_telegram_message
-from utils.binance import get_1m_klines, has_open_position
+from utils.binance import get_1m_klines, has_open_position,get_top_symbols
 from order_manager import auto_trade_from_signal, place_order, set_leverage
 
 

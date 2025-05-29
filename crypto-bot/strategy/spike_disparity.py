@@ -715,11 +715,11 @@ def check_ma_alignment(df):
     return None
     
 def monitor_ma365_breakout():
-    send_telegram_message("🔍 3분봉 MA365 종가 돌파 감시 시작")
+    send_telegram_message("🔍 3분봉 MA365 종가 돌파 감시 시작 (신호 기반 진입)")
 
     while True:
         try:
-            symbols = get_top_symbols(cfg["top_n"])  # cfg["top_n"]만큼 감시할 심볼 선택
+            symbols = get_top_symbols(cfg["top_n"])  # 감시할 상위 심볼 리스트
             for symbol in symbols:
                 df = get_1m_klines(symbol, interval="3m", limit=400)
                 if df.empty or len(df) < 366:
@@ -733,27 +733,38 @@ def monitor_ma365_breakout():
                 last_ma = df['ma365'].iloc[-1]
                 prev_ma = df['ma365'].iloc[-2]
 
-                # 아래에서 위로 돌파할 때만 진입
+                # 아래에서 위로 돌파한 경우만
                 if prev_close < prev_ma and last_close > last_ma:
                     if has_open_position(symbol):
                         continue
 
-                    qty = round(100 / last_close, 4)
-                    set_leverage(symbol, 30)
-                    place_market_order(symbol, "long", qty)
+                    tp = last_close * 1.015
+                    sl = last_close * 0.99
+
+                    signal = {
+                        "symbol": symbol,
+                        "direction": "long",
+                        "price": last_close,
+                        "take_profit": tp,
+                        "stop_loss": sl
+                    }
 
                     send_telegram_message(
-                        f"🚀 *{symbol} MA365 돌파 진입!*\n"
-                        f"   ├ 종가 : `{round(last_close, 4)}`\n"
-                        f"   ├ MA365: `{round(last_ma, 4)}`\n"
-                        f"   └ 시각 : `{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}`"
+                        f"🚀 *{symbol} MA365 종가 돌파 진입 시그널*\n"
+                        f"   ├ 현재가  : `{round(last_close, 4)}`\n"
+                        f"   ├ MA365   : `{round(last_ma, 4)}`\n"
+                        f"   ├ TP      : `{round(tp, 4)}`\n"
+                        f"   ├ SL      : `{round(sl, 4)}`\n"
+                        f"   └ 전략    : `3분봉 MA365 돌파`"
                     )
+
+                    auto_trade_from_signal(signal)
 
         except Exception as e:
             send_telegram_message(f"💥 MA365 감시 오류: {e}")
 
         time.sleep(30)
-    
+        
 # 자동 감시 루프
 def spike_watcher_loop():
     monitor_ma365_breakout()

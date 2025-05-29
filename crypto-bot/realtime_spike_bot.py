@@ -113,7 +113,7 @@ def spike_checker():
             if len(data) < 30:
                 continue
 
-            print(f"🔄 {sym} 데이터 처리 중... ({len(data)}개)")
+            # print(f"🔄 {sym} 데이터 처리 중... ({len(data)}개)")
             df = pd.DataFrame(data)
             df['minute'] = pd.to_datetime(df['ts'], unit='ms').dt.floor('min')
             grouped = df.groupby('minute').agg({'price': 'last', 'volume': 'sum'}).reset_index()
@@ -122,12 +122,16 @@ def spike_checker():
             if len(grouped) < 10:
                 continue
 
+            print(f"🔄 {sym} 이동평균 계산 중...")
+
             grouped['volume_ma'] = grouped['volume'].rolling(10).mean()
             grouped['ma'] = grouped['price'].rolling(10).mean()
             grouped.dropna(inplace=True)
-
+            print(f"🔄 {sym} 이동평균 계산 완료")
+    
             latest = grouped.iloc[-1]
             disparity = abs((latest['price'] - latest['ma']) / latest['ma']) * 100
+            print(f"🔄 {sym} 최신 데이터: {latest['price']}, MA: {latest['ma']}, 이격도: {disparity:.2f}%")
 
             if latest['volume'] > latest['volume_ma'] * SPIKE_MULTIPLIER and disparity > DISPARITY_THRESH:
                 direction = "long" if latest['price'] > latest['ma'] else "short"

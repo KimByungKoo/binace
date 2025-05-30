@@ -956,7 +956,15 @@ def process_trade_exit(symbol: str, trade: dict, exit_price: float, reason: str)
         update_daily_stats(trade_result)
         
         if CONFIG["debug"]["show_trade_details"]:
-            send_telegram_message(f"{reason}\n"
+            # 청산 이유에 따른 이모지 설정
+            if "TP" in reason:
+                emoji = "🟢" if pnl > 0 else "🔴"
+            elif "SL" in reason:
+                emoji = "🔴"
+            else:
+                emoji = "⚪"
+                
+            send_telegram_message(f"{emoji} {reason}\n"
                               f"   ├ 종목     : `{symbol}`\n"
                               f"   ├ 방향     : `{trade['direction']}`\n"
                               f"   ├ 진입가   : `{trade['entry_price']:.4f}`\n"
@@ -1017,14 +1025,14 @@ def on_message(ws, message):
             exit_reason = None
             if direction == "long":
                 if current_price >= tp:
-                    exit_reason = "🟢 익절 TP 도달"
+                    exit_reason = "익절 TP 도달"
                 elif current_price <= sl:
-                    exit_reason = "🔴 손절 SL 도달"
+                    exit_reason = "손절 SL 도달"
             else:  # short
                 if current_price <= tp:
-                    exit_reason = "🟢 익절 TP 도달"
+                    exit_reason = "익절 TP 도달"
                 elif current_price >= sl:
-                    exit_reason = "🔴 손절 SL 도달"
+                    exit_reason = "손절 SL 도달"
                     
             if exit_reason:
                 try:

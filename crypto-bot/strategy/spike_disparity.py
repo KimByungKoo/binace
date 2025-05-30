@@ -632,6 +632,7 @@ def report_spike():
             for x in bb_hits:
                 msg += f"   ├ {x['symbol']} → `{x['type'].upper()}` {x['streak']}봉 연속\n"
         
+            send_telegram_message(msg)
             analyze_market_and_get_contrarian_picks(bb_hits, symbols)
             
             

@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Tuple
 from collections import deque
 import json
 import os
+import psutil
+import threading
 
 # client = Client("api_key", "api_secret")
 
@@ -34,7 +36,41 @@ CONFIG = {
     "high_volatility_hours": [  # 변동성 높은 시간대 (UTC)
         "02:00-04:00",  # 뉴욕 마감 시간
         "14:00-16:00"   # 런던 마감 시간
-    ]
+    ],
+    # 스마트 포지션 관리 설정
+    "trailing_stop": {
+        "enabled": True,
+        "activation_pct": 0.5,  # TP의 50% 도달 시 트레일링 스탑 활성화
+        "distance_pct": 0.2     # 현재가와의 거리 (%)
+    },
+    "partial_tp": {
+        "enabled": True,
+        "levels": [
+            {"pct": 0.3, "tp_pct": 0.5},  # 30% 포지션, TP 0.5%
+            {"pct": 0.3, "tp_pct": 0.8},  # 30% 포지션, TP 0.8%
+            {"pct": 0.4, "tp_pct": 1.2}   # 40% 포지션, TP 1.2%
+        ]
+    },
+    # 시장 상황 기반 전략 설정
+    "market_conditions": {
+        "high_volatility": {
+            "tp_multiplier": 1.2,  # TP 거리 증가
+            "sl_multiplier": 1.2,  # SL 거리 증가
+            "position_size_multiplier": 0.8  # 포지션 크기 감소
+        },
+        "low_volatility": {
+            "tp_multiplier": 0.8,  # TP 거리 감소
+            "sl_multiplier": 0.8,  # SL 거리 감소
+            "position_size_multiplier": 1.2  # 포지션 크기 증가
+        }
+    },
+    # 시스템 모니터링 설정
+    "monitoring": {
+        "check_interval": 300,  # 5분마다 체크
+        "max_cpu_usage": 80,    # 최대 CPU 사용률 (%)
+        "max_memory_usage": 80, # 최대 메모리 사용률 (%)
+        "min_balance": 100      # 최소 잔고 (USDT)
+    }
 }
 
 # 일일 손실 추적
@@ -51,7 +87,9 @@ daily_stats = {
     "total_loss": 0,            # 총 손실
     "best_trade": None,         # 최고 수익 거래
     "worst_trade": None,        # 최대 손실 거래
-    "trading_hours_stats": {}   # 시간대별 통계
+    "trading_hours_stats": {},  # 시간대별 통계
+    "partial_tp_hits": 0,       # 부분 익절 성공 횟수
+    "trailing_stop_hits": 0     # 트레일링 스탑 성공 횟수
 }
 
 # 시장 상황 분석
@@ -59,7 +97,10 @@ market_analysis = {
     "overall_trend": None,      # 전체 시장 트렌드
     "volatility_index": 0,      # 변동성 지수
     "correlation_groups": {},    # 상관관계 그룹
-    "last_update": None
+    "last_update": None,
+    "volume_profile": {},       # 거래량 프로파일
+    "trend_strength": 0,        # 추세 강도 (0-100)
+    "market_phase": None        # 시장 단계 (accumulation/distribution/trending)
 }
 
 def is_trading_allowed() -> bool:
@@ -367,8 +408,178 @@ def determine_trade_mode_from_wave(wave_info):
 
     return "scalp"
 
+def check_system_health() -> bool:
+    """
+    시스템 상태 체크
+    """
+    try:
+        cpu_usage = psutil.cpu_percent()
+        memory_usage = psutil.virtual_memory().percent
+        
+        if cpu_usage > CONFIG["monitoring"]["max_cpu_usage"]:
+            send_telegram_message(f"⚠️ CPU 사용률 높음: {cpu_usage}%")
+            return False
+            
+        if memory_usage > CONFIG["monitoring"]["max_memory_usage"]:
+            send_telegram_message(f"⚠️ 메모리 사용률 높음: {memory_usage}%")
+            return False
+            
+        # 잔고 체크
+        balance = float(client.futures_account()['totalWalletBalance'])
+        if balance < CONFIG["monitoring"]["min_balance"]:
+            send_telegram_message(f"⚠️ 잔고 부족: {balance} USDT")
+            return False
+            
+        return True
+        
+    except Exception as e:
+        send_telegram_message(f"💥 시스템 상태 체크 실패: {str(e)}")
+        return False
+
+def update_trailing_stop(symbol: str, current_price: float):
+    """
+    트레일링 스탑 업데이트
+    """
+    if symbol not in open_trades:
+        return
+        
+    trade = open_trades[symbol]
+    if not CONFIG["trailing_stop"]["enabled"]:
+        return
+        
+    direction = trade["direction"]
+    entry_price = trade["entry_price"]
+    tp = trade["tp"]
+    
+    # TP 도달 비율 계산
+    if direction == "long":
+        tp_distance = tp - entry_price
+        current_distance = current_price - entry_price
+        if current_distance >= tp_distance * CONFIG["trailing_stop"]["activation_pct"]:
+            new_sl = current_price * (1 - CONFIG["trailing_stop"]["distance_pct"] / 100)
+            if new_sl > trade["sl"]:
+                trade["sl"] = new_sl
+                send_telegram_message(f"🔄 트레일링 스탑 업데이트: {symbol}\n"
+                                    f"   ├ 새로운 SL: `{round(new_sl, 4)}`\n"
+                                    f"   └ 현재가: `{round(current_price, 4)}`")
+    else:
+        tp_distance = entry_price - tp
+        current_distance = entry_price - current_price
+        if current_distance >= tp_distance * CONFIG["trailing_stop"]["activation_pct"]:
+            new_sl = current_price * (1 + CONFIG["trailing_stop"]["distance_pct"] / 100)
+            if new_sl < trade["sl"]:
+                trade["sl"] = new_sl
+                send_telegram_message(f"🔄 트레일링 스탑 업데이트: {symbol}\n"
+                                    f"   ├ 새로운 SL: `{round(new_sl, 4)}`\n"
+                                    f"   └ 현재가: `{round(current_price, 4)}`")
+
+def check_partial_tp(symbol: str, current_price: float):
+    """
+    부분 익절 체크
+    """
+    if symbol not in open_trades or not CONFIG["partial_tp"]["enabled"]:
+        return
+        
+    trade = open_trades[symbol]
+    if "partial_tp_executed" in trade:
+        return
+        
+    direction = trade["direction"]
+    entry_price = trade["entry_price"]
+    total_qty = trade["qty"]
+    
+    for level in CONFIG["partial_tp"]["levels"]:
+        if level["pct"] in trade.get("partial_tp_levels", []):
+            continue
+            
+        tp_price = entry_price * (1 + level["tp_pct"] / 100) if direction == "long" else entry_price * (1 - level["tp_pct"] / 100)
+        
+        if (direction == "long" and current_price >= tp_price) or (direction == "short" and current_price <= tp_price):
+            partial_qty = total_qty * level["pct"]
+            close_position(symbol, partial_qty, "short" if direction == "long" else "long")
+            
+            if "partial_tp_levels" not in trade:
+                trade["partial_tp_levels"] = []
+            trade["partial_tp_levels"].append(level["pct"])
+            
+            daily_stats["partial_tp_hits"] += 1
+            
+            send_telegram_message(f"🎯 부분 익절 실행: {symbol}\n"
+                                f"   ├ 수량: `{round(partial_qty, 4)}`\n"
+                                f"   ├ 목표가: `{round(tp_price, 4)}`\n"
+                                f"   └ 현재가: `{round(current_price, 4)}`")
+
+def analyze_market_phase(df: pd.DataFrame) -> str:
+    """
+    시장 단계 분석
+    """
+    # 볼린저 밴드
+    df['bb_middle'] = df['close'].rolling(20).mean()
+    df['bb_std'] = df['close'].rolling(20).std()
+    df['bb_upper'] = df['bb_middle'] + 2 * df['bb_std']
+    df['bb_lower'] = df['bb_middle'] - 2 * df['bb_std']
+    
+    # RSI
+    df['rsi'] = calculate_rsi(df)
+    
+    # 거래량 프로파일
+    df['volume_ma'] = df['volume'].rolling(20).mean()
+    
+    latest = df.iloc[-1]
+    
+    # 추세 강도 계산
+    price_trend = (latest['close'] - df['close'].iloc[-20]) / df['close'].iloc[-20] * 100
+    volume_trend = (latest['volume'] - df['volume'].iloc[-20]) / df['volume'].iloc[-20] * 100
+    
+    trend_strength = abs(price_trend) * (1 + volume_trend / 100)
+    market_analysis["trend_strength"] = min(trend_strength, 100)
+    
+    # 시장 단계 판단
+    if latest['close'] > latest['bb_upper']:
+        return "trending"
+    elif latest['close'] < latest['bb_lower']:
+        return "trending"
+    elif latest['rsi'] > 70 or latest['rsi'] < 30:
+        return "distribution"
+    else:
+        return "accumulation"
+
+def adjust_strategy_parameters(symbol: str, df: pd.DataFrame) -> Dict:
+    """
+    시장 상황에 따른 전략 파라미터 조정
+    """
+    volatility = calculate_volatility(df)
+    market_phase = analyze_market_phase(df)
+    
+    # 기본 파라미터
+    params = {
+        "tp_multiplier": 1.0,
+        "sl_multiplier": 1.0,
+        "position_size_multiplier": 1.0
+    }
+    
+    # 변동성 기반 조정
+    if volatility > 0.02:  # 높은 변동성
+        params.update(CONFIG["market_conditions"]["high_volatility"])
+    elif volatility < 0.01:  # 낮은 변동성
+        params.update(CONFIG["market_conditions"]["low_volatility"])
+    
+    # 시장 단계 기반 추가 조정
+    if market_phase == "trending":
+        params["tp_multiplier"] *= 1.2
+        params["sl_multiplier"] *= 1.2
+    elif market_phase == "accumulation":
+        params["position_size_multiplier"] *= 0.8
+    
+    return params
+
 def enter_trade_from_wave(symbol, wave_info, price):
     try:
+        # 시스템 상태 체크
+        if not check_system_health():
+            send_telegram_message(f"⚠️ 시스템 상태 불량: {symbol} 진입 생략")
+            return
+
         # 거래 시간 체크
         if not is_trading_allowed():
             send_telegram_message(f"⏰ {symbol} 거래 시간 외 → 진입 생략")
@@ -404,6 +615,10 @@ def enter_trade_from_wave(symbol, wave_info, price):
         volatility = calculate_volatility(df)
         position_size = calculate_position_size(symbol, price, volatility)
 
+        # 전략 파라미터 조정
+        strategy_params = adjust_strategy_parameters(symbol, df)
+        position_size *= strategy_params["position_size_multiplier"]
+
         mode = determine_trade_mode_from_wave(wave_info)
         direction = "long" if wave_info['direction'] == "up" else "short"
 
@@ -419,8 +634,9 @@ def enter_trade_from_wave(symbol, wave_info, price):
             "revert": 0.99
         }
 
-        tp = price * tp_ratio[mode] if direction == "long" else price * (2 - tp_ratio[mode])
-        sl = price * sl_ratio[mode] if direction == "long" else price * (2 - sl_ratio[mode])
+        # TP/SL 거리 조정
+        tp = price * tp_ratio[mode] * strategy_params["tp_multiplier"] if direction == "long" else price * (2 - tp_ratio[mode] * strategy_params["tp_multiplier"])
+        sl = price * sl_ratio[mode] * strategy_params["sl_multiplier"] if direction == "long" else price * (2 - sl_ratio[mode] * strategy_params["sl_multiplier"])
 
         signal = {
             "symbol": symbol,
@@ -442,7 +658,9 @@ def enter_trade_from_wave(symbol, wave_info, price):
                 "sl": sl,
                 "qty": qty,
                 "mode": mode,
-                "position_size": position_size
+                "position_size": position_size,
+                "strategy_params": strategy_params,
+                "partial_tp_levels": []
             }
 
             send_telegram_message(f"🚀 진입 완료: {symbol} ({mode.upper()})\n"
@@ -452,6 +670,7 @@ def enter_trade_from_wave(symbol, wave_info, price):
                                 f"   ├ SL       : `{round(sl, 4)}`\n"
                                 f"   ├ 수량     : `{round(qty, 4)}`\n"
                                 f"   ├ 변동성   : `{round(volatility * 100, 2)}%`\n"
+                                f"   ├ 시장단계 : `{analyze_market_phase(df)}`\n"
                                 f"   └ 모드     : `{mode}`")
 
     except Exception as e:
@@ -522,6 +741,12 @@ def monitor_exit():
                 
             last_price = df['close'].iloc[-1]
 
+            # 트레일링 스탑 업데이트
+            update_trailing_stop(symbol, last_price)
+            
+            # 부분 익절 체크
+            check_partial_tp(symbol, last_price)
+
             direction = trade['direction']
             tp = trade['tp']
             sl = trade['sl']
@@ -556,7 +781,9 @@ def monitor_exit():
                     "qty": qty,
                     "pnl": pnl,
                     "reason": exit_reason,
-                    "timestamp": datetime.utcnow()
+                    "timestamp": datetime.utcnow(),
+                    "market_phase": analyze_market_phase(df),
+                    "strategy_params": trade.get("strategy_params", {})
                 }
                 
                 # 통계 업데이트
@@ -589,6 +816,7 @@ def monitor_exit():
                                     f"   ├ 진입가   : `{round(trade['entry_price'], 4)}`\n"
                                     f"   ├ 현재가   : `{round(last_price, 4)}`\n"
                                     f"   ├ 수익금   : `{round(pnl, 2)} USDT`\n"
+                                    f"   ├ 시장단계 : `{analyze_market_phase(df)}`\n"
                                     f"   └ 모드     : `{trade['mode']}`")
                 
                 # 딕셔너리에서 항목 제거
@@ -613,9 +841,17 @@ def wave_trade_watcher():
     consecutive_errors = 0  # 연속 에러 카운트
     last_report_time = datetime.utcnow()
     last_market_analysis_time = datetime.utcnow()
+    last_health_check_time = datetime.utcnow()
 
     while True:
         try:
+            # 시스템 상태 체크 (5분마다)
+            if (datetime.utcnow() - last_health_check_time).total_seconds() > CONFIG["monitoring"]["check_interval"]:
+                if not check_system_health():
+                    time.sleep(300)  # 5분 대기
+                    continue
+                last_health_check_time = datetime.utcnow()
+
             # 시장 분석 업데이트 (1시간마다)
             if (datetime.utcnow() - last_market_analysis_time).total_seconds() > 3600:
                 update_market_analysis()

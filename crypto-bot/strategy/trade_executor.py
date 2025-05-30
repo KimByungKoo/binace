@@ -14,6 +14,7 @@ import psutil
 import threading
 import websocket
 from binance.client import Client
+import ssl
 
 # client = Client("api_key", "api_secret")
 
@@ -23,12 +24,25 @@ open_trades = {}
 # 전역 변수로 웹소켓 연결 관리
 price_sockets = {}
 ws = None
+ws_lock = threading.Lock()  # 웹소켓 스레드 안전성을 위한 락 추가
+ws_connected = False  # 웹소켓 연결 상태 추적
+ws_reconnect_delay = 5  # 재연결 대기 시간 (초)
+ws_max_reconnect_attempts = 5  # 최대 재연결 시도 횟수
+ws_reconnect_attempts = 0  # 현재 재연결 시도 횟수
+last_api_request = {}  # API 요청 시간 추적
+api_request_delay = 0.1  # API 요청 간 최소 대기 시간 (초)
+
+# 전역 변수로 주문 상태 추적
+market_maker_orders = {}
+
+# 거래 내역 데이터 저장용 전역 변수
+trade_history_data = {}
 
 # 설정값
 CONFIG = {
     "max_daily_loss_pct": 5.0,  # 일일 최대 손실 제한 (%)
-    "max_position_size": 100,   # 최대 포지션 크기 (USDT)
-    "min_position_size": 20,    # 최소 포지션 크기 (USDT)
+    "max_position_size": 500,   # 최대 포지션 크기 (USDT)
+    "min_position_size": 100,    # 최소 포지션 크기 (USDT)
     "volatility_window": 20,    # 변동성 계산 기간
     "volume_ma_window": 20,     # 거래량 이동평균 기간
     "min_volume_ratio": 1.5,    # 최소 거래량 비율 (평균 대비)
@@ -167,6 +181,12 @@ market_analysis = {
     "trend_strength": 0,        # 추세 강도 (0-100)
     "market_phase": None        # 시장 단계 (accumulation/distribution/trending)
 }
+
+# 전역 변수로 캐시 추가
+symbol_info_cache = {}
+last_symbol_info_update = {}
+last_top_symbols_update = None
+top_symbols_cache = None
 
 def debug_message(message: str, level: str = "INFO"):
     """
@@ -440,13 +460,60 @@ def calculate_position_size(symbol: str, price: float, volatility: float) -> flo
     """
     변동성에 따른 포지션 크기 계산
     """
-    base_size = CONFIG["max_position_size"]
-    # 변동성이 높을수록 포지션 크기 감소
-    volatility_factor = 1 / (1 + volatility)
-    position_size = base_size * volatility_factor
-    
-    # 최소/최대 제한 적용
-    return max(min(position_size, CONFIG["max_position_size"]), CONFIG["min_position_size"])
+    try:
+        # 기본 포지션 크기 (CONFIG의 min_position_size 사용)
+        base_size = CONFIG["min_position_size"]
+        
+        # 변동성이 NaN이거나 유효하지 않은 경우 기본값 사용
+        if pd.isna(volatility) or not isinstance(volatility, (int, float)):
+            volatility = 0.0
+            
+        # 변동성이 높을수록 포지션 크기 감소 (안전한 계산)
+        volatility_factor = 1 / (1 + max(0, min(volatility, 1.0)))  # 0~1 사이로 제한
+        position_size = base_size * volatility_factor
+        
+        # 최소/최대 제한 적용 (CONFIG 값 사용)
+        position_size = max(min(position_size, CONFIG["max_position_size"]), CONFIG["min_position_size"])
+        
+        # 심볼 정보 가져오기
+        symbol_info = client.futures_exchange_info()
+        symbol_info = next((s for s in symbol_info['symbols'] if s['symbol'] == symbol), None)
+        
+        if symbol_info:
+            # LOT_SIZE 필터 찾기
+            lot_size_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+            if lot_size_filter:
+                min_qty = float(lot_size_filter['minQty'])
+                step_size = float(lot_size_filter['stepSize'])
+                
+                # 최소 주문 수량 계산
+                min_order_qty = min_qty
+                
+                # 최소 주문 가치 계산 (CONFIG의 min_position_size 사용)
+                min_order_value = CONFIG["min_position_size"]
+                min_qty_by_value = min_order_value / price
+                
+                # 두 기준 중 큰 값 선택
+                min_qty = max(min_order_qty, min_qty_by_value)
+                
+                # step size에 맞게 반올림
+                position_size = round(position_size / step_size) * step_size
+                
+                # 최소 수량보다 작으면 최소 수량으로 설정
+                if position_size < min_qty:
+                    position_size = min_qty
+                
+                debug_message(f"주문 수량 계산: {symbol}\n"
+                            f"   ├ 기본 수량: {base_size}\n"
+                            f"   ├ 최소 수량: {min_qty}\n"
+                            f"   ├ 최종 수량: {position_size}\n"
+                            f"   └ 가격: {price}", "INFO")
+        
+        return position_size
+        
+    except Exception as e:
+        debug_message(f"포지션 크기 계산 실패: {str(e)}", "ERROR")
+        return CONFIG["min_position_size"]  # 에러 발생 시 최소 포지션 크기 반환
 
 def calculate_volatility(df: pd.DataFrame) -> float:
     """
@@ -898,645 +965,147 @@ def calculate_dynamic_sl(df: pd.DataFrame, direction: str) -> float:
         send_telegram_message(f"💥 동적 SL 계산 오류: {str(e)}")
         return None
 
-def process_trade_exit(symbol: str, trade: dict, exit_price: float, reason: str):
+def process_trade_exit(symbol: str, exit_price: float, exit_reason: str):
     """
-    거래 청산 처리
-    """
-    try:
-        debug_message(f"청산 처리 시작: {symbol}", "DEBUG")
-        
-        # 수익금 계산 수정
-        if trade['direction'] == "long":
-            pnl = (exit_price - trade['entry_price']) * trade['qty']
-            pnl_pct = (exit_price - trade['entry_price']) / trade['entry_price'] * 100
-        else:
-            pnl = (trade['entry_price'] - exit_price) * trade['qty']
-            pnl_pct = (trade['entry_price'] - exit_price) / trade['entry_price'] * 100
-        
-        # 거래 결과 기록
-        trade_result = {
-            "symbol": symbol,
-            "direction": trade['direction'],
-            "entry_price": trade['entry_price'],
-            "exit_price": exit_price,
-            "qty": trade['qty'],
-            "pnl": pnl,
-            "pnl_pct": pnl_pct,
-            "reason": reason,
-            "timestamp": datetime.utcnow(),
-            "strategy_params": trade.get("strategy_params", {})
-        }
-        
-        debug_message(f"거래 결과: {symbol} - PnL: {pnl:.2f} USDT ({pnl_pct:.2f}%)", "INFO")
-        
-        # 통계 업데이트
-        daily_stats["total_trades"] += 1
-        if pnl > 0:
-            daily_stats["winning_trades"] += 1
-            daily_stats["total_profit"] += pnl
-            daily_stats["consecutive_losses"] = 0
-            if daily_stats["best_trade"] is None or pnl > daily_stats["best_trade"]["pnl"]:
-                daily_stats["best_trade"] = trade_result
-        else:
-            daily_stats["losing_trades"] += 1
-            daily_stats["total_loss"] += abs(pnl)
-            daily_stats["consecutive_losses"] += 1
-            if daily_stats["worst_trade"] is None or pnl < daily_stats["worst_trade"]["pnl"]:
-                daily_stats["worst_trade"] = trade_result
-        
-        debug_message(f"통계 업데이트 완료: {symbol}", "DEBUG")
-        
-        # 시간대별 통계 업데이트
-        hour = trade_result["timestamp"].hour
-        if hour not in daily_stats["trading_hours_stats"]:
-            daily_stats["trading_hours_stats"][hour] = {"trades": 0, "profit": 0}
-        daily_stats["trading_hours_stats"][hour]["trades"] += 1
-        daily_stats["trading_hours_stats"][hour]["profit"] += pnl
-        
-        update_daily_stats(trade_result)
-        
-        if CONFIG["debug"]["show_trade_details"]:
-            # 청산 이유에 따른 이모지 설정
-            if "TP" in reason:
-                emoji = "🟢" if pnl > 0 else "🔴"
-            elif "SL" in reason:
-                emoji = "🔴"
-            else:
-                emoji = "⚪"
-                
-            send_telegram_message(f"{emoji} {reason}\n"
-                              f"   ├ 종목     : `{symbol}`\n"
-                              f"   ├ 방향     : `{trade['direction']}`\n"
-                              f"   ├ 진입가   : `{trade['entry_price']:.4f}`\n"
-                              f"   ├ 청산가   : `{exit_price:.4f}`\n"
-                              f"   ├ 수량     : `{trade['qty']:.4f}`\n"
-                              f"   ├ 수익금   : `{pnl:.2f} USDT`\n"
-                              f"   ├ 수익률   : `{pnl_pct:.2f}%`\n"
-                              f"   └ 모드     : `{trade['mode']}`")
-        
-        # 포지션 제거
-        if symbol in open_trades:
-            del open_trades[symbol]
-            debug_message(f"포지션 제거 완료: {symbol}", "DEBUG")
-            
-        # 웹소켓 구독 해제
-        if symbol in price_sockets:
-            if ws is not None:
-                payload = {
-                    "method": "UNSUBSCRIBE",
-                    "params": [f"{symbol.lower()}@trade"],
-                    "id": 1
-                }
-                ws.send(json.dumps(payload))
-            del price_sockets[symbol]
-            debug_message(f"웹소켓 구독 해제 완료: {symbol}", "DEBUG")
-            
-    except Exception as e:
-        debug_message(f"거래 청산 처리 오류: {str(e)}", "ERROR")
-
-def on_message(ws, message):
-    """
-    웹소켓 메시지 처리
+    포지션 종료 처리
     """
     try:
-        data = json.loads(message)
-        if data.get("e") != "trade":
+        if symbol not in open_trades:
+            debug_message(f"포지션 종료 실패: {symbol} - 열린 포지션 없음", "ERROR")
             return
 
-        symbol = data["s"].upper()
-        if symbol in open_trades:
-            current_price = float(data["p"])
-            open_trades[symbol]['current_price'] = current_price
-            
-            debug_message(f"가격 업데이트: {symbol} = {current_price}", "DEBUG")
-            
-            # TP/SL 체크
-            trade = open_trades[symbol]
-            direction = trade['direction']
-            tp = trade['tp']
-            sl = trade['sl']
-            
-            debug_message(f"TP/SL 체크: {symbol} - TP: {tp}, SL: {sl}, 현재가: {current_price}", "DEBUG")
-            
-            if tp is None or sl is None:
-                debug_message(f"TP/SL 없음: {symbol}", "WARNING")
+        trade = open_trades[symbol]
+        entry_price = trade['entry_price']
+        qty = trade['qty']
+        direction = trade['direction']
+        
+        # 포지션 정보 가져오기
+        try:
+            position_info = client.futures_position_information(symbol=symbol)
+            if not position_info:
+                debug_message(f"포지션 정보 조회 실패: {symbol}", "ERROR")
                 return
                 
-            exit_reason = None
-            if direction == "long":
-                if current_price >= tp:
-                    exit_reason = "익절 TP 도달"
-                elif current_price <= sl:
-                    exit_reason = "손절 SL 도달"
-            else:  # short
-                if current_price <= tp:
-                    exit_reason = "익절 TP 도달"
-                elif current_price >= sl:
-                    exit_reason = "손절 SL 도달"
-                    
-            if exit_reason:
-                try:
-                    debug_message(f"청산 조건 도달: {symbol} - {exit_reason}", "INFO")
-                    
-                    # 포지션 방향 확인
-                    position = client.futures_position_information(symbol=symbol)[0]
-                    position_amt = float(position['positionAmt'])
-                    
-                    debug_message(f"포지션 확인: {symbol} - 수량: {position_amt}", "DEBUG")
-                    
-                    if position_amt != 0:  # 포지션이 실제로 존재하는 경우에만 청산
-                        # 청산 방향 결정
-                        close_direction = "short" if direction == "long" else "long"
-                        
-                        debug_message(f"청산 시도: {symbol} - 방향: {close_direction}, 수량: {trade['qty']}", "INFO")
-                        
-                        # 청산 실행
-                        close_position(symbol, trade['qty'], close_direction)
-                        debug_message(f"청산 주문 실행 완료: {symbol}", "INFO")
-                        
-                        # 청산 처리
-                        process_trade_exit(symbol, trade, current_price, exit_reason)
-                    else:
-                        debug_message(f"포지션 없음: {symbol} - 이미 청산됨", "WARNING")
-                        if symbol in open_trades:
-                            del open_trades[symbol]
-                except Exception as e:
-                    debug_message(f"청산 실행 오류: {symbol} - {str(e)}", "ERROR")
+            position = position_info[0]
+            position_amt = float(position['positionAmt'])
+            
+            # 실제 포지션 수량이 0이면 이미 청산된 것으로 간주
+            if position_amt == 0:
+                debug_message(f"포지션 이미 청산됨: {symbol}", "INFO")
+                if symbol in open_trades:
+                    del open_trades[symbol]
+                return
                 
-    except Exception as e:
-        debug_message(f"웹소켓 메시지 처리 오류: {str(e)}", "ERROR")
-
-def on_error(ws, error):
-    send_telegram_message(f"💥 웹소켓 에러: {error}")
-
-def on_close(ws, close_status_code, close_msg):
-    send_telegram_message(f"🔌 웹소켓 연결 종료 (코드: {close_status_code}, 메시지: {close_msg})")
-
-def on_open(ws):
-    """
-    웹소켓 연결 시작 시 호출
-    """
-    try:
-        # 현재 포지션에 대한 웹소켓 연결
-        params = [f"{symbol.lower()}@trade" for symbol in open_trades.keys()]
-        if params:
-            payload = {
-                "method": "SUBSCRIBE",
-                "params": params,
-                "id": 1
-            }
-            ws.send(json.dumps(payload))
-            send_telegram_message(f"🔌 웹소켓 연결 시작됨 (구독 심볼: {', '.join(params)})")
+            # 포지션 크기 계산
+            position_size = abs(position_amt) * entry_price
             
-            # price_sockets 업데이트
-            for symbol in open_trades.keys():
-                price_sockets[symbol] = True
-        else:
-            send_telegram_message("🔌 웹소켓 연결 시작됨 (구독 심볼 없음)")
-    except Exception as e:
-        send_telegram_message(f"💥 웹소켓 연결 실패: {str(e)}")
-
-def start_websocket_connections():
-    """
-    웹소켓 연결 시작
-    """
-    global ws
-    try:
-        ws_url = "wss://fstream.binance.com/ws"
-        send_telegram_message(f"🔌 웹소켓 연결 시도 중... (URL: {ws_url})")
-        
-        ws = websocket.WebSocketApp(
-            ws_url,
-            on_open=on_open,
-            on_message=on_message,
-            on_error=on_error,
-            on_close=on_close
-        )
-        
-        # 웹소켓 연결을 별도의 스레드에서 실행
-        ws_thread = threading.Thread(target=ws.run_forever)
-        ws_thread.daemon = True  # 메인 스레드가 종료되면 함께 종료되도록 설정
-        ws_thread.start()
-        
-        # 연결이 시작될 때까지 잠시 대기
-        time.sleep(1)
-        
-    except Exception as e:
-        send_telegram_message(f"💥 웹소켓 연결 실패: {str(e)}")
-
-def enter_trade_from_wave(symbol, wave_info, price):
-    try:
-        # 시스템 상태 체크
-        if not check_system_health():
-            return
-        # 거래 시간 체크
-        if not is_trading_allowed():
-            return
-        # 최대 포지션 수 체크
-        if len(open_trades) >= CONFIG["max_open_positions"]:
-            return
-        # 연속 손실 체크
-        if daily_stats["consecutive_losses"] >= CONFIG["max_consecutive_losses"]:
-            return
-        # 일일 손실 제한 체크
-        if not check_daily_loss_limit():
-            return
-        # 이미 포지션이 있는지 한번 더 확인
-        if has_open_position(symbol):
-            return
-        # 거래량 조건 체크
-        df = get_1m_klines(symbol, interval="3m", limit=CONFIG["volume_ma_window"] + 1)
-        if not check_volume_condition(df):
-            return
-        # 변동성 계산 및 포지션 크기 결정
-        volatility = calculate_volatility(df)
-        position_size = calculate_position_size(symbol, price, volatility)
-        # 전략 파라미터 조정
-        strategy_params = adjust_strategy_parameters(symbol, df)
-        position_size *= strategy_params["position_size_multiplier"]
-        mode = determine_trade_mode_from_wave(wave_info)
-        direction = "long" if wave_info['direction'] == "up" else "short"
-        qty = round_qty(symbol, position_size / price)
-        tp_ratio = {"scalp": 1.003, "trend": 1.015, "revert": 1.01}
-        sl_ratio = {"scalp": 0.995, "trend": 0.985, "revert": 0.99}
-        # TP/SL 거리 조정
-        tp = price * tp_ratio[mode] * strategy_params["tp_multiplier"] if direction == "long" else price * (2 - tp_ratio[mode] * strategy_params["tp_multiplier"])
-        sl = price * sl_ratio[mode] * strategy_params["sl_multiplier"] if direction == "long" else price * (2 - sl_ratio[mode] * strategy_params["sl_multiplier"])
-        signal = {
-            "symbol": symbol,
-            "direction": direction,
-            "price": price,
-            "take_profit": tp,
-            "stop_loss": sl
-        }
-        # 리스크 제한 체크
-        if not check_risk_limits(symbol, direction, position_size):
-            return
-        # 동적 SL 계산
-        dynamic_sl = calculate_dynamic_sl(df, direction)
-        if dynamic_sl:
-            sl = dynamic_sl
-        # 주문 실행 전에 한번 더 포지션 체크
-        if not has_open_position(symbol):
-            auto_trade_from_signal(signal)
-        open_trades[symbol] = {
-            "entry_time": datetime.utcnow(),
-            "entry_price": price,
-            "direction": direction,
-            "tp": tp,
-            "sl": sl,
-            "qty": qty,
-            "mode": mode,
-            "position_size": position_size,
-            "strategy_params": strategy_params,
-            "partial_tp_levels": [],
-            "current_price": price
-        }
-        send_telegram_message(f"🚀 진입 완료: {symbol} ({mode.upper()})\n"
-                              f"   ├ 방향     : `{direction}`\n"
-                              f"   ├ 현재가   : `{round(price, 4)}`\n"
-                              f"   ├ TP       : `{round(tp, 4)}`\n"
-                              f"   ├ SL       : `{round(sl, 4)}`\n"
-                              f"   ├ 수량     : `{round(qty, 4)}`\n"
-                              f"   ├ 변동성   : `{round(volatility * 100, 2)}%`\n"
-                              f"   ├ 시장단계 : `{analyze_market_phase(df)}`\n"
-                              f"   └ 모드     : `{mode}`")
-        # 웹소켓 연결 추가
-        if symbol not in price_sockets and ws is not None:
-            params = [f"{symbol.lower()}@trade"]
-            payload = {
-                "method": "SUBSCRIBE",
-                "params": params,
-                "id": 1
-            }
-            ws.send(json.dumps(payload))
-            price_sockets[symbol] = True
-            send_telegram_message(f"🔌 {symbol} 웹소켓 구독 추가됨")
-    except Exception as e:
-        send_telegram_message(f"💥 진입 실패: {symbol} - {str(e)}")
-
-def initialize_trade_history():
-    """
-    기존 거래 데이터와 현재 보유 포지션을 초기화
-    """
-    try:
-        history_file = "trade_history.json"
-        
-        # 현재 보유 포지션 정보 가져오기
-        positions = client.futures_position_information()
-        current_positions = []
-        
-        for position in positions:
-            if float(position['positionAmt']) != 0:
-                position_info = {
-                    "symbol": position['symbol'],
-                    "direction": "long" if float(position['positionAmt']) > 0 else "short",
-                    "entry_price": float(position['entryPrice']),
-                    "current_price": float(position['markPrice']),
-                    "quantity": abs(float(position['positionAmt'])),
-                    "unrealized_pnl": float(position['unRealizedProfit'])
-                }
-                
-                # leverage 정보가 있는 경우에만 추가
-                if 'leverage' in position:
-                    position_info["leverage"] = float(position['leverage'])
-                    
-                current_positions.append(position_info)
-        
-        # 오늘 날짜의 거래 내역 생성
-        today_data = {
-            "date": datetime.utcnow().strftime("%Y-%m-%d"),
-            "trades": [],
-            "current_positions": current_positions,
-            "summary": {
-                "total_trades": 0,
-                "win_rate": 0,
-                "total_profit": 0,
-                "total_loss": 0,
-                "open_positions": len(current_positions)
-            }
-        }
-        
-        # 파일이 없으면 생성하고 초기화
-        if not os.path.exists(history_file):
-            with open(history_file, 'w') as f:
-                json.dump([today_data], f, indent=2)
-            debug_message("거래 내역 파일 생성 및 초기화 완료", "INFO")
-        else:
-            # 기존 데이터 읽기
-            with open(history_file, 'r') as f:
-                history = json.load(f)
+            # 포지션 청산 시도
+            try:
+                # 청산 주문 실행
+                close_position(symbol, abs(position_amt), "short" if direction == "long" else "long")
+                debug_message(f"포지션 청산 주문 실행: {symbol}", "INFO")
+            except Exception as e:
+                debug_message(f"포지션 청산 주문 실패: {symbol} - {str(e)}", "ERROR")
+                return
             
-            # 오늘 날짜의 데이터가 있는지 확인
-            today = datetime.utcnow().strftime("%Y-%m-%d")
-            today_exists = False
-            
-            for entry in history:
-                if entry["date"] == today:
-                    # 오늘 데이터 업데이트
-                    entry["current_positions"] = current_positions
-                    entry["summary"]["open_positions"] = len(current_positions)
-                    today_exists = True
-                    break
-            
-            # 오늘 데이터가 없으면 추가
-            if not today_exists:
-                history.append(today_data)
-            
-            # 파일 저장
-            with open(history_file, 'w') as f:
-                json.dump(history, f, indent=2)
-            
-            debug_message("거래 내역 업데이트 완료", "INFO")
-        
-        if current_positions:
-            debug_message(f"현재 보유 포지션 {len(current_positions)}개 추가됨", "INFO")
-            
-    except Exception as e:
-        debug_message(f"거래 내역 초기화 실패: {str(e)}", "ERROR")
-
-def wave_trade_watcher():
-    """
-    파동 기반 트레이드 감시 루프
-    """
-    send_telegram_message("🌊 파동 기반 진입 감시 시작...")
-    
-    # 거래 내역 초기화
-    initialize_trade_history()
-    
-    # 기존 포지션 확인 및 웹소켓 구독
-    try:
-        positions = client.futures_position_information()
-        for position in positions:
-            symbol = position['symbol']
-            if float(position['positionAmt']) != 0:  # 포지션이 있는 경우
-                if symbol not in open_trades:
-                    # 포지션 정보 저장
-                    entry_price = float(position['entryPrice'])
-                    current_price = float(position['markPrice'])
-                    direction = 'long' if float(position['positionAmt']) > 0 else 'short'
-                    qty = abs(float(position['positionAmt']))
-                    
-                    # 수익률 계산
-                    pnl_pct = ((current_price - entry_price) / entry_price * 100) if direction == 'long' else ((entry_price - current_price) / entry_price * 100)
-                    
-                    # 모드 결정 (수익률 기반)
-                    if abs(pnl_pct) < 0.3:
-                        mode = 'scalp'
-                    elif abs(pnl_pct) < 1.0:
-                        mode = 'trend'
-                    else:
-                        mode = 'revert'
-                    
-                    # TP/SL 계산
-                    if direction == 'long':
-                        tp = entry_price * 1.015  # 1.5% 익절
-                        sl = entry_price * 0.985  # 1.5% 손절
-                    else:
-                        tp = entry_price * 0.985  # 1.5% 익절
-                        sl = entry_price * 1.015  # 1.5% 손절
-
-                    open_trades[symbol] = {
-                        'entry_price': entry_price,
-                        'direction': direction,
-                        'qty': qty,
-                        'tp': tp,
-                        'sl': sl,
-                        'mode': mode,
-                        'current_price': current_price
-                    }
-                    
-                    debug_message(f"기존 포지션 발견: {symbol}\n"
-                                f"   ├ 방향     : `{direction}`\n"
-                                f"   ├ 진입가   : `{round(entry_price, 4)}`\n"
-                                f"   ├ 현재가   : `{round(current_price, 4)}`\n"
-                                f"   ├ 수익률   : `{round(pnl_pct, 2)}%`\n"
-                                f"   ├ TP       : `{round(tp, 4)}`\n"
-                                f"   ├ SL       : `{round(sl, 4)}`\n"
-                                f"   └ 모드     : `{mode}`", "INFO")
-    except Exception as e:
-        debug_message(f"기존 포지션 확인 실패: {str(e)}", "ERROR")
-    
-    # 웹소켓 연결 시작
-    start_websocket_connections()
-    
-    # 웹소켓 연결이 시작될 때까지 잠시 대기
-    time.sleep(2)
-    
-    # 초기 상태 리포트
-    account = client.futures_account()
-    balance = float(account['totalWalletBalance'])
-    daily_stats["start_balance"] = balance
-    daily_stats["current_balance"] = balance
-    daily_stats["last_reset"] = datetime.utcnow()
-    
-    initial_report = f"""
-🤖 *봇 초기화 완료*
-├ 계좌 잔고: `{round(balance, 2)} USDT`
-├ 최대 포지션: `{CONFIG['max_open_positions']}개`
-├ 최대 손실: `{CONFIG['max_daily_loss_pct']}%`
-├ 거래 시간: `{CONFIG['trading_hours']['start']} ~ {CONFIG['trading_hours']['end']} UTC`
-└ 시스템 상태: 정상
-"""
-    send_telegram_message(initial_report)
-
-    consecutive_errors = 0  # 연속 에러 카운트
-    last_report_time = datetime.utcnow()
-    last_market_analysis_time = datetime.utcnow()
-    last_health_check_time = datetime.utcnow()
-    last_status_time = datetime.utcnow()  # 상태 메시지 시간 추적
-
-    while True:
-        try:
-            # 시스템 상태 체크 (5분마다)
-            if (datetime.utcnow() - last_health_check_time).total_seconds() > CONFIG["monitoring"]["check_interval"]:
-                if not check_system_health():
-                    time.sleep(300)  # 5분 대기
-                    continue
-                last_health_check_time = datetime.utcnow()
-
-            # 시장 분석 업데이트 (1시간마다)
-            if (datetime.utcnow() - last_market_analysis_time).total_seconds() > 3600:
-                update_market_analysis()
-                last_market_analysis_time = datetime.utcnow()
-            
-            # 일일 리포트 생성 (자정에)
-            if (datetime.utcnow() - last_report_time).total_seconds() > 86400:
-                report = generate_performance_report()
-                send_telegram_message(report)
-                save_trade_history()
-                last_report_time = datetime.utcnow()
-
-            # 상태 메시지 (10분마다)
-            if (datetime.utcnow() - last_status_time).total_seconds() > 600:
-                status_msg = f"🤖 봇 상태 업데이트\n"
-                status_msg += f"├ 현재 포지션: {len(open_trades)}개\n"
-                if open_trades:
-                    status_msg += "├ 보유 중인 포지션:\n"
-                    for symbol, trade in open_trades.items():
-                        pnl = ((trade['current_price'] - trade['entry_price']) / trade['entry_price'] * 100) if trade['direction'] == "long" else ((trade['entry_price'] - trade['current_price']) / trade['entry_price'] * 100)
-                        status_msg += f"│  ├ {symbol}: {trade['direction']} ({round(pnl, 2)}%)\n"
-                status_msg += f"├ 일일 거래: {daily_stats['total_trades']}회\n"
-                status_msg += f"├ 승률: {round(daily_stats['winning_trades'] / daily_stats['total_trades'] * 100 if daily_stats['total_trades'] > 0 else 0, 1)}%\n"
-                status_msg += f"└ 연속 손실: {daily_stats['consecutive_losses']}회"
-                send_telegram_message(status_msg)
-                last_status_time = datetime.utcnow()
-
-            # 웹소켓 연결 상태 확인 및 재연결
-            if ws is None:
-                send_telegram_message("⚠️ 웹소켓 연결이 끊어졌습니다. 재연결을 시도합니다...")
-                start_websocket_connections()
-
-            symbols = get_top_symbols(20)  # 시총 상위 20종목
-            if not symbols:
-                send_telegram_message("⚠️ 심볼 목록을 가져오지 못했습니다.")
-                time.sleep(30)
-                continue
-
-            for symbol in symbols:
-                try:
-                    # 백테스트 실행 (선택적)
-                    if CONFIG["backtest_days"] > 0:
-                        backtest_results = backtest_strategy(symbol)
-                        if backtest_results.get("win_rate", 0) < 50:  # 승률 50% 미만이면 스킵
-                            continue
-
-                    df = get_1m_klines(symbol, interval="3m", limit=120)  # 3분봉 기준
-                    if df.empty or len(df) < 60:
-                        continue
-
-                    # 기존 파동 분석
-                    wave_info = analyze_wave_from_df(df)
-                    
-                    # 추가 전략 실행
-                    if wave_info:
-                        # 모멘텀 전략
-                        if execute_momentum_strategy(symbol, df):
-                            enter_trade_from_wave(symbol, wave_info, df['close'].iloc[-1])
-                            
-                        # 돌파 전략
-                        if execute_breakout_strategy(symbol, df):
-                            enter_trade_from_wave(symbol, wave_info, df['close'].iloc[-1])
-                            
-                        # 차익거래 전략
-                        if execute_arbitrage_strategy(symbol):
-                            enter_trade_from_wave(symbol, wave_info, df['close'].iloc[-1])
-
-                except Exception as e:
-                    send_telegram_message(f"⚠️ {symbol} 처리 중 오류: {str(e)}")
-                    continue
-
-            # 마켓 메이커 전략 실행
-            if CONFIG["market_maker"]["enabled"]:
-                for symbol in symbols:
-                    if len(open_trades) < CONFIG["market_maker"]["max_positions"]:
-                        execute_market_maker_strategy(symbol)
-
-            consecutive_errors = 0  # 성공 시 에러 카운트 리셋
-            time.sleep(60)  # 1분 주기로 갱신
-
         except Exception as e:
-            consecutive_errors += 1
-            error_msg = f"💥 파동 감시 오류: {e}"
-            if consecutive_errors >= 3:
-                error_msg += "\n⚠️ 연속 3회 이상 오류 발생. 5분 대기 후 재시도합니다."
-                time.sleep(300)  # 5분 대기
-            else:
-                time.sleep(30)
-            send_telegram_message(error_msg)
-
-def execute_market_maker_strategy(symbol: str):
-    """
-    마켓 메이커 전략 실행
-    """
-    try:
-        if not CONFIG["market_maker"]["enabled"]:
-            return
-
-        # 현재가 조회
-            df = get_1m_klines(symbol, interval="1m", limit=1)
-        if df.empty:
-            return
-
-        current_price = df['close'].iloc[-1]
+            debug_message(f"포지션 정보 조회 실패: {symbol} - {str(e)}", "ERROR")
+            # 기본값으로 계산
+            position_size = qty * entry_price
         
-        # 그리드 레벨 계산
-        grid_levels = CONFIG["market_maker"]["grid_levels"]
-        grid_distance = CONFIG["market_maker"]["grid_distance"]
+        # 수익금 계산
+        if direction == "long":
+            pnl = (exit_price - entry_price) * position_size
+            pnl_pct = ((exit_price - entry_price) / entry_price) * 100
+        else:  # short
+            pnl = (entry_price - exit_price) * position_size
+            pnl_pct = ((entry_price - exit_price) / entry_price) * 100
+            
+        # 수수료 계산 (0.04% = 0.0004)
+        fee = position_size * exit_price * 0.0004
+        net_pnl = pnl - fee
         
-        # 매수/매도 주문 생성
-        for i in range(grid_levels):
-            # 매수 주문
-            buy_price = current_price * (1 - (i + 1) * grid_distance / 100)
-            buy_qty = round_qty(symbol, CONFIG["market_maker"]["position_size"] / buy_price)
+        # 이모지 설정
+        if exit_reason == 'TP':
+            reason_emoji = '🎯'
+        else:  # SL
+            reason_emoji = '🛑'
             
-            # 매도 주문
-            sell_price = current_price * (1 + (i + 1) * grid_distance / 100)
-            sell_qty = round_qty(symbol, CONFIG["market_maker"]["position_size"] / sell_price)
+        if net_pnl > 0:
+            pnl_emoji = '💰'
+        else:
+            pnl_emoji = '💸'
             
-            # 주문 실행
-            place_order(symbol, "buy", buy_qty, buy_price)
-            place_order(symbol, "sell", sell_qty, sell_price)
+        # 포지션 정보
+        position_info = f"{direction.upper()} {position_size:.4f} @ {entry_price:.4f}"
+        
+        # 메시지 전송
+        message = (
+            f"{reason_emoji} 포지션 종료: `{symbol}`\n"
+            f"   ├ 포지션: `{position_info}`\n"
+            f"   ├ 종료가: `{exit_price:.4f}`\n"
+            f"   ├ 수익금: {pnl_emoji} `{net_pnl:.2f} USDT`\n"
+            f"   └ 수익률: {pnl_emoji} `{pnl_pct:.2f}%`"
+        )
+        send_telegram_message(message)
+        
+        # 거래 내역 저장
+        trade_history = {
+            'symbol': symbol,
+            'position_type': direction.upper(),
+            'entry_price': entry_price,
+            'exit_price': exit_price,
+            'position_size': position_size,
+            'pnl': net_pnl,
+            'pnl_pct': pnl_pct,
+            'exit_reason': exit_reason,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        # 오늘 날짜의 거래 내역에 추가
+        today = datetime.now().strftime('%Y-%m-%d')
+        if today not in trade_history_data:
+            trade_history_data[today] = {
+                'trades': [],
+                'summary': {
+                    'total_trades': 0,
+                    'win_rate': 0,
+                    'total_profit': 0,
+                    'total_loss': 0,
+                    'open_positions': []
+                }
+            }
             
-        send_telegram_message(f"🔄 마켓 메이커 전략 실행: {symbol}\n"
-                            f"   ├ 현재가: `{round(current_price, 4)}`\n"
-                            f"   ├ 그리드 레벨: `{grid_levels}`\n"
-                            f"   └ 그리드 간격: `{grid_distance}%`")
-
+        trade_history_data[today]['trades'].append(trade_history)
+        
+        # 요약 정보 업데이트
+        summary = trade_history_data[today]['summary']
+        summary['total_trades'] += 1
+        
+        if net_pnl > 0:
+            summary['total_profit'] += net_pnl
+            daily_stats["winning_trades"] += 1
+            daily_stats["consecutive_losses"] = 0  # 연속 손실 카운트 리셋
+        else:
+            summary['total_loss'] += abs(net_pnl)
+            daily_stats["losing_trades"] += 1
+            daily_stats["consecutive_losses"] += 1
+            
+        # 승률 계산
+        winning_trades = len([t for t in trade_history_data[today]['trades'] if t['pnl'] > 0])
+        summary['win_rate'] = (winning_trades / summary['total_trades']) * 100
+        
+        # 거래 내역 저장
+        save_trade_history()
+        
+        # 열린 포지션에서 제거
+        if symbol in open_trades:
+            del open_trades[symbol]
+        
+        debug_message(f"포지션 종료 완료: {symbol} - {exit_reason}", "INFO")
+        
     except Exception as e:
-        send_telegram_message(f"💥 마켓 메이커 전략 오류: {str(e)}")
-
-def calculate_grid_profit(symbol: str, entry_price: float, current_price: float, direction: str) -> float:
-    """
-    그리드 전략 수익 계산
-    """
-    try:
-            if direction == "long":
-                return (current_price - entry_price) / entry_price * 100
-            else:
-                return (entry_price - current_price) / entry_price * 100
-    except Exception as e:
-        return 0
+        debug_message(f"포지션 종료 처리 실패: {symbol} - {str(e)}", "ERROR")
 
 def check_grid_exit(symbol: str, trade: dict) -> bool:
     """
@@ -1749,16 +1318,19 @@ def periodic_safety_check():
             # 2. 실계좌 포지션과 open_trades 동기화
             positions = client.futures_position_information()
             real_symbols = set()
+            
+            # 실제 포지션 정보 업데이트
             for position in positions:
                 symbol = position['symbol']
-                if float(position['positionAmt']) != 0:
+                position_amt = float(position['positionAmt'])
+                if position_amt != 0:
                     real_symbols.add(symbol)
                     if symbol not in open_trades:
                         send_telegram_message(f"⚠️ [점검] 실계좌에만 존재하는 포지션 발견: {symbol}. open_trades에 추가합니다.")
                         entry_price = float(position['entryPrice'])
                         current_price = float(position['markPrice'])
-                        direction = 'long' if float(position['positionAmt']) > 0 else 'short'
-                        qty = abs(float(position['positionAmt']))
+                        direction = 'long' if position_amt > 0 else 'short'
+                        qty = abs(position_amt)
                         if direction == 'long':
                             tp = entry_price * 1.015
                             sl = entry_price * 0.985
@@ -1774,12 +1346,41 @@ def periodic_safety_check():
                             'mode': 'sync',
                             'current_price': current_price
                         }
+                    else:
+                        # 기존 포지션 정보 업데이트
+                        open_trades[symbol]['current_price'] = float(position['markPrice'])
+                        open_trades[symbol]['qty'] = abs(position_amt)
+
+            # 3. 미체결 주문 정리
+            try:
+                all_open_orders = client.futures_get_open_orders()
+                order_count = len(all_open_orders)
+                if order_count > CONFIG["max_open_positions"] * 2:  # 최대 포지션 수의 2배를 초과하는 경우
+                    send_telegram_message(f"⚠️ [점검] 미체결 주문이 너무 많습니다 ({order_count}개). 정리합니다.")
+                    for order in all_open_orders:
+                        try:
+                            client.futures_cancel_order(symbol=order['symbol'], orderId=order['orderId'])
+                        except Exception as e:
+                            continue
+            except Exception as e:
+                send_telegram_message(f"⚠️ [점검] 미체결 주문 정리 실패: {str(e)}")
+
+            # 4. open_trades 정리
             for symbol in list(open_trades.keys()):
                 if symbol not in real_symbols:
                     send_telegram_message(f"⚠️ [점검] open_trades에만 존재하는 포지션 발견: {symbol}. 제거합니다.")
                     del open_trades[symbol]
 
-            # 3. 시스템 리소스 점검
+            # 5. market_maker_orders 정리
+            current_time = datetime.now()
+            for symbol in list(market_maker_orders.keys()):
+                if (current_time - market_maker_orders[symbol]).total_seconds() > 1800:  # 30분 이상 지난 주문
+                    del market_maker_orders[symbol]
+
+            # 6. 거래 이력 저장
+            save_trade_history()
+
+            # 7. 시스템 리소스 점검
             cpu_usage = psutil.cpu_percent()
             memory_usage = psutil.virtual_memory().percent
             if cpu_usage > CONFIG["monitoring"]["max_cpu_usage"]:
@@ -1787,15 +1388,945 @@ def periodic_safety_check():
             if memory_usage > CONFIG["monitoring"]["max_memory_usage"]:
                 send_telegram_message(f"⚠️ [점검] 메모리 사용률 높음: {memory_usage}%")
 
-            # 4. 예외 상황 로깅 (예: 최근 청산 실패 등)
-            # 필요시 예외 상황을 기록하는 전역 리스트/큐를 만들어서 여기서 알림
+            # 8. 상태 리포트
+            status_msg = f"""
+🤖 [점검] 시스템 상태
+├ 현재 포지션: {len(open_trades)}개
+├ 미체결 주문: {order_count}개
+├ 활성 그리드: {len(market_maker_orders)}개
+└ 시스템 리소스: CPU {cpu_usage}%, 메모리 {memory_usage}%
+"""
+            send_telegram_message(status_msg)
 
         except Exception as e:
             send_telegram_message(f"💥 [점검] 주기적 점검 루프 오류: {str(e)}")
         time.sleep(600)  # 10분마다 반복
 
-# 파일 맨 아래에 메인 실행부 추가
-if __name__ == '__main__':
-    safety_thread = threading.Thread(target=periodic_safety_check)
-    safety_thread.daemon = True
-    safety_thread.start()
+def start_websocket_thread():
+    """
+    웹소켓 연결을 위한 별도 스레드 시작
+    """
+    websocket_thread = threading.Thread(target=start_websocket_connections, daemon=True)
+    websocket_thread.start()
+    return websocket_thread
+
+def wave_trade_watcher():
+    """
+    파동 기반 트레이드 감시 루프
+    """
+    send_telegram_message("🌊 파동 기반 진입 감시 시작...")
+    
+    # 거래 내역 초기화
+    initialize_trade_history()
+    
+    # 웹소켓 연결을 별도 스레드로 시작
+    websocket_thread = start_websocket_thread()
+    
+    # 웹소켓 연결이 시작될 때까지 잠시 대기
+    time.sleep(2)
+    
+    # 초기 상태 리포트
+    try:
+        account = rate_limited_api_call(client.futures_account)
+        balance = float(account['totalWalletBalance'])
+        daily_stats["start_balance"] = balance
+        daily_stats["current_balance"] = balance
+        daily_stats["last_reset"] = datetime.utcnow()
+        
+        initial_report = f"""
+🤖 *봇 초기화 완료*
+├ 계좌 잔고: `{round(balance, 2)} USDT`
+├ 최대 포지션: `{CONFIG['max_open_positions']}개`
+├ 최대 손실: `{CONFIG['max_daily_loss_pct']}%`
+├ 거래 시간: `{CONFIG['trading_hours']['start']} ~ {CONFIG['trading_hours']['end']} UTC`
+└ 시스템 상태: 정상
+"""
+        send_telegram_message(initial_report)
+    except Exception as e:
+        debug_message(f"초기 상태 리포트 생성 실패: {str(e)}", "ERROR")
+    
+    # 포지션 모니터링 스레드 시작
+    monitor_thread = threading.Thread(target=monitor_positions, daemon=True)
+    monitor_thread.start()
+    
+    # 웹소켓 모니터링 스레드 시작
+    websocket_monitor_thread = threading.Thread(target=monitor_websocket_connection, daemon=True)
+    websocket_monitor_thread.start()
+    
+    consecutive_errors = 0
+    last_report_time = datetime.utcnow()
+    last_market_analysis_time = datetime.utcnow()
+    last_health_check_time = datetime.utcnow()
+    last_status_time = datetime.utcnow()
+    last_position_sync_time = datetime.utcnow()
+
+    while True:
+        try:
+            # 시스템 상태 체크 (5분마다)
+            if (datetime.utcnow() - last_health_check_time).total_seconds() > CONFIG["monitoring"]["check_interval"]:
+                if not check_system_health():
+                    time.sleep(300)
+                    continue
+                last_health_check_time = datetime.utcnow()
+
+            # 시장 분석 업데이트 (1시간마다)
+            if (datetime.utcnow() - last_market_analysis_time).total_seconds() > 3600:
+                update_market_analysis()
+                last_market_analysis_time = datetime.utcnow()
+            
+            # 일일 리포트 생성 (자정에)
+            if (datetime.utcnow() - last_report_time).total_seconds() > 86400:
+                report = generate_performance_report()
+                send_telegram_message(report)
+                save_trade_history()
+                last_report_time = datetime.utcnow()
+
+            # 상태 메시지 (10분마다)
+            if (datetime.utcnow() - last_status_time).total_seconds() > 600:
+                status_msg = f"🤖 봇 상태 업데이트\n"
+                status_msg += f"├ 현재 포지션: {len(open_trades)}개\n"
+                if open_trades:
+                    status_msg += "├ 보유 중인 포지션:\n"
+                    for symbol, trade in open_trades.items():
+                        pnl = ((trade['current_price'] - trade['entry_price']) / trade['entry_price'] * 100) if trade['direction'] == "long" else ((trade['entry_price'] - trade['current_price']) / trade['entry_price'] * 100)
+                        status_msg += f"│  ├ {symbol}: {trade['direction']} ({round(pnl, 2)}%)\n"
+                status_msg += f"├ 일일 거래: {daily_stats['total_trades']}회\n"
+                status_msg += f"├ 승률: {round(daily_stats['winning_trades'] / daily_stats['total_trades'] * 100 if daily_stats['total_trades'] > 0 else 0, 1)}%\n"
+                status_msg += f"└ 연속 손실: {daily_stats['consecutive_losses']}회"
+                send_telegram_message(status_msg)
+                last_status_time = datetime.utcnow()
+
+            # 포지션 동기화 (5분마다)
+            if (datetime.utcnow() - last_position_sync_time).total_seconds() > 300:
+                try:
+                    positions = rate_limited_api_call(client.futures_position_information)
+                    real_symbols = set()
+                    
+                    for position in positions:
+                        symbol = position['symbol']
+                        position_amt = float(position['positionAmt'])
+                        if position_amt != 0:
+                            real_symbols.add(symbol)
+                            if symbol not in open_trades:
+                                entry_price = float(position['entryPrice'])
+                                current_price = float(position['markPrice'])
+                                direction = 'long' if position_amt > 0 else 'short'
+                                qty = abs(position_amt)
+                                
+                                # TP/SL 계산
+                                if direction == 'long':
+                                    tp = entry_price * 1.015
+                                    sl = entry_price * 0.985
+                                else:
+                                    tp = entry_price * 0.985
+                                    sl = entry_price * 1.015
+                                
+                                open_trades[symbol] = {
+                                    'entry_price': entry_price,
+                                    'direction': direction,
+                                    'qty': qty,
+                                    'tp': tp,
+                                    'sl': sl,
+                                    'mode': 'sync',
+                                    'current_price': current_price
+                                }
+                    
+                    # 존재하지 않는 포지션 제거
+                    for symbol in list(open_trades.keys()):
+                        if symbol not in real_symbols:
+                            del open_trades[symbol]
+                    
+                    last_position_sync_time = datetime.utcnow()
+                    
+                except Exception as e:
+                    debug_message(f"포지션 동기화 실패: {str(e)}", "ERROR")
+                    time.sleep(60)
+
+            # 거래 신호 확인
+            symbols = get_top_symbols(20)
+            if not symbols:
+                time.sleep(30)
+                continue
+
+            for symbol in symbols:
+                try:
+                    if symbol in open_trades:
+                        continue
+
+                    df = get_1m_klines(symbol, interval="3m", limit=120)
+                    if df.empty or len(df) < 60:
+                        continue
+
+                    wave_info = analyze_wave_from_df(df)
+                    if wave_info:
+                        if execute_momentum_strategy(symbol, df) or \
+                           execute_breakout_strategy(symbol, df) or \
+                           execute_arbitrage_strategy(symbol):
+                            enter_trade_from_wave(symbol, wave_info, df['close'].iloc[-1])
+
+                except Exception as e:
+                    debug_message(f"{symbol} 처리 중 오류: {str(e)}", "ERROR")
+                    continue
+
+            # 마켓 메이커 전략 실행
+            if CONFIG["market_maker"]["enabled"]:
+                for symbol in symbols:
+                    if len(open_trades) < CONFIG["market_maker"]["max_positions"]:
+                        execute_market_maker_strategy(symbol)
+
+            consecutive_errors = 0
+            time.sleep(60)
+
+        except Exception as e:
+            consecutive_errors += 1
+            error_msg = f"💥 파동 감시 오류: {e}"
+            if consecutive_errors >= 3:
+                error_msg += "\n⚠️ 연속 3회 이상 오류 발생. 5분 대기 후 재시도합니다."
+                time.sleep(300)
+            else:
+                time.sleep(30)
+            send_telegram_message(error_msg)
+
+def start_websocket_connections():
+    global ws, ws_connected
+    try:
+        # 기존 연결 종료
+        if ws is not None:
+            try:
+                ws.close()
+            except:
+                pass
+            ws = None
+        
+        ws_connected = False
+        #debug_message("웹소켓 연결 시작...", "INFO")
+        
+        # 웹소켓 연결 설정
+        ws = websocket.WebSocketApp(
+            "wss://fstream.binance.com/ws",
+            on_message=on_message,
+            on_error=on_error,
+            on_close=on_close,
+            on_open=on_open
+        )
+        
+        # 연결 옵션 설정
+        ws.run_forever(
+            ping_interval=20,
+            ping_timeout=10,
+            skip_utf8_validation=True,
+            sslopt={"cert_reqs": ssl.CERT_NONE}
+        )
+        
+    except Exception as e:
+        #debug_message(f"웹소켓 연결 실패: {str(e)}", "ERROR")
+        ws_connected = False
+        time.sleep(ws_reconnect_delay)
+        # 재귀 호출 제거
+        return False
+    return True
+
+def is_websocket_connected():
+    """
+    웹소켓 연결 상태 확인
+    """
+    global ws, ws_connected
+    try:
+        if ws is None:
+            return False
+        if not hasattr(ws, 'sock'):
+            return False
+        if ws.sock is None:
+            return False
+        return ws.sock.connected and ws_connected
+    except:
+        return False
+
+def on_error(ws, error):
+    """
+    웹소켓 에러 처리
+    """
+    global ws_connected
+    #debug_message(f"웹소켓 에러: {str(error)}", "ERROR")
+    ws_connected = False
+    time.sleep(ws_reconnect_delay * 2)  # 재연결 대기 시간 2배로 증가
+    try:
+        if ws is not None:
+            ws.close()
+    except:
+        pass
+    # 재귀 호출 제거
+    return False
+
+def on_close(ws, close_status_code, close_msg):
+    """
+    웹소켓 연결 종료 처리
+    """
+    global ws_connected
+    #debug_message(f"웹소켓 연결 종료됨 (코드: {close_status_code}, 메시지: {close_msg})", "INFO")
+    ws_connected = False
+    time.sleep(ws_reconnect_delay)
+    try:
+        if ws is not None:
+            ws.close()
+    except:
+        pass
+    # 재귀 호출 제거
+    return False
+
+def on_open(ws):
+    """
+    웹소켓 연결 시작 처리
+    """
+    global ws_connected
+    try:
+        ws_connected = True
+        # 구독할 심볼 목록
+        symbols = list(open_trades.keys())
+        if CONFIG["market_maker"]["enabled"]:
+            # 시총 상위 심볼 가져오기
+            top_symbols = get_top_symbols(20)
+            if top_symbols:
+                symbols.extend(top_symbols)
+            
+            # 현재 활성화된 그리드 주문 심볼 추가
+            current_time = datetime.now()
+            active_symbols = [sym for sym, time in market_maker_orders.items() 
+                            if (current_time - time).total_seconds() < 1800]
+            symbols.extend(active_symbols)
+        
+        # 중복 제거 및 정렬
+        symbols = sorted(list(set(symbols)))
+        
+        # 구독 메시지 전송 (배치 처리)
+        batch_size = 3  # 한 번에 3개씩 구독으로 감소
+        for i in range(0, len(symbols), batch_size):
+            batch_symbols = symbols[i:i + batch_size]
+            try:
+                subscribe_message = {
+                    "method": "SUBSCRIBE",
+                    "params": [f"{symbol.lower()}@bookTicker" for symbol in batch_symbols],
+                    "id": 1
+                }
+                ws.send(json.dumps(subscribe_message))
+                
+                # price_sockets 초기화
+                for symbol in batch_symbols:
+                    price_sockets[symbol] = {'bid': 0, 'ask': 0}
+                
+                debug_message(f"웹소켓 구독: {', '.join(batch_symbols)}", "INFO")
+                time.sleep(2)  # 구독 요청 사이에 2초 대기로 증가
+                
+            except Exception as e:
+                #debug_message(f"웹소켓 구독 실패 (배치 {i//batch_size + 1}): {str(e)}", "ERROR")
+                continue
+        
+        debug_message(f"웹소켓 구독 완료: {len(symbols)}개 심볼", "INFO")
+        
+    except Exception as e:
+        #debug_message(f"웹소켓 구독 실패: {str(e)}", "ERROR")
+        ws_connected = False
+        time.sleep(ws_reconnect_delay)
+        try:
+            if ws is not None:
+                ws.close()
+        except:
+            pass
+        start_websocket_connections()
+
+def enter_trade_from_wave(symbol: str, wave_info: dict, current_price: float):
+    """
+    파동 분석 결과를 기반으로 포지션 진입
+    """
+    try:
+        # 이미 포지션이 있는 경우 스킵
+        if symbol in open_trades:
+            return
+            
+        # 최대 포지션 수 체크
+        if len(open_trades) >= CONFIG["max_open_positions"]:
+            debug_message(f"최대 포지션 수 도달: {CONFIG['max_open_positions']}개", "INFO")
+            return
+            
+        # 거래 시간 체크
+        if not is_trading_allowed():
+            debug_message("현재 거래 시간이 아님", "INFO")
+            return
+            
+        # 일일 손실 제한 체크
+        if not check_daily_loss_limit():
+            debug_message("일일 손실 제한 도달", "WARNING")
+            return
+            
+        # 변동성 계산
+        df = get_1m_klines(symbol, interval="3m", limit=20)
+        volatility = calculate_volatility(df)
+        
+        # 포지션 크기 계산
+        position_size = calculate_position_size(symbol, current_price, volatility)
+        
+        # 리스크 제한 체크
+        direction = "long" if wave_info["direction"] == "up" else "short"
+        if not check_risk_limits(symbol, direction, position_size):
+            return
+            
+        # 동적 SL 계산
+        sl = calculate_dynamic_sl(df, direction)
+        if sl is None:
+            sl = current_price * 0.985 if direction == "long" else current_price * 1.015
+            
+        # TP 계산
+        tp = current_price * 1.015 if direction == "long" else current_price * 0.985
+        
+        # 모드 결정
+        mode = determine_trade_mode_from_wave(wave_info)
+        
+        # 포지션 진입
+        try:
+            # 레버리지 설정
+            client.futures_change_leverage(symbol=symbol, leverage=1)
+            
+            # 주문 실행
+            order = client.futures_create_order(
+                symbol=symbol,
+                side="BUY" if direction == "long" else "SELL",
+                type="MARKET",
+                quantity=position_size
+            )
+            
+            # 포지션 정보 저장
+            open_trades[symbol] = {
+                'entry_price': current_price,
+                'direction': direction,
+                'qty': position_size,
+                'tp': tp,
+                'sl': sl,
+                'mode': mode,
+                'current_price': current_price
+            }
+            
+            # TP/SL 주문
+            client.futures_create_order(
+                symbol=symbol,
+                side="SELL" if direction == "long" else "BUY",
+                type="TAKE_PROFIT_MARKET",
+                stopPrice=tp,
+                closePosition=True
+            )
+            
+            client.futures_create_order(
+                symbol=symbol,
+                side="SELL" if direction == "long" else "BUY",
+                type="STOP_MARKET",
+                stopPrice=sl,
+                closePosition=True
+            )
+            
+            # 메시지 전송
+            message = f"""
+🎯 포지션 진입: `{symbol}`
+   ├ 방향     : `{direction.upper()}`
+   ├ 진입가   : `{round(current_price, 4)}`
+   ├ 수량     : `{round(position_size, 4)}`
+   ├ TP       : `{round(tp, 4)}`
+   ├ SL       : `{round(sl, 4)}`
+   └ 모드     : `{mode}`
+"""
+            send_telegram_message(message)
+            
+            # 거래 내역 업데이트
+            daily_stats["total_trades"] += 1
+            
+        except Exception as e:
+            debug_message(f"포지션 진입 실패: {symbol} - {str(e)}", "ERROR")
+            
+    except Exception as e:
+        debug_message(f"포지션 진입 처리 실패: {symbol} - {str(e)}", "ERROR")
+
+def execute_market_maker_strategy(symbol: str):
+    """
+    마켓 메이커 전략 실행
+    """
+    try:
+        if not CONFIG["market_maker"]["enabled"]:
+            return
+            
+        # 주문 상태 확인 (더 엄격한 체크)
+        current_time = datetime.now()
+        
+        # 1. 현재 활성 그리드 주문 수 확인
+        active_grid_orders = sum(1 for sym in market_maker_orders.keys() 
+                               if (current_time - market_maker_orders[sym]).total_seconds() < 1800)
+        if active_grid_orders >= CONFIG["market_maker"]["max_positions"]:
+            active_symbols = [sym for sym, time in market_maker_orders.items() 
+                            if (current_time - time).total_seconds() < 1800]
+            remaining_times = [f"{sym}({int((1800 - (current_time - time).total_seconds()) / 60)}분)" 
+                             for sym, time in market_maker_orders.items() 
+                             if (current_time - time).total_seconds() < 1800]
+            
+            debug_message(f"마켓 메이커 상태:\n"
+                        f"   ├ 활성 그리드: {active_grid_orders}/{CONFIG['market_maker']['max_positions']}개\n"
+                        f"   ├ 활성 심볼: {', '.join(active_symbols)}\n"
+                        f"   └ 남은 시간: {', '.join(remaining_times)}", "INFO")
+            return
+            
+        # 2. 해당 심볼의 최근 주문 확인
+        if symbol in market_maker_orders:
+            last_order_time = market_maker_orders[symbol]
+            time_diff = (current_time - last_order_time).total_seconds()
+            if time_diff < 1800:  # 30분 이내
+                remaining_minutes = int((1800 - time_diff) / 60)
+                debug_message(f"마켓 메이커: {symbol} 상태\n"
+                            f"   ├ 마지막 주문: {last_order_time.strftime('%H:%M:%S')}\n"
+                            f"   └ 남은 시간: {remaining_minutes}분", "INFO")
+                return
+            
+        # 3. 기존 주문 확인
+        try:
+            # 미체결 주문 확인
+            open_orders = client.futures_get_open_orders(symbol=symbol)
+            if open_orders:
+                order_details = [f"{order['side']} @ {order['price']}" for order in open_orders]
+                debug_message(f"마켓 메이커: {symbol} 미체결 주문\n"
+                            f"   ├ 주문 수: {len(open_orders)}개\n"
+                            f"   └ 주문 내역: {', '.join(order_details)}", "INFO")
+                return
+                
+            # 포지션 확인
+            position_info = client.futures_position_information(symbol=symbol)
+            if position_info and float(position_info[0]['positionAmt']) != 0:
+                position = position_info[0]
+                position_amt = float(position['positionAmt'])
+                entry_price = float(position['entryPrice'])
+                current_price = float(position['markPrice'])
+                pnl = float(position['unRealizedProfit'])
+                
+                debug_message(f"마켓 메이커: {symbol} 포지션 정보\n"
+                            f"   ├ 방향: {'LONG' if position_amt > 0 else 'SHORT'}\n"
+                            f"   ├ 수량: {abs(position_amt)}\n"
+                            f"   ├ 진입가: {entry_price}\n"
+                            f"   ├ 현재가: {current_price}\n"
+                            f"   └ 미실현 손익: {pnl:.2f} USDT", "INFO")
+                return
+                
+            # 최근 주문 내역 확인 (30분 이내)
+            recent_orders = client.futures_get_all_orders(symbol=symbol, limit=50)
+            if recent_orders:
+                recent_active = False
+                for order in recent_orders:
+                    order_time = datetime.fromtimestamp(order['time'] / 1000)
+                    if (current_time - order_time).total_seconds() < 1800:
+                        recent_active = True
+                        debug_message(f"마켓 메이커: {symbol} 최근 주문\n"
+                                    f"   ├ 시간: {order_time.strftime('%H:%M:%S')}\n"
+                                    f"   ├ 유형: {order['type']}\n"
+                                    f"   └ 상태: {order['status']}", "INFO")
+                        break
+                if recent_active:
+                    return
+                    
+        except Exception as e:
+            debug_message(f"마켓 메이커: {symbol} 주문 조회 실패 - {str(e)}", "ERROR")
+            return
+            
+        # 4. 현재가 조회
+        ticker = client.futures_symbol_ticker(symbol=symbol)
+        current_price = float(ticker['price'])
+        
+        # 5. 심볼 정보 가져오기 (캐싱 적용)
+        symbol_info = get_symbol_info(symbol)
+        if not symbol_info:
+            debug_message(f"마켓 메이커: {symbol} 심볼 정보 없음", "ERROR")
+            return
+            
+        # 6. 필터 확인
+        lot_size_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+        price_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'), None)
+        
+        if not lot_size_filter or not price_filter:
+            debug_message(f"마켓 메이커: {symbol} 필터 정보 없음", "ERROR")
+            return
+            
+        # 7. 수량 및 가격 정밀도 계산
+        min_qty = float(lot_size_filter['minQty'])
+        step_size = float(lot_size_filter['stepSize'])
+        tick_size = float(price_filter['tickSize'])
+        price_precision = len(str(tick_size).split('.')[-1].rstrip('0'))
+        
+        # 8. 포지션 크기 계산
+        position_size = CONFIG["min_position_size"] / current_price
+        position_size = round(position_size / step_size) * step_size
+        if position_size < min_qty:
+            position_size = min_qty
+            
+        # 9. 그리드 레벨 설정
+        grid_levels = min(CONFIG["market_maker"]["grid_levels"], 3)  # 최대 3개 레벨로 제한
+        grid_distance = CONFIG["market_maker"]["grid_distance"] / 100
+        
+        # 10. 주문 생성 전 최종 확인
+        try:
+            final_check = client.futures_get_open_orders(symbol=symbol)
+            if final_check:
+                debug_message(f"마켓 메이커: {symbol} 최종 확인 - 기존 주문 발견", "INFO")
+                return
+        except Exception as e:
+            debug_message(f"마켓 메이커: {symbol} 최종 확인 실패 - {str(e)}", "ERROR")
+            return
+        
+        # 11. 주문 생성
+        orders_created = False
+        order_details = []
+        
+        for i in range(grid_levels):
+            # 매수 주문
+            buy_price = current_price * (1 - grid_distance * (i + 1))
+            buy_price = round(buy_price / tick_size) * tick_size
+            buy_price = round(buy_price, price_precision)
+            
+            try:
+                client.futures_create_order(
+                    symbol=symbol,
+                    side="BUY",
+                    type="LIMIT",
+                    timeInForce="GTC",
+                    quantity=position_size,
+                    price=buy_price
+                )
+                orders_created = True
+                order_details.append(f"BUY @ {buy_price}")
+                time.sleep(0.1)  # 주문 사이에 0.1초 대기
+            except Exception as e:
+                debug_message(f"마켓 메이커: {symbol} 매수 주문 실패 - {str(e)}", "ERROR")
+                return
+            
+            # 매도 주문
+            sell_price = current_price * (1 + grid_distance * (i + 1))
+            sell_price = round(sell_price / tick_size) * tick_size
+            sell_price = round(sell_price, price_precision)
+            
+            try:
+                client.futures_create_order(
+                    symbol=symbol,
+                    side="SELL",
+                    type="LIMIT",
+                    timeInForce="GTC",
+                    quantity=position_size,
+                    price=sell_price
+                )
+                orders_created = True
+                order_details.append(f"SELL @ {sell_price}")
+                time.sleep(0.1)  # 주문 사이에 0.1초 대기
+            except Exception as e:
+                debug_message(f"마켓 메이커: {symbol} 매도 주문 실패 - {str(e)}", "ERROR")
+                return
+        
+        # 12. 주문 생성 성공 시 시간 기록
+        if orders_created:
+            market_maker_orders[symbol] = current_time
+            debug_message(f"마켓 메이커: {symbol} 그리드 주문 생성\n"
+                        f"   ├ 현재가: {current_price}\n"
+                        f"   ├ 수량: {position_size}\n"
+                        f"   ├ 레벨: {grid_levels}\n"
+                        f"   └ 주문 내역: {', '.join(order_details)}", "INFO")
+        
+    except Exception as e:
+        debug_message(f"마켓 메이커 전략 실행 실패: {symbol} - {str(e)}", "ERROR")
+
+def get_top_symbols(limit: int = 20) -> List[str]:
+    """
+    거래량 기준 상위 심볼 목록 반환 (캐싱 적용)
+    """
+    global last_top_symbols_update, top_symbols_cache
+    
+    current_time = datetime.now()
+    
+    # 캐시가 있고 5분 이내인 경우 캐시된 데이터 반환
+    if top_symbols_cache and last_top_symbols_update and \
+       (current_time - last_top_symbols_update).total_seconds() < 300:
+        return top_symbols_cache[:limit]
+    
+    try:
+        # 24시간 티커 정보 가져오기 (API 요청 제한 적용)
+        tickers = rate_limited_api_call(client.futures_ticker)
+        
+        # USDT 마켓만 필터링
+        usdt_tickers = [t for t in tickers if t['symbol'].endswith('USDT')]
+        
+        # 거래량 기준 정렬
+        sorted_tickers = sorted(usdt_tickers, 
+                              key=lambda x: float(x['quoteVolume']), 
+                              reverse=True)
+        
+        # 상위 심볼 추출
+        top_symbols = [t['symbol'] for t in sorted_tickers[:limit]]
+        
+        # 캐시 업데이트
+        top_symbols_cache = top_symbols
+        last_top_symbols_update = current_time
+        
+        return top_symbols
+        
+    except Exception as e:
+        debug_message(f"거래금액 순위 가져오기 실패: {str(e)}", "ERROR")
+        # 캐시된 데이터가 있으면 반환
+        if top_symbols_cache:
+            return top_symbols_cache[:limit]
+        return []
+
+def get_symbol_info(symbol: str) -> Optional[Dict]:
+    """
+    심볼 정보 조회 (캐싱 적용)
+    """
+    global symbol_info_cache, last_symbol_info_update
+    
+    current_time = datetime.now()
+    
+    # 캐시가 있고 1시간 이내인 경우 캐시된 데이터 반환
+    if symbol in symbol_info_cache and symbol in last_symbol_info_update and \
+       (current_time - last_symbol_info_update[symbol]).total_seconds() < 3600:
+        return symbol_info_cache[symbol]
+    
+    try:
+        # 심볼 정보 조회
+        info = client.futures_exchange_info()
+        symbol_info = next((s for s in info['symbols'] if s['symbol'] == symbol), None)
+        
+        if symbol_info:
+            # 캐시 업데이트
+            symbol_info_cache[symbol] = symbol_info
+            last_symbol_info_update[symbol] = current_time
+            
+        return symbol_info
+        
+    except Exception as e:
+        debug_message(f"심볼 정보 조회 실패 ({symbol}): {str(e)}", "ERROR")
+        # 캐시된 데이터가 있으면 반환
+        return symbol_info_cache.get(symbol)
+
+def rate_limited_api_call(func, *args, **kwargs):
+    """
+    API 요청 제한을 관리하는 래퍼 함수
+    """
+    global last_api_request
+    
+    func_name = func.__name__
+    current_time = time.time()
+    
+    # 마지막 요청 시간 확인
+    if func_name in last_api_request:
+        time_since_last = current_time - last_api_request[func_name]
+        if time_since_last < api_request_delay:
+            time.sleep(api_request_delay - time_since_last)
+    
+    try:
+        result = func(*args, **kwargs)
+        last_api_request[func_name] = time.time()
+        return result
+    except Exception as e:
+        if "Way too many requests" in str(e):
+            debug_message(f"API 요청 제한 도달. 1분 대기 후 재시도합니다.", "WARNING")
+            time.sleep(60)  # 1분 대기
+            return rate_limited_api_call(func, *args, **kwargs)
+        raise e
+
+def on_message(ws, message):
+    """
+    웹소켓 메시지 수신 처리
+    """
+    try:
+        data = json.loads(message)
+        
+        # 가격 업데이트 처리
+        if 'e' in data and data['e'] == 'bookTicker':
+            symbol = data['s']
+            if symbol in price_sockets:
+                price_sockets[symbol]['bid'] = float(data['b'])
+                price_sockets[symbol]['ask'] = float(data['a'])
+                
+                # 포지션 업데이트
+                if symbol in open_trades:
+                    trade = open_trades[symbol]
+                    current_price = float(data['b']) if trade['direction'] == 'long' else float(data['a'])
+                    trade['current_price'] = current_price
+                    
+                    # TP/SL 체크
+                    if trade['direction'] == 'long':
+                        if current_price >= trade['tp']:
+                            debug_message(f"TP 도달 (웹소켓): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ TP: {trade['tp']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'TP')
+                        elif current_price <= trade['sl']:
+                            debug_message(f"SL 도달 (웹소켓): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ SL: {trade['sl']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'SL')
+                    else:  # short
+                        if current_price <= trade['tp']:
+                            debug_message(f"TP 도달 (웹소켓): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ TP: {trade['tp']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'TP')
+                        elif current_price >= trade['sl']:
+                            debug_message(f"SL 도달 (웹소켓): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ SL: {trade['sl']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'SL')
+                    
+                    # 트레일링 스탑 업데이트
+                    update_trailing_stop(symbol, current_price)
+                    
+                    # 부분 익절 체크
+                    check_partial_tp(symbol, current_price)
+                    
+                    # 그리드 전략 청산 체크
+                    if trade.get('mode') == 'grid':
+                        if check_grid_exit(symbol, trade):
+                            debug_message(f"그리드 청산 조건 도달: {symbol}", "INFO")
+                            process_trade_exit(symbol, current_price, 'GRID')
+        
+    except Exception as e:
+        debug_message(f"웹소켓 메시지 처리 오류: {str(e)}", "ERROR")
+
+def monitor_positions():
+    """
+    주기적으로 포지션 상태를 체크하는 함수
+    """
+    last_price_update = {}  # 가격 업데이트 시간 추적
+    price_cache = {}  # 가격 캐시
+    
+    while True:
+        try:
+            current_time = datetime.now()
+            
+            for symbol in list(open_trades.keys()):
+                try:
+                    # 가격 캐시 확인 (1초 이내면 캐시된 가격 사용)
+                    if symbol in price_cache and symbol in last_price_update and \
+                       (current_time - last_price_update[symbol]).total_seconds() < 1:
+                        current_price = price_cache[symbol]
+                    else:
+                        # 웹소켓에서 가격 정보 확인
+                        if symbol in price_sockets:
+                            current_price = price_sockets[symbol]['bid'] if open_trades[symbol]['direction'] == 'long' else price_sockets[symbol]['ask']
+                            price_cache[symbol] = current_price
+                            last_price_update[symbol] = current_time
+                        else:
+                            # 웹소켓 정보가 없을 때만 API 호출 (API 요청 제한 적용)
+                            ticker = rate_limited_api_call(client.futures_symbol_ticker, symbol=symbol)
+                            current_price = float(ticker['price'])
+                            price_cache[symbol] = current_price
+                            last_price_update[symbol] = current_time
+                    
+                    trade = open_trades[symbol]
+                    trade['current_price'] = current_price
+                    
+                    # TP/SL 체크
+                    if trade['direction'] == 'long':
+                        if current_price >= trade['tp']:
+                            debug_message(f"TP 도달 (모니터링): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ TP: {trade['tp']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'TP')
+                        elif current_price <= trade['sl']:
+                            debug_message(f"SL 도달 (모니터링): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ SL: {trade['sl']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'SL')
+                    else:  # short
+                        if current_price <= trade['tp']:
+                            debug_message(f"TP 도달 (모니터링): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ TP: {trade['tp']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'TP')
+                        elif current_price >= trade['sl']:
+                            debug_message(f"SL 도달 (모니터링): {symbol}\n"
+                                        f"   ├ 현재가: {current_price}\n"
+                                        f"   └ SL: {trade['sl']}", "INFO")
+                            process_trade_exit(symbol, current_price, 'SL')
+                    
+                    # 트레일링 스탑 업데이트
+                    update_trailing_stop(symbol, current_price)
+                    
+                    # 부분 익절 체크
+                    check_partial_tp(symbol, current_price)
+                    
+                except Exception as e:
+                    debug_message(f"포지션 모니터링 오류 ({symbol}): {str(e)}", "ERROR")
+                    time.sleep(1)  # 에러 발생 시 1초 대기
+            
+            time.sleep(0.5)  # 전체 루프는 0.5초마다 실행
+            
+        except Exception as e:
+            debug_message(f"포지션 모니터링 스레드 오류: {str(e)}", "ERROR")
+            time.sleep(5)  # 오류 발생 시 5초 대기
+
+def monitor_websocket_connection():
+    """
+    웹소켓 연결 상태를 모니터링하고 필요시 재연결
+    """
+    global ws, ws_connected
+    last_message_time = time.time()
+    connection_status = {
+        'last_message': last_message_time,
+        'reconnect_count': 0,
+        'last_reconnect': time.time()
+    }
+    
+    while True:
+        try:
+            current_time = time.time()
+            
+            # 연결 상태 로깅
+            # if ws_connected:
+            #     debug_message(f"웹소켓 상태: 연결됨 (마지막 메시지: {int(current_time - connection_status['last_message'])}초 전)", "INFO")
+            # else:
+            #     debug_message(f"웹소켓 상태: 연결 끊김 (재연결 시도: {connection_status['reconnect_count']}회)", "WARNING")
+            
+            # 메시지 수신 타임아웃 체크
+            if current_time - connection_status['last_message'] > 30:
+                debug_message("웹소켓 메시지 수신 타임아웃", "WARNING")
+                if ws is not None:
+                    ws.close()
+                ws_connected = False
+                connection_status['reconnect_count'] += 1
+                connection_status['last_reconnect'] = current_time
+                
+                # 재연결 시도
+                if start_websocket_connections():
+                    connection_status['last_message'] = current_time
+                    connection_status['reconnect_count'] = 0
+            
+            # 재연결 시도 횟수 제한
+            if connection_status['reconnect_count'] >= 5:
+                debug_message("웹소켓 재연결 시도 횟수 초과. 5분 대기 후 재시도", "ERROR")
+                time.sleep(300)  # 5분 대기
+                connection_status['reconnect_count'] = 0
+            
+            time.sleep(5)
+            
+        except Exception as e:
+            debug_message(f"웹소켓 모니터링 오류: {str(e)}", "ERROR")
+            time.sleep(5)
+
+def check_websocket_status():
+    global ws, ws_connected
+    try:
+        if ws is None:
+            return "연결 없음"
+        
+        if not ws_connected:
+            return "연결 끊김"
+        
+        if not is_websocket_connected():
+            return "소켓 닫힘"
+        
+        # 핑 테스트
+        try:
+            ws.ping()
+            return "정상"
+        except:
+            return "핑 실패"
+            
+    except Exception as e:
+        return f"상태 확인 오류: {str(e)}"

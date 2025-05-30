@@ -7,6 +7,9 @@ import time
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
+from collections import deque
+import json
+import os
 
 # client = Client("api_key", "api_secret")
 
@@ -22,6 +25,16 @@ CONFIG = {
     "volume_ma_window": 20,     # 거래량 이동평균 기간
     "min_volume_ratio": 1.5,    # 최소 거래량 비율 (평균 대비)
     "backtest_days": 7,         # 백테스트 기간 (일)
+    "max_consecutive_losses": 3,  # 최대 연속 손실 횟수
+    "max_open_positions": 5,    # 최대 동시 포지션 수
+    "trading_hours": {          # 거래 시간 제한
+        "start": "00:00",
+        "end": "23:59"
+    },
+    "high_volatility_hours": [  # 변동성 높은 시간대 (UTC)
+        "02:00-04:00",  # 뉴욕 마감 시간
+        "14:00-16:00"   # 런던 마감 시간
+    ]
 }
 
 # 일일 손실 추적
@@ -29,8 +42,150 @@ daily_stats = {
     "start_balance": None,
     "current_balance": None,
     "trades": [],
-    "last_reset": None
+    "last_reset": None,
+    "consecutive_losses": 0,    # 연속 손실 카운트
+    "total_trades": 0,          # 총 거래 횟수
+    "winning_trades": 0,        # 승리 거래 횟수
+    "losing_trades": 0,         # 손실 거래 횟수
+    "total_profit": 0,          # 총 수익
+    "total_loss": 0,            # 총 손실
+    "best_trade": None,         # 최고 수익 거래
+    "worst_trade": None,        # 최대 손실 거래
+    "trading_hours_stats": {}   # 시간대별 통계
 }
+
+# 시장 상황 분석
+market_analysis = {
+    "overall_trend": None,      # 전체 시장 트렌드
+    "volatility_index": 0,      # 변동성 지수
+    "correlation_groups": {},    # 상관관계 그룹
+    "last_update": None
+}
+
+def is_trading_allowed() -> bool:
+    """
+    현재 시간이 거래 가능한 시간인지 확인
+    """
+    now = datetime.utcnow()
+    current_time = now.strftime("%H:%M")
+    
+    # 기본 거래 시간 체크
+    if not (CONFIG["trading_hours"]["start"] <= current_time <= CONFIG["trading_hours"]["end"]):
+        return False
+    
+    # 변동성 높은 시간대 체크
+    for period in CONFIG["high_volatility_hours"]:
+        start, end = period.split("-")
+        if start <= current_time <= end:
+            return False
+    
+    return True
+
+def update_market_analysis():
+    """
+    시장 상황 분석 업데이트
+    """
+    global market_analysis
+    
+    try:
+        # 상위 20개 코인 데이터 수집
+        symbols = get_top_symbols(20)
+        if not symbols:
+            return
+        
+        # 각 코인의 가격 데이터 수집
+        price_data = {}
+        for symbol in symbols:
+            df = get_1m_klines(symbol, interval="1h", limit=24)
+            if not df.empty:
+                price_data[symbol] = df['close'].pct_change().dropna()
+        
+        # 전체 시장 트렌드 계산
+        market_returns = pd.DataFrame(price_data).mean(axis=1)
+        market_analysis["overall_trend"] = "up" if market_returns.mean() > 0 else "down"
+        
+        # 변동성 지수 계산
+        market_analysis["volatility_index"] = market_returns.std() * 100
+        
+        # 상관관계 분석
+        corr_matrix = pd.DataFrame(price_data).corr()
+        market_analysis["correlation_groups"] = {}
+        
+        # 상관계수 0.7 이상인 그룹 찾기
+        for symbol in symbols:
+            if symbol not in market_analysis["correlation_groups"]:
+                group = [s for s in symbols if corr_matrix.loc[symbol, s] > 0.7]
+                if len(group) > 1:
+                    market_analysis["correlation_groups"][symbol] = group
+        
+        market_analysis["last_update"] = datetime.utcnow()
+        
+    except Exception as e:
+        send_telegram_message(f"⚠️ 시장 분석 업데이트 실패: {str(e)}")
+
+def generate_performance_report() -> str:
+    """
+    성과 리포트 생성
+    """
+    if not daily_stats["trades"]:
+        return "거래 내역이 없습니다."
+    
+    total_trades = len(daily_stats["trades"])
+    win_rate = (daily_stats["winning_trades"] / total_trades * 100) if total_trades > 0 else 0
+    profit_factor = abs(daily_stats["total_profit"] / daily_stats["total_loss"]) if daily_stats["total_loss"] != 0 else float('inf')
+    
+    # 시간대별 통계
+    hour_stats = {}
+    for trade in daily_stats["trades"]:
+        hour = trade["timestamp"].hour
+        if hour not in hour_stats:
+            hour_stats[hour] = {"trades": 0, "profit": 0}
+        hour_stats[hour]["trades"] += 1
+        hour_stats[hour]["profit"] += trade["pnl"]
+    
+    best_hour = max(hour_stats.items(), key=lambda x: x[1]["profit"] / x[1]["trades"])[0] if hour_stats else None
+    
+    report = f"""
+📊 *일일 거래 리포트*
+├ 총 거래 횟수: `{total_trades}`
+├ 승률: `{win_rate:.1f}%`
+├ 수익률: `{(daily_stats["total_profit"] + daily_stats["total_loss"]) / daily_stats["start_balance"] * 100:.1f}%`
+├ 손익비: `{profit_factor:.2f}`
+├ 최고 수익: `{daily_stats["best_trade"]["pnl"]:.2f} USDT` ({daily_stats["best_trade"]["symbol"]})
+├ 최대 손실: `{daily_stats["worst_trade"]["pnl"]:.2f} USDT` ({daily_stats["worst_trade"]["symbol"]})
+└ 최적 거래 시간: `{best_hour:02d}:00 UTC`
+"""
+    return report
+
+def save_trade_history():
+    """
+    거래 내역 저장
+    """
+    try:
+        history_file = "trade_history.json"
+        history = []
+        
+        if os.path.exists(history_file):
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+        
+        # 오늘의 거래 내역 추가
+        history.append({
+            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "trades": daily_stats["trades"],
+            "summary": {
+                "total_trades": len(daily_stats["trades"]),
+                "win_rate": (daily_stats["winning_trades"] / len(daily_stats["trades"]) * 100) if daily_stats["trades"] else 0,
+                "total_profit": daily_stats["total_profit"],
+                "total_loss": daily_stats["total_loss"]
+            }
+        })
+        
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=2)
+            
+    except Exception as e:
+        send_telegram_message(f"⚠️ 거래 내역 저장 실패: {str(e)}")
 
 def calculate_position_size(symbol: str, price: float, volatility: float) -> float:
     """
@@ -214,6 +369,21 @@ def determine_trade_mode_from_wave(wave_info):
 
 def enter_trade_from_wave(symbol, wave_info, price):
     try:
+        # 거래 시간 체크
+        if not is_trading_allowed():
+            send_telegram_message(f"⏰ {symbol} 거래 시간 외 → 진입 생략")
+            return
+
+        # 최대 포지션 수 체크
+        if len(open_trades) >= CONFIG["max_open_positions"]:
+            send_telegram_message(f"⚠️ 최대 포지션 수 도달: {symbol} 진입 생략")
+            return
+
+        # 연속 손실 체크
+        if daily_stats["consecutive_losses"] >= CONFIG["max_consecutive_losses"]:
+            send_telegram_message(f"⚠️ 연속 손실 한도 도달: {symbol} 진입 생략")
+            return
+
         # 일일 손실 제한 체크
         if not check_daily_loss_limit():
             send_telegram_message(f"⚠️ 일일 손실 제한 도달: {symbol} 진입 생략")
@@ -377,16 +547,40 @@ def monitor_exit():
                 close_position(symbol, qty, "short" if direction == "long" else "long")
                 
                 # 거래 결과 기록
+                pnl = (last_price - trade['entry_price']) * qty if direction == "long" else (trade['entry_price'] - last_price) * qty
                 trade_result = {
                     "symbol": symbol,
                     "direction": direction,
                     "entry_price": trade['entry_price'],
                     "exit_price": last_price,
                     "qty": qty,
-                    "pnl": (last_price - trade['entry_price']) * qty if direction == "long" else (trade['entry_price'] - last_price) * qty,
+                    "pnl": pnl,
                     "reason": exit_reason,
                     "timestamp": datetime.utcnow()
                 }
+                
+                # 통계 업데이트
+                daily_stats["total_trades"] += 1
+                if pnl > 0:
+                    daily_stats["winning_trades"] += 1
+                    daily_stats["total_profit"] += pnl
+                    daily_stats["consecutive_losses"] = 0
+                    if daily_stats["best_trade"] is None or pnl > daily_stats["best_trade"]["pnl"]:
+                        daily_stats["best_trade"] = trade_result
+                else:
+                    daily_stats["losing_trades"] += 1
+                    daily_stats["total_loss"] += abs(pnl)
+                    daily_stats["consecutive_losses"] += 1
+                    if daily_stats["worst_trade"] is None or pnl < daily_stats["worst_trade"]["pnl"]:
+                        daily_stats["worst_trade"] = trade_result
+                
+                # 시간대별 통계 업데이트
+                hour = trade_result["timestamp"].hour
+                if hour not in daily_stats["trading_hours_stats"]:
+                    daily_stats["trading_hours_stats"][hour] = {"trades": 0, "profit": 0}
+                daily_stats["trading_hours_stats"][hour]["trades"] += 1
+                daily_stats["trading_hours_stats"][hour]["profit"] += pnl
+                
                 update_daily_stats(trade_result)
                 
                 send_telegram_message(f"{exit_reason}\n"
@@ -394,8 +588,9 @@ def monitor_exit():
                                     f"   ├ 방향     : `{direction}`\n"
                                     f"   ├ 진입가   : `{round(trade['entry_price'], 4)}`\n"
                                     f"   ├ 현재가   : `{round(last_price, 4)}`\n"
-                                    f"   ├ 수익금   : `{round(trade_result['pnl'], 2)} USDT`\n"
+                                    f"   ├ 수익금   : `{round(pnl, 2)} USDT`\n"
                                     f"   └ 모드     : `{trade['mode']}`")
+                
                 # 딕셔너리에서 항목 제거
                 if symbol in open_trades:
                     del open_trades[symbol]
@@ -406,10 +601,74 @@ def monitor_exit():
             if symbol in open_trades:
                 del open_trades[symbol]
 
-def monitor_exit_watcher():
+def wave_trade_watcher():
+    """
+    ✅ 파동 기반 트레이드 감시 루프
+    - 시총 상위 심볼 대상으로 주기적으로 파동 분석
+    - 진입 조건 만족 시 자동 진입
+    """
+    send_telegram_message("🌊 파동 기반 진입 감시 시작...")
+
+    refresh_open_trades_from_binance()
+    consecutive_errors = 0  # 연속 에러 카운트
+    last_report_time = datetime.utcnow()
+    last_market_analysis_time = datetime.utcnow()
+
     while True:
-        monitor_exit()
-        time.sleep(2)
+        try:
+            # 시장 분석 업데이트 (1시간마다)
+            if (datetime.utcnow() - last_market_analysis_time).total_seconds() > 3600:
+                update_market_analysis()
+                last_market_analysis_time = datetime.utcnow()
+            
+            # 일일 리포트 생성 (자정에)
+            if (datetime.utcnow() - last_report_time).total_seconds() > 86400:
+                report = generate_performance_report()
+                send_telegram_message(report)
+                save_trade_history()
+                last_report_time = datetime.utcnow()
+
+            symbols = get_top_symbols(20)  # 시총 상위 20종목
+            if not symbols:
+                send_telegram_message("⚠️ 심볼 목록을 가져오지 못했습니다.")
+                time.sleep(30)
+                continue
+
+            for symbol in symbols:
+                try:
+                    # 백테스트 실행 (선택적)
+                    if CONFIG["backtest_days"] > 0:
+                        backtest_results = backtest_strategy(symbol)
+                        if backtest_results.get("win_rate", 0) < 50:  # 승률 50% 미만이면 스킵
+                            continue
+
+                    df = get_1m_klines(symbol, interval="3m", limit=120)  # 3분봉 기준
+                    if df.empty or len(df) < 60:
+                        continue
+
+                    wave_info = analyze_wave_from_df(df)
+                    if not wave_info:
+                        continue
+
+                    price = df.iloc[-1]['close']
+                    enter_trade_from_wave(symbol, wave_info, price)
+
+                except Exception as e:
+                    send_telegram_message(f"⚠️ {symbol} 처리 중 오류: {str(e)}")
+                    continue
+
+            consecutive_errors = 0  # 성공 시 에러 카운트 리셋
+            time.sleep(60)  # 1분 주기로 갱신
+
+        except Exception as e:
+            consecutive_errors += 1
+            error_msg = f"💥 파동 감시 오류: {e}"
+            if consecutive_errors >= 3:
+                error_msg += "\n⚠️ 연속 3회 이상 오류 발생. 5분 대기 후 재시도합니다."
+                time.sleep(300)  # 5분 대기
+            else:
+                time.sleep(30)
+            send_telegram_message(error_msg)
 
 def analyze_wave_from_df(df):
     """
@@ -464,58 +723,3 @@ def calculate_rsi(df, period=7):
     rsi = 100 - (100 / (1 + rs))
 
     return rsi
-
-def wave_trade_watcher():
-    """
-    ✅ 파동 기반 트레이드 감시 루프
-    - 시총 상위 심볼 대상으로 주기적으로 파동 분석
-    - 진입 조건 만족 시 자동 진입
-    """
-    send_telegram_message("🌊 파동 기반 진입 감시 시작...")
-
-    refresh_open_trades_from_binance()
-    consecutive_errors = 0  # 연속 에러 카운트
-
-    while True:
-        try:
-            symbols = get_top_symbols(20)  # 시총 상위 20종목
-            if not symbols:
-                send_telegram_message("⚠️ 심볼 목록을 가져오지 못했습니다.")
-                time.sleep(30)
-                continue
-
-            for symbol in symbols:
-                try:
-                    # 백테스트 실행 (선택적)
-                    if CONFIG["backtest_days"] > 0:
-                        backtest_results = backtest_strategy(symbol)
-                        if backtest_results.get("win_rate", 0) < 50:  # 승률 50% 미만이면 스킵
-                            continue
-
-                    df = get_1m_klines(symbol, interval="3m", limit=120)  # 3분봉 기준
-                    if df.empty or len(df) < 60:
-                        continue
-
-                    wave_info = analyze_wave_from_df(df)
-                    if not wave_info:
-                        continue
-
-                    price = df.iloc[-1]['close']
-                    enter_trade_from_wave(symbol, wave_info, price)
-
-                except Exception as e:
-                    send_telegram_message(f"⚠️ {symbol} 처리 중 오류: {str(e)}")
-                    continue
-
-            consecutive_errors = 0  # 성공 시 에러 카운트 리셋
-            time.sleep(60)  # 1분 주기로 갱신
-
-        except Exception as e:
-            consecutive_errors += 1
-            error_msg = f"💥 파동 감시 오류: {e}"
-            if consecutive_errors >= 3:
-                error_msg += "\n⚠️ 연속 3회 이상 오류 발생. 5분 대기 후 재시도합니다."
-                time.sleep(300)  # 5분 대기
-            else:
-                time.sleep(30)
-            send_telegram_message(error_msg)

@@ -61,7 +61,7 @@ def place_order(symbol, side, quantity, entry_price, tp_price, sl_price):
         client.futures_create_order(
             symbol=symbol,
             side=Client.SIDE_SELL if side == "long" else Client.SIDE_BUY,
-            type=Client.ORDER_TYPE_TAKE_PROFIT_MARKET,
+            type="TAKE_PROFIT_MARKET",
             stopPrice=round(tp_price, 4),
             closePosition=True,
             reduceOnly=True,
@@ -72,7 +72,7 @@ def place_order(symbol, side, quantity, entry_price, tp_price, sl_price):
         client.futures_create_order(
             symbol=symbol,
             side=Client.SIDE_SELL if side == "long" else Client.SIDE_BUY,
-            type=Client.ORDER_TYPE_STOP_MARKET,
+            type="STOP_MARKET",
             stopPrice=round(sl_price, 4),
             closePosition=True,
             reduceOnly=True,
@@ -124,11 +124,11 @@ def auto_trade_from_signal(signal):
         
     
 
-    qty = 300 / price  # $100 진입 기준 수량
+    qty = 100 / price  # $100 진입 기준 수량
     
-    set_leverage(symbol, 30)  # 선택적으로 레버리지 설정 추가
+    set_leverage(symbol, 20)  # 선택적으로 레버리지 설정 추가
     
-    place_order(symbol, direction, qty, price, tp)
+    place_order(symbol, direction, qty, price, tp,sl)
     
     
     active_positions[symbol] = {
@@ -509,26 +509,27 @@ def monitor_fixed_profit_loss_exit():
 
 def close_position(symbol, quantity, side):
     try:
-        # 남은 잔량까지 모두 정리 (precision mismatch 대비)
-        info = client.futures_exchange_info()
-        for s in info['symbols']:
-            if s['symbol'] == symbol:
-                for f in s['filters']:
-                    if f['filterType'] == 'LOT_SIZE':
-                        step_size = float(f['stepSize'])
-                        precision = int(round(-1 * math.log(step_size, 10)))
-                        quantity = round(quantity, precision)
-                        break
+        # 현재 포지션의 정확한 수량 가져오기
+        positions = client.futures_account()['positions']
+        for p in positions:
+            if p['symbol'] == symbol:
+                actual_quantity = abs(float(p['positionAmt']))
+                if actual_quantity > 0:
+                    # 시장가 청산
+                    client.futures_create_order(
+                        symbol=symbol,
+                        side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
+                        type=Client.ORDER_TYPE_MARKET,
+                        quantity=actual_quantity,
+                        reduceOnly=True
+                    )
+                    send_telegram_message(f"✅ {symbol} {side.upper()} 포지션 청산 완료 (수량: {actual_quantity})")
+                    return
+                else:
+                    send_telegram_message(f"⚠️ {symbol} 청산할 포지션이 없습니다.")
+                    return
 
-        # 시장가 청산
-        client.futures_create_order(
-            symbol=symbol,
-            side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
-            type=Client.ORDER_TYPE_MARKET,
-            quantity=quantity,
-            reduceOnly=True
-        )
-        send_telegram_message(f"✅ {symbol} {side.upper()} 포지션 청산 완료 (수량: {quantity})")
+        send_telegram_message(f"⚠️ {symbol} 포지션을 찾을 수 없습니다.")
 
     except Exception as e:
         send_telegram_message(f"❌ {symbol} 청산 실패: {e}")

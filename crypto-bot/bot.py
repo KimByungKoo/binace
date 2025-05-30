@@ -9,6 +9,7 @@ import threading
 from order_manager import monitor_trailing_stop,monitor_ma7_touch_exit,monitor_fixed_profit_loss_exit
 
 from strategy.hyper_disparity import check_and_enter_hyper_disparity,report_top_5m_changers,get_top5_consecutive_green
+from strategy.trade_executor import wave_trade_watcher,monitor_exit_watcher
 
 if __name__ == "__main__":
     #!/bin/bash
@@ -22,8 +23,12 @@ if __name__ == "__main__":
     # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
 
  
-    threading.Thread(target=spike_watcher_loop1, daemon=True).start()
-    threading.Thread(target=spike_watcher_loop, daemon=True).start()
+    # threading.Thread(target=spike_watcher_loop1, daemon=True).start()
+    # threading.Thread(target=spike_watcher_loop, daemon=True).start()
+
+    threading.Thread(target=wave_trade_watcher, daemon=True).start()  # 진입 감시
+    threading.Thread(target=monitor_exit_watcher, daemon=True).start()        # 청산 감시
+
 
     
     # threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()

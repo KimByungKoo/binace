@@ -1,47 +1,82 @@
 from strategy.ma365 import monitor_top10_ma365
 from strategy.ma90_disparity import ma90_watcher_loop
 from telegram.commands import telegram_command_listener
-from strategy.spike_disparity import spike_watcher_loop,monitor_ma365_breakout
+from strategy.spike_disparity import spike_watcher_loop, monitor_ma365_breakout
 from strategy.vtb_breakout_strategy import spike_watcher_loop1
 from position_monitor import position_watcher_loop
-#from strategy.disparity_monitor import run_disparity_monitor
 import threading
-from order_manager import monitor_trailing_stop,monitor_ma7_touch_exit,monitor_fixed_profit_loss_exit
+from order_manager import monitor_trailing_stop, monitor_ma7_touch_exit, monitor_fixed_profit_loss_exit
+from strategy.hyper_disparity import check_and_enter_hyper_disparity, report_top_5m_changers, get_top5_consecutive_green
+from strategy.trade_executor import (
+    wave_trade_watcher,
+    check_system_health,
+    update_market_analysis,
+    generate_performance_report,
+    save_trade_history,
+    start_websocket_connections
+)
+from datetime import datetime
+import time
 
-from strategy.hyper_disparity import check_and_enter_hyper_disparity,report_top_5m_changers,get_top5_consecutive_green
-from strategy.trade_executor import wave_trade_watcher,monitor_exit_watcher
+def system_monitor_loop():
+    """
+    시스템 상태 모니터링 루프
+    """
+    while True:
+        try:
+            if not check_system_health():
+                time.sleep(300)  # 5분 대기
+            time.sleep(60)  # 1분마다 체크
+        except Exception as e:
+            print(f"시스템 모니터링 오류: {e}")
+            time.sleep(60)
+
+def market_analysis_loop():
+    """
+    시장 분석 업데이트 루프
+    """
+    while True:
+        try:
+            update_market_analysis()
+            time.sleep(3600)  # 1시간마다 업데이트
+        except Exception as e:
+            print(f"시장 분석 오류: {e}")
+            time.sleep(300)
+
+def performance_report_loop():
+    """
+    성과 보고서 생성 루프
+    """
+    while True:
+        try:
+            now = datetime.utcnow()
+            # 자정에 보고서 생성
+            if now.hour == 0 and now.minute == 0:
+                report = generate_performance_report()
+                save_trade_history()
+                time.sleep(60)  # 1분 대기
+            time.sleep(30)  # 30초마다 체크
+        except Exception as e:
+            print(f"성과 보고서 생성 오류: {e}")
+            time.sleep(300)
 
 if __name__ == "__main__":
-    #!/bin/bash
-    print("🔧 실행 중...") 
+    print("🚀 트레이딩 봇 시작...")
     
-     
-    # MA365 감시 (1분봉, 기울기 포함)
-    # threading.Thread(target=monitor_top10_ma365, daemon=True).start()
-
-    # 15분봉 MA90 이격도 감시 (자동 알림)
-    # threading.Thread(target=ma90_watcher_loop, daemon=True).start()
-
- 
-    # threading.Thread(target=spike_watcher_loop1, daemon=True).start()
-    # threading.Thread(target=spike_watcher_loop, daemon=True).start()
-
+    # 시스템 모니터링
+    threading.Thread(target=system_monitor_loop, daemon=True).start()
+    
+    # 시장 분석
+    threading.Thread(target=market_analysis_loop, daemon=True).start()
+    
+    # 성과 보고서
+    threading.Thread(target=performance_report_loop, daemon=True).start()
+    
+    # 웹소켓 연결 시작
+    start_websocket_connections()
+    
+    # 파동 기반 트레이딩
     threading.Thread(target=wave_trade_watcher, daemon=True).start()  # 진입 감시
-    threading.Thread(target=monitor_exit_watcher, daemon=True).start()        # 청산 감시
-
-
     
-    # threading.Thread(target=check_and_enter_hyper_disparity, daemon=True).start()
-    
-    # threading.Thread(target=report_top_5m_changers, daemon=True).start()
-    #threading.Thread(target=get_top5_consecutive_green, daemon=True).start()
-
-    #monitor_ma365_breakout()
-    #threading.Thread(target=monitor_ma365_breakout, daemon=True).start()
-    # threading.Thread(target=monitor_ma7_touch_exit, daemon=True).start()
-    #threading.Thread(target=vtb_breakout_strategy, daemon=True).start()
-    
-
-    
-    # 텔레그램 명령 대기 (/ma90 등)
+    # 텔레그램 명령 대기
     telegram_command_listener()

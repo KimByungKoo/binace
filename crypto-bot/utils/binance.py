@@ -18,21 +18,14 @@ client = Client(API_KEY, API_SECRET)
 
 def has_open_position(symbol):
     try:
-        #send_telegram_message(f"🔎 [{symbol}] 포지션 확인 시작")
-
         positions = client.futures_account()['positions']
-        #send_telegram_message(f"📦 총 포지션 수: {len(positions)}")
-
+        
         for p in positions:
             sym = p['symbol']
             amt = float(p['positionAmt'])
-            #if amt != 0:
-                #send_telegram_message(f"🧾 {sym} 보유 중 수량: {amt}")
             if sym == symbol.upper() and amt != 0:
-                send_telegram_message(f"✅ [{symbol}] 이미 포지션 보유 중")
                 return True
 
-        # send_telegram_message(f"❌ [{symbol}] 포지션 없음")
         return False
 
     except Exception as e:
@@ -42,23 +35,61 @@ def has_open_position(symbol):
 
 def get_1m_klines(symbol, interval='1m', limit=120):
     try:
-        klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+        # 바이낸스 API의 최대 limit 값
+        MAX_LIMIT = 1000
+        
+        if limit <= MAX_LIMIT:
+            # 한 번에 가져올 수 있는 경우
+            klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+        else:
+            # 여러 번 나눠서 가져오기
+            klines = []
+            remaining = limit
+            end_time = None
+            
+            while remaining > 0:
+                current_limit = min(remaining, MAX_LIMIT)
+                params = {
+                    'symbol': symbol,
+                    'interval': interval,
+                    'limit': current_limit
+                }
+                
+                if end_time:
+                    params['endTime'] = end_time
+                
+                batch = client.futures_klines(**params)
+                if not batch:
+                    break
+                    
+                klines = batch + klines
+                remaining -= len(batch)
+                
+                if len(batch) < current_limit:
+                    break
+                    
+                end_time = batch[0][0]  # 이전 배치의 시작 시간
+                time.sleep(0.1)  # API 호출 제한 방지
+        
+        if not klines:
+            return pd.DataFrame()
+            
         df = pd.DataFrame(klines, columns=[
             'timestamp', 'open', 'high', 'low', 'close', 'volume',
             'close_time', 'quote_asset_volume', 'number_of_trades',
             'taker_buy_base', 'taker_buy_quote', 'ignore'
         ])
-        #df['close'] = df['close'].astype(float)
-        #df['volume'] = df['volume'].astype(float)
         
         df['open'] = df['open'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
         df['close'] = df['close'].astype(float)
         df['volume'] = df['volume'].astype(float)
+        
         return df
+        
     except Exception as e:
-        print(f"[{symbol}] 1분봉 데이터 불러오기 실패: {e}")
+        print(f"[{symbol}] {interval} 데이터 불러오기 실패: {e}")
         return pd.DataFrame()
       
 # def get_top_symbols(n=20):

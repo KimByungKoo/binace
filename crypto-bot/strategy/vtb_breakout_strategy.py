@@ -65,7 +65,7 @@ def vtb_signal(symbol):
             return
         
         if latest['ADX'] < CONFIG['adx_thresh']:
-            printe(f"❌ {symbol} ADX 부족: {latest['ADX']} < {CONFIG['adx_thresh']}")
+            print(f"❌ {symbol} ADX 부족: {latest['ADX']} < {CONFIG['adx_thresh']}")
             return
         
         if not (CONFIG['rsi_min'] <= latest['RSI'] <= CONFIG['rsi_max']):

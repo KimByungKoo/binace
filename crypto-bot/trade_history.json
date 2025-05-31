@@ -7,16 +7,8 @@
         "symbol": "TRBUSDT",
         "direction": "long",
         "entry_price": 50.445,
-        "current_price": 50.36,
+        "current_price": 0,
         "quantity": 2.0,
-        "mode": "sync"
-      },
-      {
-        "symbol": "WCTUSDT",
-        "direction": "short",
-        "entry_price": 1.0541,
-        "current_price": 1.0701,
-        "quantity": 285.0,
         "mode": "sync"
       }
     ],
@@ -25,7 +17,19 @@
       "win_rate": 0,
       "total_profit": 0,
       "total_loss": 0,
-      "open_positions": 2
+      "open_positions": 1
+    }
+  },
+  {
+    "date": "2025-05-31",
+    "trades": [],
+    "current_positions": [],
+    "summary": {
+      "total_trades": 0,
+      "win_rate": 0,
+      "total_profit": 0,
+      "total_loss": 0,
+      "open_positions": 0
     }
   }
 ]

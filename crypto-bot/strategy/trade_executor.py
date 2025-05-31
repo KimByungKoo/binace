@@ -43,12 +43,13 @@ CONFIG = {
     "max_daily_loss_pct": 5.0,  # 일일 최대 손실 제한 (%)
     "max_position_size": 500,   # 최대 포지션 크기 (USDT)
     "min_position_size": 100,    # 최소 포지션 크기 (USDT)
+    "leverage": 20,             # 기본 레버리지 설정
     "volatility_window": 20,    # 변동성 계산 기간
     "volume_ma_window": 20,     # 거래량 이동평균 기간
     "min_volume_ratio": 1.5,    # 최소 거래량 비율 (평균 대비)
     "backtest_days": 7,         # 백테스트 기간 (일)
     "max_consecutive_losses": 3,  # 최대 연속 손실 횟수
-    "max_open_positions": 5,    # 최대 동시 포지션 수
+    "max_open_positions": 10,    # 최대 동시 포지션 수
     "debug": {                  # 디버깅 설정
         "enabled": True,        # 디버깅 모드 활성화
         "log_level": "INFO",    # 로그 레벨 (DEBUG, INFO, WARNING, ERROR)
@@ -1004,6 +1005,20 @@ def process_trade_exit(symbol: str, exit_price: float, exit_reason: str):
                 # 청산 주문 실행
                 close_position(symbol, abs(position_amt), "short" if direction == "long" else "long")
                 debug_message(f"포지션 청산 주문 실행: {symbol}", "INFO")
+                
+                # 모든 미체결 주문 취소
+                try:
+                    open_orders = client.futures_get_open_orders(symbol=symbol)
+                    if open_orders:
+                        for order in open_orders:
+                            try:
+                                client.futures_cancel_order(symbol=symbol, orderId=order['orderId'])
+                                debug_message(f"미체결 주문 취소: {symbol} - {order['orderId']}", "INFO")
+                            except Exception as e:
+                                debug_message(f"주문 취소 실패: {symbol} - {order['orderId']} - {str(e)}", "ERROR")
+                except Exception as e:
+                    debug_message(f"미체결 주문 조회 실패: {symbol} - {str(e)}", "ERROR")
+                
             except Exception as e:
                 debug_message(f"포지션 청산 주문 실패: {symbol} - {str(e)}", "ERROR")
                 return
@@ -1101,6 +1116,10 @@ def process_trade_exit(symbol: str, exit_price: float, exit_reason: str):
         # 열린 포지션에서 제거
         if symbol in open_trades:
             del open_trades[symbol]
+            
+        # market_maker_orders에서도 제거
+        if symbol in market_maker_orders:
+            del market_maker_orders[symbol]
         
         debug_message(f"포지션 종료 완료: {symbol} - {exit_reason}", "INFO")
         
@@ -1784,7 +1803,7 @@ def enter_trade_from_wave(symbol: str, wave_info: dict, current_price: float):
         # 포지션 진입
         try:
             # 레버리지 설정
-            client.futures_change_leverage(symbol=symbol, leverage=1)
+            client.futures_change_leverage(symbol=symbol, leverage=CONFIG["leverage"])
             
             # 주문 실행
             order = client.futures_create_order(
@@ -1802,7 +1821,8 @@ def enter_trade_from_wave(symbol: str, wave_info: dict, current_price: float):
                 'tp': tp,
                 'sl': sl,
                 'mode': mode,
-                'current_price': current_price
+                'current_price': current_price,
+                'leverage': CONFIG["leverage"]
             }
             
             # TP/SL 주문
@@ -1828,6 +1848,7 @@ def enter_trade_from_wave(symbol: str, wave_info: dict, current_price: float):
    ├ 방향     : `{direction.upper()}`
    ├ 진입가   : `{round(current_price, 4)}`
    ├ 수량     : `{round(position_size, 4)}`
+   ├ 레버리지 : `{CONFIG["leverage"]}x`
    ├ TP       : `{round(tp, 4)}`
    ├ SL       : `{round(sl, 4)}`
    └ 모드     : `{mode}`
@@ -1977,6 +1998,9 @@ def execute_market_maker_strategy(symbol: str):
         orders_created = False
         order_details = []
         
+        # 레버리지 설정
+        client.futures_change_leverage(symbol=symbol, leverage=CONFIG["leverage"])
+        
         for i in range(grid_levels):
             # 매수 주문
             buy_price = current_price * (1 - grid_distance * (i + 1))
@@ -2026,6 +2050,7 @@ def execute_market_maker_strategy(symbol: str):
             debug_message(f"마켓 메이커: {symbol} 그리드 주문 생성\n"
                         f"   ├ 현재가: {current_price}\n"
                         f"   ├ 수량: {position_size}\n"
+                        f"   ├ 레버리지: {CONFIG['leverage']}x\n"
                         f"   ├ 레벨: {grid_levels}\n"
                         f"   └ 주문 내역: {', '.join(order_details)}", "INFO")
         

@@ -1434,7 +1434,7 @@ def wave_trade_watcher():
     파동 기반 트레이드 감시 루프
     """
     send_telegram_message("🌊 파동 기반 진입 감시 시작...")
-    
+
     # 거래 내역 초기화
     initialize_trade_history()
     

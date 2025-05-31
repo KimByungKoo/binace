@@ -65,16 +65,16 @@ if __name__ == "__main__":
     
     # 시스템 모니터링
     threading.Thread(target=system_monitor_loop, daemon=True).start()
-    
+     
     # 시장 분석
     threading.Thread(target=market_analysis_loop, daemon=True).start()
-    
+
     # 성과 보고서
     threading.Thread(target=performance_report_loop, daemon=True).start()
-    
+
     # 웹소켓 연결 시작
     start_websocket_connections()
-    
+ 
     # 파동 기반 트레이딩
     threading.Thread(target=wave_trade_watcher, daemon=True).start()  # 진입 감시
     

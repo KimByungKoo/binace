@@ -23,13 +23,30 @@
   {
     "date": "2025-05-31",
     "trades": [],
-    "current_positions": [],
+    "current_positions": [
+      {
+        "symbol": "TRBUSDT",
+        "direction": "short",
+        "entry_price": 48.844,
+        "current_price": 48.90069542,
+        "quantity": 4.2,
+        "unrealized_pnl": -0.23812076
+      },
+      {
+        "symbol": "WCTUSDT",
+        "direction": "short",
+        "entry_price": 1.2195,
+        "current_price": 1.2435,
+        "quantity": 164.0,
+        "unrealized_pnl": -3.936
+      }
+    ],
     "summary": {
       "total_trades": 0,
       "win_rate": 0,
       "total_profit": 0,
       "total_loss": 0,
-      "open_positions": 0
+      "open_positions": 2
     }
   }
 ]

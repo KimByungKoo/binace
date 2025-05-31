@@ -40,7 +40,7 @@ def get_1m_klines(symbol, interval='1m', limit=120):
         
         if limit <= MAX_LIMIT:
             # 한 번에 가져올 수 있는 경우
-        klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+            klines = client.futures_klines(symbol=symbol, interval=interval, limit=limit)
         else:
             # 여러 번 나눠서 가져오기
             klines = []

@@ -515,14 +515,14 @@ def close_position(symbol, quantity, side):
             if p['symbol'] == symbol:
                 actual_quantity = abs(float(p['positionAmt']))
                 if actual_quantity > 0:
-        # 시장가 청산
-        client.futures_create_order(
-            symbol=symbol,
-            side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
-            type=Client.ORDER_TYPE_MARKET,
+                    # 시장가 청산
+                    client.futures_create_order(
+                        symbol=symbol,
+                        side=Client.SIDE_BUY if side == "long" else Client.SIDE_SELL,
+                        type=Client.ORDER_TYPE_MARKET,
                         quantity=actual_quantity,
-            reduceOnly=True
-        )
+                        reduceOnly=True
+                    )
                     send_telegram_message(f"✅ {symbol} {side.upper()} 포지션 청산 완료 (수량: {actual_quantity})")
                     return
                 else:

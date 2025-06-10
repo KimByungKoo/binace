@@ -31,7 +31,7 @@ class TelegramBot:
         self._test_connection()
         
         # 명령어 처리 스레드 시작
-        self.command_thread = threading.Thread(target=self._handle_commands)
+        self.command_thread = threading.Thread(target=self.process_commands)
         self.command_thread.daemon = True
         self.command_thread.start()
     
@@ -74,50 +74,72 @@ class TelegramBot:
             print(f"Error sending telegram message: {e}")
             return None
     
-    def _handle_commands(self):
+    def process_commands(self):
         """
         텔레그램 명령어를 처리합니다.
         """
-        print("텔레그램 명령어 처리 시작")
         while self.running:
             try:
-                url = f"{self.base_url}/getUpdates"
+                url = f"https://api.telegram.org/bot{self.token}/getUpdates"
                 params = {
                     "offset": self.last_update_id + 1,
                     "timeout": 30
                 }
                 response = requests.get(url, params=params)
-                if response.status_code != 200:
-                    print(f"Error getting updates: {response.text}")
-                    time.sleep(1)
-                    continue
-                    
-                updates = response.json().get('result', [])
-                if updates:
-                    print(f"수신된 업데이트: {len(updates)}개")
                 
-                for update in updates:
-                    self.last_update_id = update['update_id']
-                    if 'message' in update and 'text' in update['message']:
-                        text = update['message']['text']
-                        print(f"수신된 명령어: {text}")
-                        if text == '/rsi' and self.rsi_monitor:
-                            print("RSI 명령어 처리 시작")
-                            current_rsi = self.rsi_monitor.get_current_rsi()
-                            if not current_rsi:
-                                print("현재 RSI 데이터가 없습니다.")
-                                self.send_message("⚠️ 아직 RSI 데이터가 수집되지 않았습니다. 잠시 후 다시 시도해주세요.")
-                                continue
-                                
-                            message = "📊 <b>현재 RSI 상태</b>\n\n"
-                            for symbol, rsi in current_rsi.items():
-                                message += f"{symbol}: {rsi:.2f}\n"
-                            print("RSI 상태 메시지 전송")
-                            self.send_message(message)
+                if response.status_code == 200:
+                    updates = response.json()
+                    if updates.get('ok'):
+                        for update in updates.get('result', []):
+                            self.last_update_id = update['update_id']
+                            if 'message' in update and 'text' in update['message']:
+                                command = update['message']['text']
+                                print(f"수신된 명령어: {command}")  # 디버그 로그 추가
+                                self.handle_command(command)
+                else:
+                    print(f"Error getting updates: {response.text}")
+                    time.sleep(5)
+                    
+            except Exception as e:
+                print(f"Error processing updates: {e}")
+                time.sleep(5)
+    
+    def handle_command(self, command):
+        """
+        텔레그램 명령어를 처리합니다.
+        """
+        print(f"명령어 처리 시작: {command}")
+        
+        if command in ['/status', '/rsi']:
+            try:
+                print("RSI 데이터 요청 중...")
+                rsi_14, rsi_7 = self.rsi_monitor.get_current_rsi()
+                print(f"RSI 데이터 수신: {rsi_14}, {rsi_7}")
+                
+                # 시가총액 순위대로 정렬된 심볼 리스트
+                market_cap_order = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 
+                                  'UNIUSDT', 'SUIUSDT', 'PEPEUSDT', 'USDCUSDT', 'FDUSDUSDT']
+                
+                message = "📊 <b>현재 RSI 상태 (시가총액 순)</b>\n\n"
+                for symbol in market_cap_order:
+                    if symbol in rsi_14:
+                        message += f"{symbol}:\n"
+                        message += f"RSI(14): {rsi_14[symbol]:.2f}\n"
+                        message += f"RSI(7): {rsi_7[symbol]:.2f}\n\n"
+                
+                print("메시지 전송 시도...")
+                self.send_message(message)
+                print("메시지 전송 완료")
                 
             except Exception as e:
-                print(f"Error handling commands: {e}")
-                time.sleep(1)
+                print(f"Error handling status command: {e}")
+                self.send_message("⚠️ RSI 데이터를 가져오는 중 오류가 발생했습니다.")
+        
+        elif command == '/help':
+            message = "🤖 <b>RSI 모니터링 봇 명령어</b>\n\n" \
+                     "/status 또는 /rsi - 현재 RSI 상태 확인 (시가총액 순)\n" \
+                     "/help - 도움말 보기"
+            self.send_message(message)
     
     def stop(self):
         """

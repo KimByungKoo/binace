@@ -38,7 +38,7 @@ class RSIMonitor:
             response = requests.get(url, params=params)
             if response.status_code == 200:
                 data = response.json()
-                # 종가 데이터만 추출
+                # 종가 데이터만 추출 (인덱스 4가 종가)
                 prices = [float(candle[4]) for candle in data]
                 return prices
             else:
@@ -98,7 +98,10 @@ class RSIMonitor:
             stream_data = data.get('data', {})
             symbol = stream_data.get('s', '')
             kline = stream_data.get('k', {})
-            price = float(kline.get('c', 0))
+            
+            # 종가 데이터만 사용
+            price = float(kline.get('c', 0))  # 'c'는 종가(Close)
+            is_closed = kline.get('x', False)  # 캔들이 닫혔는지 확인
             
             if not symbol or price == 0:
                 return
@@ -107,90 +110,92 @@ class RSIMonitor:
                 self.initialize_symbol_data(symbol)
                 self.start_times[symbol] = time.time()
             
-            self.price_data[symbol].append(price)
-            
-            if len(self.price_data[symbol]) >= self.data_length:
-                prices = list(self.price_data[symbol])
-                rsi_14 = calculate_rsi_binance(prices, period=14)
-                rsi_7 = calculate_rsi_binance(prices, period=7)
-                self.current_rsi_14[symbol] = rsi_14
-                self.current_rsi_7[symbol] = rsi_7
+            # 캔들이 닫힐 때만 데이터 추가
+            if is_closed:
+                self.price_data[symbol].append(price)
                 
-                if symbol in self.start_times:
-                    elapsed_time = time.time() - self.start_times[symbol]
-                    print(f"\n{symbol} 실시간 데이터 수집 완료")
-                    print(f"수집된 데이터: {len(self.price_data[symbol])}개")
-                    print(f"수집 시간: {elapsed_time:.1f}초")
-                    print(f"RSI(14): {rsi_14:.2f}")
-                    print(f"RSI(7): {rsi_7:.2f}")
-                    print(f"현재 가격: {price:.8f}")
-                    del self.start_times[symbol]
-                
-                # RSI(14) 과매수 조건 체크
-                if rsi_14 >= self.rsi_overbought and symbol not in self.alerted_overbought_14:
-                    message = f"🚨 <b>RSI(14) 과매수 알림</b>\n\n" \
-                             f"심볼: {symbol}\n" \
-                             f"RSI(14): {rsi_14:.2f}\n" \
-                             f"RSI(7): {rsi_7:.2f}\n" \
-                             f"현재 가격: {price:.8f} USDT"
+                if len(self.price_data[symbol]) >= self.data_length:
+                    prices = list(self.price_data[symbol])
+                    rsi_14 = calculate_rsi_binance(prices, period=14)
+                    rsi_7 = calculate_rsi_binance(prices, period=7)
+                    self.current_rsi_14[symbol] = rsi_14
+                    self.current_rsi_7[symbol] = rsi_7
                     
-                    self.telegram_bot.send_message(message)
-                    self.alerted_overbought_14.add(symbol)
-                    print(f"RSI(14) 과매수 알림 전송: {symbol} - RSI(14): {rsi_14:.2f}")
-                
-                # RSI(14) 과매도 조건 체크
-                elif rsi_14 <= self.rsi_oversold and symbol not in self.alerted_oversold_14:
-                    message = f"📉 <b>RSI(14) 과매도 알림</b>\n\n" \
-                             f"심볼: {symbol}\n" \
-                             f"RSI(14): {rsi_14:.2f}\n" \
-                             f"RSI(7): {rsi_7:.2f}\n" \
-                             f"현재 가격: {price:.8f} USDT"
+                    if symbol in self.start_times:
+                        elapsed_time = time.time() - self.start_times[symbol]
+                        print(f"\n{symbol} 실시간 데이터 수집 완료")
+                        print(f"수집된 데이터: {len(self.price_data[symbol])}개")
+                        print(f"수집 시간: {elapsed_time:.1f}초")
+                        print(f"RSI(14): {rsi_14:.2f}")
+                        print(f"RSI(7): {rsi_7:.2f}")
+                        print(f"현재 가격: {price:.8f}")
+                        del self.start_times[symbol]
                     
-                    self.telegram_bot.send_message(message)
-                    self.alerted_oversold_14.add(symbol)
-                    print(f"RSI(14) 과매도 알림 전송: {symbol} - RSI(14): {rsi_14:.2f}")
+                    # RSI(14) 과매수 조건 체크
+                    if rsi_14 >= self.rsi_overbought and symbol not in self.alerted_overbought_14:
+                        message = f"🚨 <b>RSI(14) 과매수 알림</b>\n\n" \
+                                 f"심볼: {symbol}\n" \
+                                 f"RSI(14): {rsi_14:.2f}\n" \
+                                 f"RSI(7): {rsi_7:.2f}\n" \
+                                 f"현재 가격: {price:.8f} USDT"
+                        
+                        self.telegram_bot.send_message(message)
+                        self.alerted_overbought_14.add(symbol)
+                        print(f"RSI(14) 과매수 알림 전송: {symbol} - RSI(14): {rsi_14:.2f}")
+                    
+                    # RSI(14) 과매도 조건 체크
+                    elif rsi_14 <= self.rsi_oversold and symbol not in self.alerted_oversold_14:
+                        message = f"📉 <b>RSI(14) 과매도 알림</b>\n\n" \
+                                 f"심볼: {symbol}\n" \
+                                 f"RSI(14): {rsi_14:.2f}\n" \
+                                 f"RSI(7): {rsi_7:.2f}\n" \
+                                 f"현재 가격: {price:.8f} USDT"
+                        
+                        self.telegram_bot.send_message(message)
+                        self.alerted_oversold_14.add(symbol)
+                        print(f"RSI(14) 과매도 알림 전송: {symbol} - RSI(14): {rsi_14:.2f}")
 
-                # RSI(7) 과매수 조건 체크
-                if rsi_7 >= self.rsi_overbought and symbol not in self.alerted_overbought_7:
-                    message = f"🚨 <b>RSI(7) 과매수 알림</b>\n\n" \
-                             f"심볼: {symbol}\n" \
-                             f"RSI(14): {rsi_14:.2f}\n" \
-                             f"RSI(7): {rsi_7:.2f}\n" \
-                             f"현재 가격: {price:.8f} USDT"
+                    # RSI(7) 과매수 조건 체크
+                    if rsi_7 >= self.rsi_overbought and symbol not in self.alerted_overbought_7:
+                        message = f"🚨 <b>RSI(7) 과매수 알림</b>\n\n" \
+                                 f"심볼: {symbol}\n" \
+                                 f"RSI(14): {rsi_14:.2f}\n" \
+                                 f"RSI(7): {rsi_7:.2f}\n" \
+                                 f"현재 가격: {price:.8f} USDT"
+                        
+                        self.telegram_bot.send_message(message)
+                        self.alerted_overbought_7.add(symbol)
+                        print(f"RSI(7) 과매수 알림 전송: {symbol} - RSI(7): {rsi_7:.2f}")
                     
-                    self.telegram_bot.send_message(message)
-                    self.alerted_overbought_7.add(symbol)
-                    print(f"RSI(7) 과매수 알림 전송: {symbol} - RSI(7): {rsi_7:.2f}")
-                
-                # RSI(7) 과매도 조건 체크
-                elif rsi_7 <= self.rsi_oversold and symbol not in self.alerted_oversold_7:
-                    message = f"📉 <b>RSI(7) 과매도 알림</b>\n\n" \
-                             f"심볼: {symbol}\n" \
-                             f"RSI(14): {rsi_14:.2f}\n" \
-                             f"RSI(7): {rsi_7:.2f}\n" \
-                             f"현재 가격: {price:.8f} USDT"
+                    # RSI(7) 과매도 조건 체크
+                    elif rsi_7 <= self.rsi_oversold and symbol not in self.alerted_oversold_7:
+                        message = f"📉 <b>RSI(7) 과매도 알림</b>\n\n" \
+                                 f"심볼: {symbol}\n" \
+                                 f"RSI(14): {rsi_14:.2f}\n" \
+                                 f"RSI(7): {rsi_7:.2f}\n" \
+                                 f"현재 가격: {price:.8f} USDT"
+                        
+                        self.telegram_bot.send_message(message)
+                        self.alerted_oversold_7.add(symbol)
+                        print(f"RSI(7) 과매도 알림 전송: {symbol} - RSI(7): {rsi_7:.2f}")
                     
-                    self.telegram_bot.send_message(message)
-                    self.alerted_oversold_7.add(symbol)
-                    print(f"RSI(7) 과매도 알림 전송: {symbol} - RSI(7): {rsi_7:.2f}")
-                
-                # RSI(14) 알림 초기화
-                if rsi_14 < self.rsi_overbought and symbol in self.alerted_overbought_14:
-                    self.alerted_overbought_14.remove(symbol)
-                    print(f"RSI(14) 과매수 알림 초기화: {symbol} - RSI(14): {rsi_14:.2f}")
-                
-                if rsi_14 > self.rsi_oversold and symbol in self.alerted_oversold_14:
-                    self.alerted_oversold_14.remove(symbol)
-                    print(f"RSI(14) 과매도 알림 초기화: {symbol} - RSI(14): {rsi_14:.2f}")
+                    # RSI(14) 알림 초기화
+                    if rsi_14 < self.rsi_overbought and symbol in self.alerted_overbought_14:
+                        self.alerted_overbought_14.remove(symbol)
+                        print(f"RSI(14) 과매수 알림 초기화: {symbol} - RSI(14): {rsi_14:.2f}")
+                    
+                    if rsi_14 > self.rsi_oversold and symbol in self.alerted_oversold_14:
+                        self.alerted_oversold_14.remove(symbol)
+                        print(f"RSI(14) 과매도 알림 초기화: {symbol} - RSI(14): {rsi_14:.2f}")
 
-                # RSI(7) 알림 초기화
-                if rsi_7 < self.rsi_overbought and symbol in self.alerted_overbought_7:
-                    self.alerted_overbought_7.remove(symbol)
-                    print(f"RSI(7) 과매수 알림 초기화: {symbol} - RSI(7): {rsi_7:.2f}")
-                
-                if rsi_7 > self.rsi_oversold and symbol in self.alerted_oversold_7:
-                    self.alerted_oversold_7.remove(symbol)
-                    print(f"RSI(7) 과매도 알림 초기화: {symbol} - RSI(7): {rsi_7:.2f}")
+                    # RSI(7) 알림 초기화
+                    if rsi_7 < self.rsi_overbought and symbol in self.alerted_overbought_7:
+                        self.alerted_overbought_7.remove(symbol)
+                        print(f"RSI(7) 과매수 알림 초기화: {symbol} - RSI(7): {rsi_7:.2f}")
+                    
+                    if rsi_7 > self.rsi_oversold and symbol in self.alerted_oversold_7:
+                        self.alerted_oversold_7.remove(symbol)
+                        print(f"RSI(7) 과매도 알림 초기화: {symbol} - RSI(7): {rsi_7:.2f}")
                     
         except Exception as e:
             print(f"Error processing message: {e}")

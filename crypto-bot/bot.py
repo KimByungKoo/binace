@@ -17,7 +17,7 @@ from strategy.trade_executor import (
 )
 from datetime import datetime
 import time
-a
+
 def system_monitor_loop():
     """
     시스템 상태 모니터링 루프

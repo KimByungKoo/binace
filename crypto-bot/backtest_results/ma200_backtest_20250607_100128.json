@@ -1,0 +1,939 @@
+{
+  "BTCUSDT": {
+    "symbol": "BTCUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:01:00",
+    "end_time": "2025-06-07 01:01:00"
+  },
+  "ETHUSDT": {
+    "symbol": "ETHUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:01:00",
+    "end_time": "2025-06-07 01:01:00"
+  },
+  "SOLUSDT": {
+    "symbol": "SOLUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:01:00",
+    "end_time": "2025-06-07 01:01:00"
+  },
+  "DOGEUSDT": {
+    "symbol": "DOGEUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:02:00",
+    "end_time": "2025-06-07 01:02:00"
+  },
+  "MASKUSDT": {
+    "symbol": "MASKUSDT",
+    "total_trades": 4,
+    "win_rate": 75.0,
+    "total_profit": 12.184880189483463,
+    "max_drawdown": 0.11135293819911826,
+    "profit_factor": 110.42576268346681,
+    "trades": [
+      {
+        "entry_time": "2025-04-01 17:58:00",
+        "exit_time": "2025-04-01 18:02:00",
+        "entry_price": 1.9757,
+        "exit_price": 1.9735,
+        "profit": -0.11135293819911826,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-02 01:50:00",
+        "exit_time": "2025-04-02 02:12:00",
+        "entry_price": 1.3637,
+        "exit_price": 1.3676,
+        "profit": 0.2859866539561498,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-16 05:29:00",
+        "exit_time": "2025-05-16 05:37:00",
+        "entry_price": 1.4755,
+        "exit_price": 1.4865,
+        "profit": 0.7455099966113112,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-01 17:06:00",
+        "exit_time": "2025-06-01 18:14:00",
+        "entry_price": 2.3072,
+        "exit_price": 2.5671,
+        "profit": 11.26473647711512,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:02:00",
+    "end_time": "2025-06-07 01:02:00"
+  },
+  "1000PEPEUSDT": {
+    "symbol": "1000PEPEUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:02:00",
+    "end_time": "2025-06-07 01:02:00"
+  },
+  "LAUSDT": {
+    "symbol": "LAUSDT",
+    "total_trades": 1,
+    "win_rate": 0.0,
+    "total_profit": -0.7156798959010996,
+    "max_drawdown": 0.7156798959010996,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-06-06 04:19:00",
+        "exit_time": "2025-06-06 04:25:00",
+        "entry_price": 1.537,
+        "exit_price": 1.526,
+        "profit": -0.7156798959010996,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-06-05 09:00:00",
+    "end_time": "2025-06-07 01:03:00"
+  },
+  "XRPUSDT": {
+    "symbol": "XRPUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:03:00",
+    "end_time": "2025-06-07 01:03:00"
+  },
+  "TRUMPUSDT": {
+    "symbol": "TRUMPUSDT",
+    "total_trades": 1,
+    "win_rate": 0.0,
+    "total_profit": -0.7092722571111938,
+    "max_drawdown": 0.7092722571111938,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-04-23 23:42:00",
+        "exit_time": "2025-04-24 00:00:00",
+        "entry_price": 13.535,
+        "exit_price": 13.439,
+        "profit": -0.7092722571111938,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:03:00",
+    "end_time": "2025-06-07 01:03:00"
+  },
+  "SUIUSDT": {
+    "symbol": "SUIUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:04:00",
+    "end_time": "2025-06-07 01:04:00"
+  },
+  "ADAUSDT": {
+    "symbol": "ADAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:04:00",
+    "end_time": "2025-06-07 01:04:00"
+  },
+  "FARTCOINUSDT": {
+    "symbol": "FARTCOINUSDT",
+    "total_trades": 12,
+    "win_rate": 41.66666666666667,
+    "total_profit": -2.0735789036705086,
+    "max_drawdown": 3.945950330964948,
+    "profit_factor": 0.763855531967177,
+    "trades": [
+      {
+        "entry_time": "2025-03-11 21:45:00",
+        "exit_time": "2025-03-11 21:51:00",
+        "entry_price": 0.2581,
+        "exit_price": 0.2573,
+        "profit": -0.30995738086014063,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-03-12 14:53:00",
+        "exit_time": "2025-03-12 15:39:00",
+        "entry_price": 0.2551,
+        "exit_price": 0.2578,
+        "profit": 1.0584084672677303,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-03-20 16:19:00",
+        "exit_time": "2025-03-20 16:26:00",
+        "entry_price": 0.3613,
+        "exit_price": 0.3583,
+        "profit": -0.830334901743704,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-03-26 23:07:00",
+        "exit_time": "2025-03-26 23:13:00",
+        "entry_price": 0.519,
+        "exit_price": 0.5091,
+        "profit": -1.9075144508670558,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-03-30 21:52:00",
+        "exit_time": "2025-03-30 22:06:00",
+        "entry_price": 0.4532,
+        "exit_price": 0.448,
+        "profit": -1.1473962930273571,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-01 11:53:00",
+        "exit_time": "2025-04-01 12:10:00",
+        "entry_price": 0.5116,
+        "exit_price": 0.5148,
+        "profit": 0.625488663017979,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-04 10:24:00",
+        "exit_time": "2025-04-04 10:58:00",
+        "entry_price": 0.4511,
+        "exit_price": 0.4405,
+        "profit": -2.3498115717135883,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-06 23:04:00",
+        "exit_time": "2025-04-06 23:16:00",
+        "entry_price": 0.4283,
+        "exit_price": 0.4307,
+        "profit": 0.5603548914312428,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-07 04:13:00",
+        "exit_time": "2025-04-07 04:37:00",
+        "entry_price": 0.4453,
+        "exit_price": 0.4382,
+        "profit": -1.5944307208623392,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-07 16:55:00",
+        "exit_time": "2025-04-07 17:24:00",
+        "entry_price": 0.4842,
+        "exit_price": 0.5002,
+        "profit": 3.3044196612969765,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-12 17:11:00",
+        "exit_time": "2025-04-12 17:24:00",
+        "entry_price": 0.8885,
+        "exit_price": 0.8828,
+        "profit": -0.6415306696679716,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-27 01:09:00",
+        "exit_time": "2025-04-27 01:16:00",
+        "entry_price": 1.0011,
+        "exit_price": 1.0127,
+        "profit": 1.1587254020577196,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:04:00",
+    "end_time": "2025-06-07 01:04:00"
+  },
+  "BNBUSDT": {
+    "symbol": "BNBUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:05:00",
+    "end_time": "2025-06-07 01:05:00"
+  },
+  "RVNUSDT": {
+    "symbol": "RVNUSDT",
+    "total_trades": 2,
+    "win_rate": 0.0,
+    "total_profit": -4.717272983406755,
+    "max_drawdown": 3.744628606507056,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-06-05 10:37:00",
+        "exit_time": "2025-06-05 10:40:00",
+        "entry_price": 0.01645,
+        "exit_price": 0.01629,
+        "profit": -0.9726443768996987,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-05 22:05:00",
+        "exit_time": "2025-06-05 22:14:00",
+        "entry_price": 0.01629,
+        "exit_price": 0.01568,
+        "profit": -3.744628606507056,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:05:00",
+    "end_time": "2025-06-07 01:05:00"
+  },
+  "LPTUSDT": {
+    "symbol": "LPTUSDT",
+    "total_trades": 4,
+    "win_rate": 0.0,
+    "total_profit": -3.3206467522550236,
+    "max_drawdown": 3.0369867662029226,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-05-30 15:39:00",
+        "exit_time": "2025-05-30 16:16:00",
+        "entry_price": 11.788,
+        "exit_price": 11.43,
+        "profit": -3.0369867662029226,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-31 09:15:00",
+        "exit_time": "2025-05-31 09:37:00",
+        "entry_price": 10.943,
+        "exit_price": 10.924,
+        "profit": -0.1736269761491376,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-01 00:54:00",
+        "exit_time": "2025-06-01 01:12:00",
+        "entry_price": 9.172,
+        "exit_price": 9.172,
+        "profit": 0.0,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-05 00:25:00",
+        "exit_time": "2025-06-05 00:54:00",
+        "entry_price": 9.997,
+        "exit_price": 9.986,
+        "profit": -0.11003300990296322,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:05:00",
+    "end_time": "2025-06-07 01:05:00"
+  },
+  "HUMAUSDT": {
+    "symbol": "HUMAUSDT",
+    "total_trades": 5,
+    "win_rate": 0.0,
+    "total_profit": -6.501755726442723,
+    "max_drawdown": 2.882581378461152,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-05-26 18:46:00",
+        "exit_time": "2025-05-26 19:07:00",
+        "entry_price": 0.067545,
+        "exit_price": 0.066506,
+        "profit": -1.538233770079204,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-27 01:10:00",
+        "exit_time": "2025-05-27 01:15:00",
+        "entry_price": 0.063346,
+        "exit_price": 0.06152,
+        "profit": -2.882581378461152,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-02 10:41:00",
+        "exit_time": "2025-06-02 10:50:00",
+        "entry_price": 0.037755,
+        "exit_price": 0.037508,
+        "profit": -0.6542179843729234,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-03 07:38:00",
+        "exit_time": "2025-06-03 07:42:00",
+        "entry_price": 0.042144,
+        "exit_price": 0.041954,
+        "profit": -0.4508352315869464,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-07 00:27:00",
+        "exit_time": "2025-06-07 00:34:00",
+        "entry_price": 0.047444,
+        "exit_price": 0.046981,
+        "profit": -0.9758873619424967,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-05-26 13:00:00",
+    "end_time": "2025-06-07 01:06:00"
+  },
+  "VIRTUALUSDT": {
+    "symbol": "VIRTUALUSDT",
+    "total_trades": 3,
+    "win_rate": 66.66666666666666,
+    "total_profit": 0.2725124737353225,
+    "max_drawdown": 1.3304627150814599,
+    "profit_factor": 1.3521865153984682,
+    "trades": [
+      {
+        "entry_time": "2025-04-12 10:42:00",
+        "exit_time": "2025-04-12 10:49:00",
+        "entry_price": 0.5389,
+        "exit_price": 0.5419,
+        "profit": 0.5566895527927264,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-25 17:59:00",
+        "exit_time": "2025-04-25 18:08:00",
+        "entry_price": 0.8987,
+        "exit_price": 0.9031,
+        "profit": 0.4895960832313296,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-18 18:20:00",
+        "exit_time": "2025-05-18 19:04:00",
+        "entry_price": 1.9644,
+        "exit_price": 1.9492,
+        "profit": -0.7737731622887335,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:06:00",
+    "end_time": "2025-06-07 01:06:00"
+  },
+  "WIFUSDT": {
+    "symbol": "WIFUSDT",
+    "total_trades": 3,
+    "win_rate": 0.0,
+    "total_profit": -2.1794706243129607,
+    "max_drawdown": 1.1325194881600131,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-05-09 03:38:00",
+        "exit_time": "2025-05-09 03:46:00",
+        "entry_price": 0.6799,
+        "exit_price": 0.6722,
+        "profit": -1.1325194881600131,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-15 18:40:00",
+        "exit_time": "2025-05-15 18:55:00",
+        "entry_price": 1.0132,
+        "exit_price": 1.0097,
+        "profit": -0.345440189498624,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-23 05:24:00",
+        "exit_time": "2025-05-23 05:32:00",
+        "entry_price": 1.2972,
+        "exit_price": 1.2881,
+        "profit": -0.7015109466543237,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:06:00",
+    "end_time": "2025-06-07 01:06:00"
+  },
+  "COMPUSDT": {
+    "symbol": "COMPUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:07:00",
+    "end_time": "2025-06-07 01:07:00"
+  },
+  "TRBUSDT": {
+    "symbol": "TRBUSDT",
+    "total_trades": 4,
+    "win_rate": 75.0,
+    "total_profit": 2.6605738430399652,
+    "max_drawdown": 2.267376653327339,
+    "profit_factor": 3.185592335182005,
+    "trades": [
+      {
+        "entry_time": "2025-05-28 03:21:00",
+        "exit_time": "2025-05-28 03:28:00",
+        "entry_price": 49.042,
+        "exit_price": 48.445,
+        "profit": -1.2173239264304092,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-28 07:27:00",
+        "exit_time": "2025-05-28 07:38:00",
+        "entry_price": 48.731,
+        "exit_price": 49.143,
+        "profit": 0.8454577168537462,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-30 06:06:00",
+        "exit_time": "2025-05-30 06:08:00",
+        "entry_price": 57.285,
+        "exit_price": 58.803,
+        "profit": 2.6499083529719836,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-05 02:31:00",
+        "exit_time": "2025-06-05 02:36:00",
+        "entry_price": 51.499,
+        "exit_price": 51.696,
+        "profit": 0.3825316996446448,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:07:00",
+    "end_time": "2025-06-07 01:07:00"
+  },
+  "ENAUSDT": {
+    "symbol": "ENAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:07:00",
+    "end_time": "2025-06-07 01:07:00"
+  },
+  "WCTUSDT": {
+    "symbol": "WCTUSDT",
+    "total_trades": 8,
+    "win_rate": 37.5,
+    "total_profit": -4.491497736283057,
+    "max_drawdown": 2.9222894054659587,
+    "profit_factor": 0.26832184643594026,
+    "trades": [
+      {
+        "entry_time": "2025-04-15 16:28:00",
+        "exit_time": "2025-04-15 16:47:00",
+        "entry_price": 0.3316,
+        "exit_price": 0.3285,
+        "profit": -0.9348612786489722,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-16 09:09:00",
+        "exit_time": "2025-04-16 09:25:00",
+        "entry_price": 0.4721,
+        "exit_price": 0.4729,
+        "profit": 0.16945562380850823,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-17 00:05:00",
+        "exit_time": "2025-04-17 00:14:00",
+        "entry_price": 0.4105,
+        "exit_price": 0.409,
+        "profit": -0.3654080389768578,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-20 05:45:00",
+        "exit_time": "2025-04-20 05:55:00",
+        "entry_price": 0.4787,
+        "exit_price": 0.4838,
+        "profit": 1.0653854188426977,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-21 03:27:00",
+        "exit_time": "2025-04-21 03:44:00",
+        "entry_price": 0.4851,
+        "exit_price": 0.4871,
+        "profit": 0.41228612657184127,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-14 09:06:00",
+        "exit_time": "2025-05-14 09:17:00",
+        "entry_price": 0.6015,
+        "exit_price": 0.5928,
+        "profit": -1.446384039900256,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-30 09:52:00",
+        "exit_time": "2025-05-30 10:11:00",
+        "entry_price": 1.0879,
+        "exit_price": 1.0712,
+        "profit": -1.5350675613567568,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-31 08:17:00",
+        "exit_time": "2025-05-31 08:21:00",
+        "entry_price": 1.1363,
+        "exit_price": 1.1152,
+        "profit": -1.8569039866232613,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-04-15 11:00:00",
+    "end_time": "2025-06-07 01:08:00"
+  },
+  "ANIMEUSDT": {
+    "symbol": "ANIMEUSDT",
+    "total_trades": 2,
+    "win_rate": 0.0,
+    "total_profit": -0.5327708630706076,
+    "max_drawdown": 0.2821442966545633,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-05-19 00:43:00",
+        "exit_time": "2025-05-19 00:48:00",
+        "entry_price": 0.02394,
+        "exit_price": 0.02388,
+        "profit": -0.25062656641604436,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-20 00:37:00",
+        "exit_time": "2025-05-20 00:47:00",
+        "entry_price": 0.02481,
+        "exit_price": 0.02474,
+        "profit": -0.2821442966545633,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:08:00",
+    "end_time": "2025-06-07 01:08:00"
+  },
+  "AAVEUSDT": {
+    "symbol": "AAVEUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:08:00",
+    "end_time": "2025-06-07 01:08:00"
+  },
+  "LINKUSDT": {
+    "symbol": "LINKUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:09:00",
+    "end_time": "2025-06-07 01:09:00"
+  },
+  "AVAXUSDT": {
+    "symbol": "AVAXUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-03-09 01:09:00",
+    "end_time": "2025-06-07 01:09:00"
+  },
+  "UMAUSDT": {
+    "symbol": "UMAUSDT",
+    "total_trades": 1,
+    "win_rate": 100.0,
+    "total_profit": 2.274715660542434,
+    "max_drawdown": 0,
+    "profit_factor": Infinity,
+    "trades": [
+      {
+        "entry_time": "2025-03-11 01:05:00",
+        "exit_time": "2025-03-11 01:44:00",
+        "entry_price": 1.143,
+        "exit_price": 1.169,
+        "profit": 2.274715660542434,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:09:00",
+    "end_time": "2025-06-07 01:09:00"
+  },
+  "HYPEUSDT": {
+    "symbol": "HYPEUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0,
+    "trades": [],
+    "start_time": "2025-05-30 10:30:00",
+    "end_time": "2025-06-07 01:10:00"
+  },
+  "NEIROUSDT": {
+    "symbol": "NEIROUSDT",
+    "total_trades": 7,
+    "win_rate": 28.57142857142857,
+    "total_profit": -1.9863015359098988,
+    "max_drawdown": 2.35724791374861,
+    "profit_factor": 0.520026841319366,
+    "trades": [
+      {
+        "entry_time": "2025-05-09 04:04:00",
+        "exit_time": "2025-05-09 04:15:00",
+        "entry_price": 0.0003055,
+        "exit_price": 0.0003086,
+        "profit": 1.0147299509001706,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-12 05:24:00",
+        "exit_time": "2025-05-12 05:28:00",
+        "entry_price": 0.0004331,
+        "exit_price": 0.0004315,
+        "profit": -0.36942969291156424,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-13 02:04:00",
+        "exit_time": "2025-05-13 02:16:00",
+        "entry_price": 0.0004283,
+        "exit_price": 0.0004231,
+        "profit": -1.2141022647676905,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-13 14:06:00",
+        "exit_time": "2025-05-13 14:26:00",
+        "entry_price": 0.0005891,
+        "exit_price": 0.0005958,
+        "profit": 1.137328127652351,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-13 22:26:00",
+        "exit_time": "2025-05-13 22:49:00",
+        "entry_price": 0.0006232,
+        "exit_price": 0.0006193,
+        "profit": -0.6258023106546747,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-18 18:20:00",
+        "exit_time": "2025-05-18 18:52:00",
+        "entry_price": 0.0005984,
+        "exit_price": 0.0005911,
+        "profit": -1.2199197860962592,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-23 03:53:00",
+        "exit_time": "2025-05-23 04:16:00",
+        "entry_price": 0.0006205,
+        "exit_price": 0.0006161,
+        "profit": -0.7091055600322318,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:10:00",
+    "end_time": "2025-06-07 01:10:00"
+  },
+  "MOODENGUSDT": {
+    "symbol": "MOODENGUSDT",
+    "total_trades": 17,
+    "win_rate": 64.70588235294117,
+    "total_profit": -10.22858126926746,
+    "max_drawdown": 10.325693905998817,
+    "profit_factor": 0.5947536880642964,
+    "trades": [
+      {
+        "entry_time": "2025-04-12 10:51:00",
+        "exit_time": "2025-04-12 11:16:00",
+        "entry_price": 0.02599,
+        "exit_price": 0.02644,
+        "profit": 1.7314351673720758,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-13 19:43:00",
+        "exit_time": "2025-04-13 20:00:00",
+        "entry_price": 0.0283,
+        "exit_price": 0.02729,
+        "profit": -3.568904593639578,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-04-24 01:22:00",
+        "exit_time": "2025-04-24 02:03:00",
+        "entry_price": 0.03711,
+        "exit_price": 0.03741,
+        "profit": 0.8084074373484282,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-09 19:18:00",
+        "exit_time": "2025-05-09 19:47:00",
+        "entry_price": 0.13654,
+        "exit_price": 0.14057,
+        "profit": 2.9515160392559,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-09 23:54:00",
+        "exit_time": "2025-05-09 23:58:00",
+        "entry_price": 0.13089,
+        "exit_price": 0.1317,
+        "profit": 0.6188402475361029,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-11 02:12:00",
+        "exit_time": "2025-05-11 02:55:00",
+        "entry_price": 0.12151,
+        "exit_price": 0.11923,
+        "profit": -1.8763887745864571,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-12 05:14:00",
+        "exit_time": "2025-05-12 05:21:00",
+        "entry_price": 0.26185,
+        "exit_price": 0.24642,
+        "profit": -5.892686652663748,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-13 14:00:00",
+        "exit_time": "2025-05-13 14:15:00",
+        "entry_price": 0.30697,
+        "exit_price": 0.28878,
+        "profit": -5.925660487995582,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-13 22:26:00",
+        "exit_time": "2025-05-13 22:33:00",
+        "entry_price": 0.30535,
+        "exit_price": 0.30351,
+        "profit": -0.6025871950221084,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-14 08:48:00",
+        "exit_time": "2025-05-14 08:53:00",
+        "entry_price": 0.27976,
+        "exit_price": 0.25913,
+        "profit": -7.374177866742916,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-15 01:12:00",
+        "exit_time": "2025-05-15 01:24:00",
+        "entry_price": 0.23877,
+        "exit_price": 0.24108,
+        "profit": 0.96745822339489,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-16 14:49:00",
+        "exit_time": "2025-05-16 15:27:00",
+        "entry_price": 0.2185,
+        "exit_price": 0.22315,
+        "profit": 2.128146453089239,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-16 16:15:00",
+        "exit_time": "2025-05-16 16:25:00",
+        "entry_price": 0.21864,
+        "exit_price": 0.21873,
+        "profit": 0.041163556531287386,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-18 16:42:00",
+        "exit_time": "2025-05-18 16:47:00",
+        "entry_price": 0.25584,
+        "exit_price": 0.25765,
+        "profit": 0.7074734208880465,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-19 02:45:00",
+        "exit_time": "2025-05-19 02:58:00",
+        "entry_price": 0.24672,
+        "exit_price": 0.24716,
+        "profit": 0.1783398184176378,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-19 16:40:00",
+        "exit_time": "2025-05-19 16:57:00",
+        "entry_price": 0.23855,
+        "exit_price": 0.24975,
+        "profit": 4.695032487948014,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-05-20 00:51:00",
+        "exit_time": "2025-05-20 01:05:00",
+        "entry_price": 0.24455,
+        "exit_price": 0.245,
+        "profit": 0.18401144960131097,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-03-09 01:10:00",
+    "end_time": "2025-06-07 01:10:00"
+  }
+}

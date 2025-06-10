@@ -1,0 +1,242 @@
+{
+  "BTCUSDT": {
+    "symbol": "BTCUSDT",
+    "total_trades": 1,
+    "win_rate": 100.0,
+    "total_profit": 3.468946830929789,
+    "max_drawdown": 0,
+    "profit_factor": Infinity
+  },
+  "ETHUSDT": {
+    "symbol": "ETHUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "SOLUSDT": {
+    "symbol": "SOLUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "MASKUSDT": {
+    "symbol": "MASKUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "1000PEPEUSDT": {
+    "symbol": "1000PEPEUSDT",
+    "total_trades": 2,
+    "win_rate": 100.0,
+    "total_profit": 15.028615363534634,
+    "max_drawdown": 0,
+    "profit_factor": Infinity
+  },
+  "DOGEUSDT": {
+    "symbol": "DOGEUSDT",
+    "total_trades": 3,
+    "win_rate": 66.66666666666666,
+    "total_profit": 14.786540782547343,
+    "max_drawdown": 2.8759221254645264,
+    "profit_factor": 6.141495540376978
+  },
+  "XRPUSDT": {
+    "symbol": "XRPUSDT",
+    "total_trades": 4,
+    "win_rate": 25.0,
+    "total_profit": -6.9802686387264075,
+    "max_drawdown": 6.9802686387264075,
+    "profit_factor": 0.04615306295554482
+  },
+  "SUIUSDT": {
+    "symbol": "SUIUSDT",
+    "total_trades": 6,
+    "win_rate": 50.0,
+    "total_profit": 6.020305093793183,
+    "max_drawdown": 8.000000000000014,
+    "profit_factor": 1.5016920911494314
+  },
+  "TRUMPUSDT": {
+    "symbol": "TRUMPUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "LAUSDT": {
+    "symbol": "LAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "FARTCOINUSDT": {
+    "symbol": "FARTCOINUSDT",
+    "total_trades": 4,
+    "win_rate": 75.0,
+    "total_profit": 4.704471734398145,
+    "max_drawdown": 3.9999999999999964,
+    "profit_factor": 2.176117933599537
+  },
+  "ADAUSDT": {
+    "symbol": "ADAUSDT",
+    "total_trades": 3,
+    "win_rate": 100.0,
+    "total_profit": 18.294242120503416,
+    "max_drawdown": 0,
+    "profit_factor": Infinity
+  },
+  "HUMAUSDT": {
+    "symbol": "HUMAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "BNBUSDT": {
+    "symbol": "BNBUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "VIRTUALUSDT": {
+    "symbol": "VIRTUALUSDT",
+    "total_trades": 7,
+    "win_rate": 28.57142857142857,
+    "total_profit": -3.389036721660462,
+    "max_drawdown": 20.000000000000014,
+    "profit_factor": 0.8305481639169771
+  },
+  "LPTUSDT": {
+    "symbol": "LPTUSDT",
+    "total_trades": 1,
+    "win_rate": 100.0,
+    "total_profit": 1.2645523885989507,
+    "max_drawdown": 0,
+    "profit_factor": Infinity
+  },
+  "WIFUSDT": {
+    "symbol": "WIFUSDT",
+    "total_trades": 1,
+    "win_rate": 0.0,
+    "total_profit": -4.0000000000000036,
+    "max_drawdown": 4.0000000000000036,
+    "profit_factor": 0.0
+  },
+  "RVNUSDT": {
+    "symbol": "RVNUSDT",
+    "total_trades": 1,
+    "win_rate": 100.0,
+    "total_profit": 0.1623376623376698,
+    "max_drawdown": 0,
+    "profit_factor": Infinity
+  },
+  "COMPUSDT": {
+    "symbol": "COMPUSDT",
+    "total_trades": 1,
+    "win_rate": 0.0,
+    "total_profit": -4.000000000000003,
+    "max_drawdown": 4.000000000000003,
+    "profit_factor": 0.0
+  },
+  "WCTUSDT": {
+    "symbol": "WCTUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "ENAUSDT": {
+    "symbol": "ENAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "ANIMEUSDT": {
+    "symbol": "ANIMEUSDT",
+    "total_trades": 3,
+    "win_rate": 66.66666666666666,
+    "total_profit": 13.689510285914698,
+    "max_drawdown": 2.1617293835068008,
+    "profit_factor": 7.332666054484258
+  },
+  "AAVEUSDT": {
+    "symbol": "AAVEUSDT",
+    "total_trades": 2,
+    "win_rate": 0.0,
+    "total_profit": -4.592952337926374,
+    "max_drawdown": 4.592952337926374,
+    "profit_factor": 0.0
+  },
+  "TRBUSDT": {
+    "symbol": "TRBUSDT",
+    "total_trades": 21,
+    "win_rate": 95.23809523809523,
+    "total_profit": 184.0079376891404,
+    "max_drawdown": 3.999999999999996,
+    "profit_factor": 47.00198442228515
+  },
+  "LINKUSDT": {
+    "symbol": "LINKUSDT",
+    "total_trades": 2,
+    "win_rate": 50.0,
+    "total_profit": 0.40441849011468456,
+    "max_drawdown": 4.000000000000008,
+    "profit_factor": 1.101104622528671
+  },
+  "UMAUSDT": {
+    "symbol": "UMAUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "AVAXUSDT": {
+    "symbol": "AVAXUSDT",
+    "total_trades": 2,
+    "win_rate": 0.0,
+    "total_profit": -8.000000000000004,
+    "max_drawdown": 8.000000000000004,
+    "profit_factor": 0.0
+  },
+  "NEIROUSDT": {
+    "symbol": "NEIROUSDT",
+    "total_trades": 1,
+    "win_rate": 0.0,
+    "total_profit": -4.000000000000004,
+    "max_drawdown": 4.000000000000004,
+    "profit_factor": 0.0
+  },
+  "HYPEUSDT": {
+    "symbol": "HYPEUSDT",
+    "total_trades": 0,
+    "win_rate": 0,
+    "total_profit": 0,
+    "max_drawdown": 0,
+    "profit_factor": 0
+  },
+  "MOODENGUSDT": {
+    "symbol": "MOODENGUSDT",
+    "total_trades": 2,
+    "win_rate": 0.0,
+    "total_profit": -8.0,
+    "max_drawdown": 8.0,
+    "profit_factor": 0.0
+  }
+}

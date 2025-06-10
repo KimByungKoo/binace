@@ -1,0 +1,42 @@
+name: Deploy RSI Monitor
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy and Run RSI Monitor
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            mkdir -p ~/binace
+            cd ~/binace
+            if [ -d ".git" ]; then
+              git pull origin main
+            else
+              git clone https://github.com/KimByungKoo/binace.git .
+            fi
+
+            # 기존 RSI 모니터 프로세스 종료
+            pkill -f rsi_monitor.py || true
+
+            # 새로운 RSI 모니터 실행
+            nohup python3 strategy/rsi_monitor.py > strategy/rsi_monitor.log 2>&1 &
+          EOF

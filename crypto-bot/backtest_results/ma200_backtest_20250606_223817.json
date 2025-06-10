@@ -1,0 +1,185 @@
+{
+  "LAUSDT": {
+    "symbol": "LAUSDT",
+    "total_trades": 3,
+    "win_rate": 0.0,
+    "total_profit": -3.469852945818128,
+    "max_drawdown": 1.4136904761904856,
+    "profit_factor": 0.0,
+    "trades": [
+      {
+        "entry_time": "2025-06-05 14:16:00",
+        "exit_time": "2025-06-05 14:36:00",
+        "entry_price": 1.344,
+        "exit_price": 1.325,
+        "profit": -1.4136904761904856,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-06 04:19:00",
+        "exit_time": "2025-06-06 04:25:00",
+        "entry_price": 1.537,
+        "exit_price": 1.526,
+        "profit": -0.7156798959010996,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      },
+      {
+        "entry_time": "2025-06-06 13:25:00",
+        "exit_time": "2025-06-06 13:36:00",
+        "entry_price": 1.492,
+        "exit_price": 1.472,
+        "profit": -1.340482573726543,
+        "exit_reason": "\ub9e4\ub3c4 \uc2dc\uadf8\ub110"
+      }
+    ],
+    "start_time": "2025-06-05 09:00:00",
+    "end_time": "2025-06-06 13:38:00"
+  },
+  "TRUMPUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "BTCUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "XRPUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "FARTCOINUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "1000PEPEUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "ETHUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "DOGEUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "SUIUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "SOLUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "LINKUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "AVAXUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "AAVEUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "RVNUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "BNBUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "ENAUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "WIFUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "MASKUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "LPTUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "ADAUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "WCTUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "MOODENGUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "TRBUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "HYPEUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "VIRTUALUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "COMPUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "UNIUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "HUMAUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "LTCUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "TRXUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "WLDUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "ETHFIUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "1000SHIBUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "NEIROUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "OPUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "FILUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "ANIMEUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "PNUTUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "KAITOUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "MKRUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "LDOUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "SOPHUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "TAOUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "NEARUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "DOTUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "CRVUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "TIAUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "INJUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "BCHUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  },
+  "NXPCUSDT": {
+    "error": "\ub370\uc774\ud130 \ubd80\uc871"
+  }
+}

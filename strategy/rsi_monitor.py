@@ -4,7 +4,7 @@ import threading
 import time
 from collections import deque
 from get_top_coins import get_top_coins
-from rsi_utils import calculate_rsi
+from rsi_utils import calculate_rsi_binance
 from telegram_bot import TelegramBot
 from datetime import datetime
 import requests
@@ -57,8 +57,8 @@ class RSIMonitor:
         if historical_prices:
             self.price_data[symbol] = deque(historical_prices, maxlen=self.data_length)
             if len(historical_prices) >= self.data_length:
-                rsi_14 = calculate_rsi(list(historical_prices), period=14)
-                rsi_7 = calculate_rsi(list(historical_prices), period=7)
+                rsi_14 = calculate_rsi_binance(list(historical_prices), period=14)
+                rsi_7 = calculate_rsi_binance(list(historical_prices), period=7)
                 self.current_rsi_14[symbol] = rsi_14
                 self.current_rsi_7[symbol] = rsi_7
                 print(f"{symbol} 초기 RSI 계산 완료:")
@@ -111,8 +111,8 @@ class RSIMonitor:
             
             if len(self.price_data[symbol]) >= self.data_length:
                 prices = list(self.price_data[symbol])
-                rsi_14 = calculate_rsi(prices, period=14)
-                rsi_7 = calculate_rsi(prices, period=7)
+                rsi_14 = calculate_rsi_binance(prices, period=14)
+                rsi_7 = calculate_rsi_binance(prices, period=7)
                 self.current_rsi_14[symbol] = rsi_14
                 self.current_rsi_7[symbol] = rsi_7
                 

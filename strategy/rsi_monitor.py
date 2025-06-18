@@ -236,7 +236,7 @@ class RSIMonitor:
         """
         모니터링 시작
         """
-        symbols = get_top_coins(10)
+        symbols = get_top_coins(20)
         if not symbols:
             print("Failed to get top coins")
             return

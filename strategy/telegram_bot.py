@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import threading
 import time
+from get_top_coins import get_top_coins
 
 load_dotenv()
 
@@ -119,7 +120,11 @@ class TelegramBot:
                 # 시가총액 순위대로 정렬된 심볼 리스트
                 market_cap_order = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'DOGEUSDT', 
                                   'UNIUSDT', 'SUIUSDT', 'PEPEUSDT', 'USDCUSDT', 'FDUSDUSDT']
+                                
+                                
                 
+                
+                market_cap_order = get_top_coins(30)
                 message = "📊 <b>현재 RSI 상태 (시가총액 순)</b>\n\n"
                 for symbol in market_cap_order:
                     if symbol in rsi_14:

@@ -30,7 +30,7 @@ class RSIMonitor:
         self.current_rsi_7 = {}  # 현재 RSI(7) 값 저장
         self.start_times = {}  # 각 심볼별 데이터 수집 시작 시간
 
-    def get_historical_data(self, symbol, interval='1m', limit=100):
+    def get_historical_data(self, symbol, interval='15m', limit=100):
         """
         Binance API를 통해 과거 데이터를 가져옵니다.
         """
@@ -243,7 +243,7 @@ class RSIMonitor:
         
         print(f"Monitoring symbols: {symbols}")
         
-        streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols]
+        streams = [f"{symbol.lower()}@kline_15m" for symbol in symbols]
         ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
         
         print(f"Connecting to WebSocket URL: {ws_url}")

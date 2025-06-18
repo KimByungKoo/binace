@@ -219,7 +219,7 @@ class RSIMonitor:
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 초기 데이터 로드
-        symbols = get_top_coins(10)
+        symbols = get_top_coins(20)
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
         

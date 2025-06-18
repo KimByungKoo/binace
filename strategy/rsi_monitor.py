@@ -219,7 +219,7 @@ class RSIMonitor:
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 초기 데이터 로드
-        symbols = get_top_coins(20)
+        symbols = get_top_coins(30)
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
         
@@ -236,7 +236,7 @@ class RSIMonitor:
         """
         모니터링 시작
         """
-        symbols = get_top_coins(20)
+        symbols = get_top_coins(30)
         if not symbols:
             print("Failed to get top coins")
             return

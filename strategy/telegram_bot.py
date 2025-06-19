@@ -116,18 +116,26 @@ class TelegramBot:
                 print("RSI 데이터 요청 중...")
                 self.send_message("RSI 데이터 요청 중...")
                 rsi_dict = self.rsi_monitor.get_current_rsi()
-                market_cap_order = get_top_coins(30)
-                message = "📊 <b>현재 RSI 상태 (1분/15분봉)</b>\n\n"
-                for symbol in market_cap_order:
-                    if symbol in rsi_dict:
-                        m1 = rsi_dict[symbol]['1m']
-                        m15 = rsi_dict[symbol]['15m']
-                        message += f"<b>{symbol}</b>\n"
-                        message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
-                        message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
-                        message += f"  15분봉 RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n"
-                        message += f"  15분봉 RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
-                print("메시지 전송 시도...")
+                # 극단값 계산: 1분봉/15분봉 RSI(14) 중 |RSI-50|이 가장 큰 값
+                rsi_extremes = []
+                for symbol, v in rsi_dict.items():
+                    rsi_1m = v['1m']['rsi14']
+                    rsi_15m = v['15m']['rsi14']
+                    candidates = [x for x in [rsi_1m, rsi_15m] if x is not None]
+                    if candidates:
+                        extreme = max(candidates, key=lambda x: abs(x-50))
+                        rsi_extremes.append((symbol, extreme))
+                rsi_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+                top10 = [x[0] for x in rsi_extremes[:10]]
+                message = "📊 <b>RSI 극단치 TOP10 (1분/15분봉)</b>\n\n"
+                for symbol in top10:
+                    m1 = rsi_dict[symbol]['1m']
+                    m15 = rsi_dict[symbol]['15m']
+                    message += f"<b>{symbol}</b>\n"
+                    message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
+                    message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
+                    message += f"  15분봉 RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n"
+                    message += f"  15분봉 RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
                 self.send_message(message)
                 print("메시지 전송 완료")
             except Exception as e:
@@ -136,7 +144,7 @@ class TelegramBot:
         
         elif command == '/help':
             message = "🤖 <b>RSI 모니터링 봇 명령어</b>\n\n" \
-                     "/status 또는 /rsi - 현재 RSI 상태 확인 (1분/15분봉)\n" \
+                     "/status 또는 /rsi - 현재 RSI 상태 확인 (1분/15분봉, 극단치 TOP10)\n" \
                      "/help - 도움말 보기"
             self.send_message(message)
     

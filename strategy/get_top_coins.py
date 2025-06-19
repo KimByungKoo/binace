@@ -1,29 +1,27 @@
 import requests
-import pandas as pd
 
-def get_top_coins(limit=10):
+def get_top_coins(top_n=10):
     """
-    시가총액 기준 상위 코인 목록을 가져옵니다.
+    바이낸스 24시간 거래대금(USDT 기준) 상위 top_n 코인 심볼 리스트 반환
     """
+    url = "https://api.binance.com/api/v3/ticker/24hr"
     try:
-        # Binance API를 통해 시가총액 정보 가져오기
-        url = "https://api.binance.com/api/v3/ticker/24hr"
         response = requests.get(url)
-        data = response.json()
-        
-        # DataFrame으로 변환
-        df = pd.DataFrame(data)
-        
-        # USDT 마켓만 필터링
-        df = df[df['symbol'].str.endswith('USDT')]
-        
-        # 시가총액 계산 (가격 * 거래량)
-        df['marketCap'] = df['quoteVolume'].astype(float)
-        
-        # 시가총액 기준 정렬 및 상위 코인 선택
-        top_coins = df.nlargest(limit, 'marketCap')
-        
-        return top_coins['symbol'].tolist()
+        if response.status_code == 200:
+            data = response.json()
+            # USDT 마켓만 필터링 (선물/현물 구분 없이 USDT 페어)
+            usdt_pairs = [item for item in data if item['symbol'].endswith('USDT') and not item['symbol'].endswith('BUSDUSDT')]
+            # 거래대금(quoteVolume, USDT 기준) 내림차순 정렬
+            sorted_pairs = sorted(usdt_pairs, key=lambda x: float(x['quoteVolume']), reverse=True)
+            # 상위 top_n개 심볼 반환
+            top_symbols = [item['symbol'] for item in sorted_pairs[:top_n]]
+            return top_symbols
+        else:
+            print(f"Error fetching 24hr ticker data: {response.text}")
+            return []
     except Exception as e:
-        print(f"Error getting top coins: {e}")
-        return [] 
+        print(f"Error fetching top coins by volume: {e}")
+        return []
+
+if __name__ == "__main__":
+    print(get_top_coins(30)) 

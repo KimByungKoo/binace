@@ -12,10 +12,10 @@ import requests
 class RSIMonitor:
     def __init__(self):
         self.price_data = {}  # 각 심볼별 가격 데이터 저장
-        self.rsi_overbought = 95  # 과매수 RSI 임계값
-        self.rsi_oversold = 5  # 과매도 RSI 임계값
-        self.rsi_warning_high = 90  # 주의 RSI 상단 임계값
-        self.rsi_warning_low = 10   # 주의 RSI 하단 임계값
+        self.rsi_overbought = 85  # 과매수 RSI 임계값
+        self.rsi_oversold = 15  # 과매도 RSI 임계값
+        self.rsi_warning_high = 80  # 주의 RSI 상단 임계값
+        self.rsi_warning_low = 20   # 주의 RSI 하단 임계값
         self.data_length = 100  # RSI 계산을 위한 데이터 길이
         self.telegram_bot = TelegramBot(self)  # RSI 모니터 인스턴스 전달
         self.alerted_overbought_14 = set()  # RSI(14) 과매수 알림을 보낸 심볼 추적

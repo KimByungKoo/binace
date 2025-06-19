@@ -114,6 +114,7 @@ class TelegramBot:
         if command in ['/status', '/rsi']:
             try:
                 print("RSI 데이터 요청 중...")
+                self.send_message("RSI 데이터 요청 중...")
                 rsi_dict = self.rsi_monitor.get_current_rsi()
                 market_cap_order = get_top_coins(30)
                 message = "📊 <b>현재 RSI 상태 (1분/15분봉)</b>\n\n"

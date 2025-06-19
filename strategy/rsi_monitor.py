@@ -250,19 +250,28 @@ class RSIMonitor:
     def on_open(self, ws):
         print("WebSocket connection opened")
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
         # 초기 데이터 로드
         symbols = get_top_coins(30)
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
-        
-        # 초기 RSI 상태 메시지 전송
-        if self.current_rsi_14:
-            message = "📊 <b>RSI 모니터링 시작</b>\n\n"
-            for symbol in self.current_rsi_14.keys():
-                message += f"{symbol}:\n"
-                message += f"RSI(14): {self.current_rsi_14[symbol]:.2f}\n"
-                message += f"RSI(7): {self.current_rsi_7[symbol]:.2f}\n\n"
+        # 초기 RSI 상태 메시지 전송 (1분/15분봉 모두)
+        if self.current_rsi_14_1m or self.current_rsi_14_15m:
+            message = "📊 <b>RSI 모니터링 시작 (1분/15분봉)</b>\n\n"
+            for symbol in symbols:
+                m1 = {
+                    'rsi14': self.current_rsi_14_1m.get(symbol),
+                    'rsi7': self.current_rsi_7_1m.get(symbol)
+                }
+                m15 = {
+                    'rsi14': self.current_rsi_14_15m.get(symbol),
+                    'rsi7': self.current_rsi_7_15m.get(symbol)
+                }
+                if m1['rsi14'] is not None or m15['rsi14'] is not None:
+                    message += f"<b>{symbol}</b>\n"
+                    message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
+                    message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
+                    message += f"  15분봉 RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n"
+                    message += f"  15분봉 RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
             self.telegram_bot.send_message(message)
     
     def start_monitoring(self):

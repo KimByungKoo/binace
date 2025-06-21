@@ -156,88 +156,188 @@ class RSIMonitor:
             rsi_7_1m = self.current_rsi_7_1m.get(symbol)
             rsi_14_15m = self.current_rsi_14_15m.get(symbol)
             rsi_7_15m = self.current_rsi_7_15m.get(symbol)
-            # 알림 로직 (예시: 14 기준)
-            if rsi_14_1m is not None and rsi_14_15m is not None:
-                # 1분, 15분봉 모두 과매수
-                if rsi_14_1m >= self.rsi_overbought and rsi_14_15m >= self.rsi_overbought and symbol not in self.alerted_strong_14:
-                    message = f"🔥 <b>강력 경고! 1분봉 & 15분봉 RSI(14) 동시 과매수 - <b>{symbol}</b></b>\n\n" \
-                              f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+            
+            # 15분봉 알림 로직 (15분봉이 업데이트된 경우에만)
+            if interval == '15m' and is_closed and rsi_14_15m is not None and rsi_7_15m is not None:
+                # 15분봉 RSI(14) 과매수/과매도 알림
+                if rsi_14_15m >= self.rsi_overbought and symbol not in self.alerted_overbought_14:
+                    message = f"🔥 <b>15분봉 RSI(14) 과매수 - {symbol}</b>\n\n" \
+                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
                               f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
                               f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_strong_14.add(symbol)
-                # 1분, 15분봉 모두 과매도
-                elif rsi_14_1m <= self.rsi_oversold and rsi_14_15m <= self.rsi_oversold and symbol not in self.alerted_strong_14:
-                    message = f"🔥 <b>강력 경고! 1분봉 & 15분봉 RSI(14) 동시 과매도 - <b>{symbol}</b></b>\n\n" \
-                              f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                    self.alerted_overbought_14.add(symbol)
+                    print(f"15분봉 RSI(14) 과매수 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
+                
+                elif rsi_14_15m <= self.rsi_oversold and symbol not in self.alerted_oversold_14:
+                    message = f"🔥 <b>15분봉 RSI(14) 과매도 - {symbol}</b>\n\n" \
+                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
                               f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
                               f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_strong_14.add(symbol)
-                # 조건 해제시 strong 알림 초기화
-                if (rsi_14_1m < self.rsi_overbought or rsi_14_15m < self.rsi_overbought) and symbol in self.alerted_strong_14:
-                    self.alerted_strong_14.remove(symbol)
-                if (rsi_14_1m > self.rsi_oversold or rsi_14_15m > self.rsi_oversold) and symbol in self.alerted_strong_14:
-                    self.alerted_strong_14.remove(symbol)
-            # 기존 개별 타임프레임 알림 로직 (1분봉 기준)
-            if rsi_14_1m is not None:
-                if rsi_14_1m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_14:
-                    message = f"⚠️ <b>RSI(14) 주의 상단 - <b>{symbol}</b></b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                    self.alerted_oversold_14.add(symbol)
+                    print(f"15분봉 RSI(14) 과매도 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
+                
+                # 15분봉 RSI(7) 과매수/과매도 알림
+                if rsi_7_15m >= self.rsi_overbought and symbol not in self.alerted_overbought_7:
+                    message = f"🔥 <b>15분봉 RSI(7) 과매수 - {symbol}</b>\n\n" \
+                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
+                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"현재 가격: {price:.8f} USDT"
+                    self.telegram_bot.send_message(message)
+                    self.alerted_overbought_7.add(symbol)
+                    print(f"15분봉 RSI(7) 과매수 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
+                
+                elif rsi_7_15m <= self.rsi_oversold and symbol not in self.alerted_oversold_7:
+                    message = f"🔥 <b>15분봉 RSI(7) 과매도 - {symbol}</b>\n\n" \
+                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
+                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"현재 가격: {price:.8f} USDT"
+                    self.telegram_bot.send_message(message)
+                    self.alerted_oversold_7.add(symbol)
+                    print(f"15분봉 RSI(7) 과매도 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
+                
+                # 15분봉 RSI(14) 주의 알림
+                if rsi_14_15m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_14:
+                    message = f"⚠️ <b>15분봉 RSI(14) 주의 상단 - {symbol}</b>\n\n" \
+                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
                     self.alerted_warning_high_14.add(symbol)
-                    print(f"RSI(14) 주의 상단 알림 전송: {symbol} - RSI(14): {rsi_14_1m:.2f}")
-                elif rsi_14_1m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_14:
-                    message = f"⚠️ <b>RSI(14) 주의 하단 - <b>{symbol}</b></b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                    print(f"15분봉 RSI(14) 주의 상단 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
+                
+                elif rsi_14_15m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_14:
+                    message = f"⚠️ <b>15분봉 RSI(14) 주의 하단 - {symbol}</b>\n\n" \
+                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
                     self.alerted_warning_low_14.add(symbol)
-                    print(f"RSI(14) 주의 하단 알림 전송: {symbol} - RSI(14): {rsi_14_1m:.2f}")
-                if rsi_14_1m < self.rsi_warning_high and symbol in self.alerted_warning_high_14:
-                    self.alerted_warning_high_14.remove(symbol)
-                    print(f"RSI(14) 주의 상단 알림 초기화: {symbol} - RSI(14): {rsi_14_1m:.2f}")
-                if rsi_14_1m > self.rsi_warning_low and symbol in self.alerted_warning_low_14:
-                    self.alerted_warning_low_14.remove(symbol)
-                    print(f"RSI(14) 주의 하단 알림 초기화: {symbol} - RSI(14): {rsi_14_1m:.2f}")
-            if rsi_7_1m is not None:
-                if rsi_7_1m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_7:
-                    message = f"⚠️ <b>RSI(7) 주의 상단 - <b>{symbol}</b></b>\n\n" \
+                    print(f"15분봉 RSI(14) 주의 하단 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
+                
+                # 15분봉 RSI(7) 주의 알림
+                if rsi_7_15m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_7:
+                    message = f"⚠️ <b>15분봉 RSI(7) 주의 상단 - {symbol}</b>\n\n" \
                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m:.2f}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
                     self.alerted_warning_high_7.add(symbol)
-                    print(f"RSI(7) 주의 상단 알림 전송: {symbol} - RSI(7): {rsi_7_1m:.2f}")
-                elif rsi_7_1m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_7:
-                    message = f"⚠️ <b>RSI(7) 주의 하단 - <b>{symbol}</b></b>\n\n" \
+                    print(f"15분봉 RSI(7) 주의 상단 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
+                
+                elif rsi_7_15m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_7:
+                    message = f"⚠️ <b>15분봉 RSI(7) 주의 하단 - {symbol}</b>\n\n" \
                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m:.2f}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
                     self.alerted_warning_low_7.add(symbol)
-                    print(f"RSI(7) 주의 하단 알림 전송: {symbol} - RSI(7): {rsi_7_1m:.2f}")
-                if rsi_7_1m < self.rsi_warning_high and symbol in self.alerted_warning_high_7:
+                    print(f"15분봉 RSI(7) 주의 하단 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
+                
+                # 15분봉 조건 해제시 알림 초기화
+                if rsi_14_15m < self.rsi_overbought and symbol in self.alerted_overbought_14:
+                    self.alerted_overbought_14.remove(symbol)
+                    print(f"15분봉 RSI(14) 과매수 알림 초기화: {symbol}")
+                if rsi_14_15m > self.rsi_oversold and symbol in self.alerted_oversold_14:
+                    self.alerted_oversold_14.remove(symbol)
+                    print(f"15분봉 RSI(14) 과매도 알림 초기화: {symbol}")
+                if rsi_7_15m < self.rsi_overbought and symbol in self.alerted_overbought_7:
+                    self.alerted_overbought_7.remove(symbol)
+                    print(f"15분봉 RSI(7) 과매수 알림 초기화: {symbol}")
+                if rsi_7_15m > self.rsi_oversold and symbol in self.alerted_oversold_7:
+                    self.alerted_oversold_7.remove(symbol)
+                    print(f"15분봉 RSI(7) 과매도 알림 초기화: {symbol}")
+                if rsi_14_15m < self.rsi_warning_high and symbol in self.alerted_warning_high_14:
+                    self.alerted_warning_high_14.remove(symbol)
+                    print(f"15분봉 RSI(14) 주의 상단 알림 초기화: {symbol}")
+                if rsi_14_15m > self.rsi_warning_low and symbol in self.alerted_warning_low_14:
+                    self.alerted_warning_low_14.remove(symbol)
+                    print(f"15분봉 RSI(14) 주의 하단 알림 초기화: {symbol}")
+                if rsi_7_15m < self.rsi_warning_high and symbol in self.alerted_warning_high_7:
                     self.alerted_warning_high_7.remove(symbol)
-                    print(f"RSI(7) 주의 상단 알림 초기화: {symbol} - RSI(7): {rsi_7_1m:.2f}")
-                if rsi_7_1m > self.rsi_warning_low and symbol in self.alerted_warning_low_7:
+                    print(f"15분봉 RSI(7) 주의 상단 알림 초기화: {symbol}")
+                if rsi_7_15m > self.rsi_warning_low and symbol in self.alerted_warning_low_7:
                     self.alerted_warning_low_7.remove(symbol)
-                    print(f"RSI(7) 주의 하단 알림 초기화: {symbol} - RSI(7): {rsi_7_1m:.2f}")
+                    print(f"15분봉 RSI(7) 주의 하단 알림 초기화: {symbol}")
+            
+            # 1분봉 알림 로직 (15분봉 조건이 맞는 경우에만)
+            if interval == '1m' and is_closed and rsi_14_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None:
+                # 15분봉이 주의 단계 이상인 경우에만 1분봉 알림 (과매수/과매도 또는 주의)
+                if (rsi_14_15m >= self.rsi_warning_high or rsi_14_15m <= self.rsi_warning_low or 
+                    rsi_7_15m >= self.rsi_warning_high or rsi_7_15m <= self.rsi_warning_low):
+                    # 1분봉 RSI(14) 과매수/과매도 알림
+                    if rsi_14_1m >= self.rsi_overbought and symbol not in self.alerted_strong_14:
+                        message = f"🔥 <b>1분봉 RSI(14) 과매수 (15분봉 주의 이상) - {symbol}</b>\n\n" \
+                                  f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                                  f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                                  f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                                  f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                                  f"현재 가격: {price:.8f} USDT"
+                        self.telegram_bot.send_message(message)
+                        self.alerted_strong_14.add(symbol)
+                        print(f"1분봉 RSI(14) 과매수 알림 전송 (15분봉 주의 이상): {symbol} - RSI(14): {rsi_14_1m:.2f}")
+                    
+                    elif rsi_14_1m <= self.rsi_oversold and symbol not in self.alerted_strong_14:
+                        message = f"🔥 <b>1분봉 RSI(14) 과매도 (15분봉 주의 이상) - {symbol}</b>\n\n" \
+                                  f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                                  f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
+                                  f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                                  f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                                  f"현재 가격: {price:.8f} USDT"
+                        self.telegram_bot.send_message(message)
+                        self.alerted_strong_14.add(symbol)
+                        print(f"1분봉 RSI(14) 과매도 알림 전송 (15분봉 주의 이상): {symbol} - RSI(14): {rsi_14_1m:.2f}")
+                    
+                    # 1분봉 RSI(7) 과매수/과매도 알림
+                    if rsi_7_1m is not None:
+                        if rsi_7_1m >= self.rsi_overbought and symbol not in self.alerted_strong_7:
+                            message = f"🔥 <b>1분봉 RSI(7) 과매수 (15분봉 주의 이상) - {symbol}</b>\n\n" \
+                                      f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                                      f"1분봉 RSI(7): {rsi_7_1m:.2f}\n" \
+                                      f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                                      f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                                      f"현재 가격: {price:.8f} USDT"
+                            self.telegram_bot.send_message(message)
+                            self.alerted_strong_7.add(symbol)
+                            print(f"1분봉 RSI(7) 과매수 알림 전송 (15분봉 주의 이상): {symbol} - RSI(7): {rsi_7_1m:.2f}")
+                        
+                        elif rsi_7_1m <= self.rsi_oversold and symbol not in self.alerted_strong_7:
+                            message = f"🔥 <b>1분봉 RSI(7) 과매도 (15분봉 주의 이상) - {symbol}</b>\n\n" \
+                                      f"1분봉 RSI(14): {rsi_14_1m:.2f}\n" \
+                                      f"1분봉 RSI(7): {rsi_7_1m:.2f}\n" \
+                                      f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
+                                      f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                                      f"현재 가격: {price:.8f} USDT"
+                            self.telegram_bot.send_message(message)
+                            self.alerted_strong_7.add(symbol)
+                            print(f"1분봉 RSI(7) 과매도 알림 전송 (15분봉 주의 이상): {symbol} - RSI(7): {rsi_7_1m:.2f}")
+                
+                # 15분봉 주의 단계가 해제되면 1분봉 알림도 초기화
+                if (rsi_14_15m < self.rsi_warning_high and rsi_14_15m > self.rsi_warning_low and 
+                    rsi_7_15m < self.rsi_warning_high and rsi_7_15m > self.rsi_warning_low):
+                    if symbol in self.alerted_strong_14:
+                        self.alerted_strong_14.remove(symbol)
+                        print(f"1분봉 RSI(14) 알림 초기화 (15분봉 주의 단계 해제): {symbol}")
+                    if symbol in self.alerted_strong_7:
+                        self.alerted_strong_7.remove(symbol)
+                        print(f"1분봉 RSI(7) 알림 초기화 (15분봉 주의 단계 해제): {symbol}")
         except Exception as e:
             print(f"Error processing message: {e}")
             print(f"Raw message: {message}")

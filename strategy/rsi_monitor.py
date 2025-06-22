@@ -71,7 +71,7 @@ class RSIMonitor:
         }
         
         # 거래량 스파이크 설정
-        self.volume_spike_threshold = 2.0  # 평균 대비 2배 이상 거래량
+        self.volume_spike_threshold = 10.0  # 평균 대비 2배 이상 거래량
         self.volume_lookback_period = 20   # 거래량 평균 계산 기간
         
         # 바이낸스 API 설정

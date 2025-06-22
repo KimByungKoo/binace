@@ -283,6 +283,21 @@ class TelegramBot:
             except Exception as e:
                 print(f"Error handling testnet command: {e}")
                 self.send_message("⚠️ 모드 확인 중 오류가 발생했습니다.")
+        
+        elif command == '/321':
+            try:
+                self.send_message("4시간봉 321EMA 이격률 계산 중...")
+                result = self.rsi_monitor.get_ema_321_proximity()
+                if not result:
+                    self.send_message("데이터가 부족하거나 계산에 실패했습니다.")
+                    return
+                message = "📊 <b>4시간봉 321EMA 근접 TOP10</b>\n\n"
+                for symbol, price, ema, diff in result:
+                    message += f"<b>{symbol}</b>\n현재가: {price:.4f}\n321EMA: {ema:.4f}\n이격률: {diff:.3f}%\n\n"
+                self.send_message(message)
+            except Exception as e:
+                print(f"Error handling /321 command: {e}")
+                self.send_message("⚠️ 321EMA 계산 중 오류가 발생했습니다.")
     
     def stop(self):
         """

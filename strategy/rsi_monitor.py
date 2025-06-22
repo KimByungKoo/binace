@@ -13,6 +13,7 @@ import hashlib
 import urllib.parse
 import os
 from dotenv import load_dotenv
+import numpy as np
 
 load_dotenv()
 
@@ -168,6 +169,7 @@ class RSIMonitor:
         else:
             volume_data = self.volume_data_1m.get(symbol, [])
         
+        volume_data = list(volume_data)  # 슬라이스를 위해 리스트로 변환
         if len(volume_data) < self.volume_lookback_period:
             return False
         
@@ -260,62 +262,48 @@ class RSIMonitor:
         
         return position_size, "계산 완료"
     
-    def calculate_sl_tp_prices(self, entry_price, position_value):
+    def calculate_sl_tp_prices(self, entry_price, position_value, position_type='LONG'):
         """
-        ROI 기준으로 SL/TP 가격을 계산합니다.
+        ROI 기준으로 SL/TP 가격을 계산합니다. (롱/숏 구분)
         """
-        # 레버리지를 고려한 가격 변동 계산
-        # 목표 ROI를 달성하기 위한 가격 변동 비율
         price_change_for_target = self.roi_threshold / self.leverage
-        
-        # 익절가 (ROI 5% 달성)
-        take_profit_price = entry_price * (1 + price_change_for_target)
-        
-        # 손절가 (ROI -2% 손실)
-        stop_loss_price = entry_price * (1 - (self.stop_loss_percent / self.leverage))
-        
+        if position_type == 'LONG':
+            take_profit_price = entry_price * (1 + price_change_for_target)
+            stop_loss_price = entry_price * (1 - (self.stop_loss_percent / self.leverage))
+        else:  # SHORT
+            take_profit_price = entry_price * (1 - price_change_for_target)
+            stop_loss_price = entry_price * (1 + (self.stop_loss_percent / self.leverage))
         return stop_loss_price, take_profit_price
     
-    def open_position(self, symbol, price, conditions_met):
+    def open_position(self, symbol, price, conditions_met, position_type='LONG'):
         """
         포지션을 오픈합니다.
         """
         if symbol in self.active_positions:
             return False, "이미 활성 포지션이 있습니다."
-        
         if len(self.active_positions) >= self.max_positions:
             return False, f"최대 포지션 수({self.max_positions})에 도달했습니다."
-        
         # 매수 수량 계산
         position_size, message = self.calculate_position_size(price)
         if position_size == 0:
             return False, message
-        
         # 레버리지 설정 (실제 거래 시)
         if not self.simulation_mode and self.trading_type == 'FUTURES':
             leverage_result = self.set_leverage(symbol, self.leverage)
             if not leverage_result:
                 print(f"레버리지 설정 실패: {symbol}")
-        
-        # 실제 매수 주문 실행
-        order_result = self.place_order(symbol, 'BUY', position_size, price, 'MARKET')
+        # 실제 주문 실행 (롱: BUY, 숏: SELL)
+        order_side = 'BUY' if position_type == 'LONG' else 'SELL'
+        order_result = self.place_order(symbol, order_side, position_size, price, 'MARKET')
         if not order_result:
             return False, "주문 실행 실패"
-        
-        # 주문 상태 확인
         if order_result.get('status') != 'FILLED':
             return False, f"주문 미체결: {order_result.get('status')}"
-        
-        # 실제 체결 가격 사용
         executed_price = float(order_result.get('price', price))
         executed_quantity = float(order_result.get('executedQty', position_size))
-        
-        # 포지션 가치 계산
         position_value = executed_quantity * executed_price
-        
-        # ROI 기준으로 SL/TP 가격 계산
-        stop_loss_price, take_profit_price = self.calculate_sl_tp_prices(executed_price, position_value)
-        
+        # SL/TP 계산 (롱/숏 구분)
+        stop_loss_price, take_profit_price = self.calculate_sl_tp_prices(executed_price, position_value, position_type)
         position = {
             'symbol': symbol,
             'entry_price': executed_price,
@@ -327,27 +315,25 @@ class RSIMonitor:
             'stop_loss': stop_loss_price,
             'take_profit': take_profit_price,
             'conditions_met': conditions_met,
-            'order_id': order_result.get('orderId')
+            'order_id': order_result.get('orderId'),
+            'position_type': position_type
         }
-        
         self.active_positions[symbol] = position
-        
-        # 매수 알림 전송
+        # 알림
         mode_text = "시뮬레이션" if self.simulation_mode else "실제 거래"
         margin_text = "선물" if self.trading_type == 'FUTURES' else "마진"
-        message = f"💰 <b>매수 신호 ({mode_text} {margin_text}) - {symbol}</b>\n\n" \
+        pos_text = "롱" if position_type == 'LONG' else "숏"
+        message = f"💰 <b>{pos_text} 신호 ({mode_text} {margin_text}) - {symbol}</b>\n\n" \
                   f"투자금액: {self.investment_amount} USDT\n" \
                   f"레버리지: {self.leverage}배\n" \
                   f"포지션 크기: {position_value:.2f} USDT\n" \
-                  f"매수가: {executed_price:.8f} USDT\n" \
-                  f"매수 수량: {executed_quantity:.6f}\n" \
-                  f"손절가: {stop_loss_price:.8f} USDT (ROI -{self.stop_loss_percent:.1%})\n" \
-                  f"익절가: {take_profit_price:.8f} USDT (ROI +{self.roi_threshold:.1%})\n" \
-                  f"매수 조건: {', '.join(conditions_met)}"
-        
+                  f"진입가: {executed_price:.8f} USDT\n" \
+                  f"수량: {executed_quantity:.6f}\n" \
+                  f"손절가: {stop_loss_price:.8f} USDT\n" \
+                  f"익절가: {take_profit_price:.8f} USDT\n" \
+                  f"조건: {', '.join(conditions_met)}"
         self.telegram_bot.send_message(message)
-        print(f"포지션 오픈: {symbol} - 매수가: {executed_price:.8f}, 수량: {executed_quantity:.6f}, 레버리지: {self.leverage}배")
-        
+        print(f"포지션 오픈: {symbol} - {pos_text}, 진입가: {executed_price:.8f}, 수량: {executed_quantity:.6f}, 레버리지: {self.leverage}배")
         return True, "포지션 오픈 완료"
     
     def check_sl_tp(self, symbol, current_price):
@@ -376,37 +362,31 @@ class RSIMonitor:
         """
         if symbol not in self.active_positions:
             return
-        
         position = self.active_positions[symbol]
         entry_price = position['entry_price']
         position_size = position['position_size']
         position_value = position['position_value']
         investment_amount = position['investment_amount']
         leverage = position['leverage']
-        
-        # 실제 매도 주문 실행
-        order_result = self.place_order(symbol, 'SELL', position_size, exit_price, 'MARKET')
+        position_type = position.get('position_type', 'LONG')
+        # 실제 주문 실행 (롱: SELL, 숏: BUY)
+        order_side = 'SELL' if position_type == 'LONG' else 'BUY'
+        order_result = self.place_order(symbol, order_side, position_size, exit_price, 'MARKET')
         if not order_result:
-            print(f"매도 주문 실패: {symbol}")
+            print(f"청산 주문 실패: {symbol}")
             return
-        
-        # 주문 상태 확인
         if order_result.get('status') != 'FILLED':
-            print(f"매도 주문 미체결: {symbol} - {order_result.get('status')}")
+            print(f"청산 주문 미체결: {symbol} - {order_result.get('status')}")
             return
-        
-        # 실제 체결 가격 사용
         executed_price = float(order_result.get('price', exit_price))
         executed_quantity = float(order_result.get('executedQty', position_size))
-        
-        # 레버리지를 고려한 손익 계산
-        price_change_percent = (executed_price - entry_price) / entry_price
+        # 손익 계산 (롱/숏 구분)
+        if position_type == 'LONG':
+            price_change_percent = (executed_price - entry_price) / entry_price
+        else:
+            price_change_percent = (entry_price - executed_price) / entry_price
         roi_percent = price_change_percent * leverage
-        
-        # 실제 손익 금액 (투자금액 기준)
         pnl = investment_amount * roi_percent
-        
-        # 거래 이력에 추가
         trade_record = {
             'symbol': symbol,
             'entry_price': entry_price,
@@ -422,19 +402,16 @@ class RSIMonitor:
             'pnl_percent': roi_percent,
             'price_change_percent': price_change_percent,
             'conditions_met': position['conditions_met'],
-            'order_id': order_result.get('orderId')
+            'order_id': order_result.get('orderId'),
+            'position_type': position_type
         }
-        
         self.position_history.append(trade_record)
-        
-        # 포지션 제거
         del self.active_positions[symbol]
-        
-        # 종료 알림 전송
         mode_text = "시뮬레이션" if self.simulation_mode else "실제 거래"
         margin_text = "선물" if self.trading_type == 'FUTURES' else "마진"
+        pos_text = "롱" if position_type == 'LONG' else "숏"
         emoji = "🔴" if reason == '손절' else "🟢"
-        message = f"{emoji} <b>{reason} ({mode_text} {margin_text}) - {symbol}</b>\n\n" \
+        message = f"{emoji} <b>{reason} ({mode_text} {margin_text} {pos_text}) - {symbol}</b>\n\n" \
                   f"투자금액: {investment_amount} USDT\n" \
                   f"레버리지: {leverage}배\n" \
                   f"진입가: {entry_price:.8f} USDT\n" \
@@ -444,9 +421,8 @@ class RSIMonitor:
                   f"ROI: {roi_percent:.2%}\n" \
                   f"손익: {pnl:.2f} USDT\n" \
                   f"보유 시간: {trade_record['exit_time'] - trade_record['entry_time']}"
-        
         self.telegram_bot.send_message(message)
-        print(f"포지션 종료: {symbol} - {reason}, ROI: {roi_percent:.2%}, 손익: {pnl:.2f} USDT")
+        print(f"포지션 종료: {symbol} - {reason}, {pos_text}, ROI: {roi_percent:.2%}, 손익: {pnl:.2f} USDT")
     
     def get_position_summary(self):
         """
@@ -532,6 +508,7 @@ class RSIMonitor:
                 return
             if symbol not in self.price_data_1m or symbol not in self.price_data_15m:
                 self.initialize_symbol_data(symbol)
+            
             # 1분봉
             if interval == '1m' and is_closed:
                 self.price_data_1m[symbol].append(price)
@@ -561,23 +538,39 @@ class RSIMonitor:
             # SL/TP 체크 (모든 가격 업데이트에서)
             self.check_sl_tp(symbol, price)
             
-            # 매수 조건 확인 (15분봉 완료 시에만)
-            if interval == '15m' and is_closed and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None:
-                buy_signal, conditions_met = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m)
-                if buy_signal and symbol not in self.active_positions:
+            # 매수/매도 조건 확인 (15분봉 완료 시에만)
+            if interval == '15m' and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None:
+                # 롱 조건
+                long_signal, long_conditions = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m)
+                # 숏 조건
+                short_signal, short_conditions = self.check_short_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m)
+                # 롱 진입
+                if long_signal and symbol not in self.active_positions:
                     if self.auto_trading:
-                        success, message = self.open_position(symbol, price, conditions_met)
+                        success, message = self.open_position(symbol, price, long_conditions, position_type='LONG')
                         if success:
-                            print(f"매수 신호 감지: {symbol} - 조건: {conditions_met}")
+                            print(f"롱 신호 감지: {symbol} - 조건: {long_conditions}")
                         else:
-                            print(f"매수 실패: {symbol} - {message}")
+                            print(f"롱 진입 실패: {symbol} - {message}")
                     else:
-                        msg = f"[자동주문 OFF] 매수 신호 감지: {symbol} - 조건: {', '.join(conditions_met)}"
+                        msg = f"[자동주문 OFF] 롱 신호 감지: {symbol} - 조건: {', '.join(long_conditions)}"
+                        print(msg)
+                        self.telegram_bot.send_message(msg)
+                # 숏 진입
+                if short_signal and symbol not in self.active_positions:
+                    if self.auto_trading:
+                        success, message = self.open_position(symbol, price, short_conditions, position_type='SHORT')
+                        if success:
+                            print(f"숏 신호 감지: {symbol} - 조건: {short_conditions}")
+                        else:
+                            print(f"숏 진입 실패: {symbol} - {message}")
+                    else:
+                        msg = f"[자동주문 OFF] 숏 신호 감지: {symbol} - 조건: {', '.join(short_conditions)}"
                         print(msg)
                         self.telegram_bot.send_message(msg)
             
             # 15분봉 알림 로직 (15분봉이 업데이트된 경우에만)
-            if interval == '15m' and is_closed and rsi_14_15m is not None and rsi_7_15m is not None:
+            if interval == '15m'  and rsi_14_15m is not None and rsi_7_15m is not None:
                 # 15분봉 RSI(14) 과매수/과매도 알림
                 if rsi_14_15m >= self.rsi_overbought and symbol not in self.alerted_overbought_14:
                     message = f"🔥 <b>15분봉 RSI(14) 과매수 - {symbol}</b>\n\n" \
@@ -715,33 +708,24 @@ class RSIMonitor:
             self.initialize_symbol_data(symbol)
         # 초기 RSI 상태 메시지 전송 (극단치 TOP10)
         if self.current_rsi_14_1m or self.current_rsi_14_15m:
-            # 극단값 계산: 1분봉/15분봉 RSI(14) 중 |RSI-50|이 가장 큰 값
-            rsi_dict = {}
-            for symbol in set(list(self.current_rsi_14_1m.keys()) + list(self.current_rsi_14_15m.keys())):
-                rsi_dict[symbol] = {
-                    '1m': {
-                        'rsi14': self.current_rsi_14_1m.get(symbol),
-                        'rsi7': self.current_rsi_7_1m.get(symbol)
-                    },
-                    '15m': {
-                        'rsi14': self.current_rsi_14_15m.get(symbol),
-                        'rsi7': self.current_rsi_7_15m.get(symbol)
-                    }
-                }
-            rsi_extremes = []
-            for symbol, v in rsi_dict.items():
-                rsi_1m = v['1m']['rsi14']
-                rsi_15m = v['15m']['rsi14']
-                candidates = [x for x in [rsi_1m, rsi_15m] if x is not None]
-                if candidates:
-                    extreme = max(candidates, key=lambda x: abs(x-50))
-                    rsi_extremes.append((symbol, extreme))
-            rsi_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
-            top10 = [x[0] for x in rsi_extremes[:10]]
-            message = "📊 <b>RSI 모니터링 시작 (극단치 TOP10, 1분/15분봉)</b>\n\n"
+            # 15분봉 RSI(14) 극단치 TOP10만 선정
+            rsi_15m_extremes = []
+            for symbol, rsi in self.current_rsi_14_15m.items():
+                if rsi is not None:
+                    rsi_15m_extremes.append((symbol, abs(rsi-50)))
+            rsi_15m_extremes.sort(key=lambda x: x[1], reverse=True)
+            top10 = [x[0] for x in rsi_15m_extremes[:10]]
+
+            message = "📊 <b>RSI 모니터링 시작 (15분봉 극단치 TOP10)</b>\n\n"
             for symbol in top10:
-                m1 = rsi_dict[symbol]['1m']
-                m15 = rsi_dict[symbol]['15m']
+                m1 = {
+                    'rsi14': self.current_rsi_14_1m.get(symbol),
+                    'rsi7': self.current_rsi_7_1m.get(symbol)
+                }
+                m15 = {
+                    'rsi14': self.current_rsi_14_15m.get(symbol),
+                    'rsi7': self.current_rsi_7_15m.get(symbol)
+                }
                 message += f"<b>{symbol}</b>\n"
                 message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
                 message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
@@ -1022,6 +1006,100 @@ class RSIMonitor:
             return self._make_request('GET', '/fapi/v1/order', params, signed=True)
         else:
             return self._make_request('GET', '/api/v3/order', params, signed=True)
+
+    def check_short_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m):
+        """
+        숏(Short) 진입 조건을 확인합니다.
+        """
+        conditions_met = []
+        # 15분봉 RSI 과매수 조건
+        if self.buy_conditions['rsi_15m_oversold']:
+            if (rsi_14_15m is not None and rsi_14_15m >= self.rsi_overbought) or \
+               (rsi_7_15m is not None and rsi_7_15m >= self.rsi_overbought):
+                conditions_met.append('15분봉 RSI 과매수')
+        # 1분봉 RSI 과매수 조건
+        if self.buy_conditions['rsi_1m_oversold']:
+            if (rsi_14_1m is not None and rsi_14_1m >= self.rsi_overbought) or \
+               (rsi_7_1m is not None and rsi_7_1m >= self.rsi_overbought):
+                conditions_met.append('1분봉 RSI 과매수')
+        # 거래량 스파이크 조건 (필수)
+        if self.buy_conditions['volume_spike']:
+            volume_spike_15m, volume_ratio_15m = self.check_volume_spike(symbol, '15m')
+            volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
+            if volume_spike_15m or volume_spike_1m:
+                max_ratio = max(volume_ratio_15m, volume_ratio_1m)
+                conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
+            else:
+                return False, []
+        # 가격 상승 조건 (최근 10개 캔들 기준)
+        if self.buy_conditions['price_drop'] > 0:
+            if len(self.price_data_15m.get(symbol, [])) >= 10:
+                recent_prices = list(self.price_data_15m[symbol])[-10:]
+                price_rise = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
+                if price_rise >= self.buy_conditions['price_drop']:
+                    conditions_met.append(f'가격 상승 {price_rise:.2%}')
+        return len(conditions_met) >= 2, conditions_met
+
+    def get_futures_usdt_symbols(self):
+        """
+        바이낸스 USDT-M 선물 마켓에서 실제 거래(TRADING) 중인 심볼 리스트 반환
+        """
+        try:
+            url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
+            response = requests.get(url)
+            if response.status_code != 200:
+                return []
+            data = response.json()
+            symbols = [
+                s['symbol']
+                for s in data['symbols']
+                if s['contractType'] == 'PERPETUAL'
+                and s['quoteAsset'] == 'USDT'
+                and s['status'] == 'TRADING'
+            ]
+            return symbols
+        except Exception as e:
+            print(f"선물 심볼 조회 오류: {e}")
+            return []
+
+    def get_ema_321_proximity(self, top_n=10):
+        """
+        4시간봉 321EMA와 현재가 이격률이 가장 작은 USDT-M 선물 코인 TOP N 반환
+        """
+        symbols = self.get_futures_usdt_symbols()
+        results = []
+        for symbol in symbols:
+            try:
+                url = "https://fapi.binance.com/fapi/v1/klines"
+                params = {'symbol': symbol, 'interval': '4h', 'limit': 350}
+                response = requests.get(url, params=params)
+                if response.status_code != 200:
+                    continue
+                data = response.json()
+                closes = [float(c[4]) for c in data]
+                if len(closes) < 321:
+                    continue
+                ema = self.calculate_ema(closes, 321)[-1]
+                current_price = closes[-1]
+                diff = abs(current_price - ema) / ema * 100
+                results.append((symbol, current_price, ema, diff))
+            except Exception as e:
+                print(f"{symbol} 321EMA 계산 오류: {e}")
+                continue
+        results.sort(key=lambda x: x[3])
+        return results[:top_n]
+
+    def calculate_ema(self, prices, period):
+        """
+        단순 EMA 계산 함수 (numpy 활용)
+        """
+        prices = np.array(prices)
+        ema = np.zeros_like(prices)
+        alpha = 2 / (period + 1)
+        ema[0] = prices[0]
+        for i in range(1, len(prices)):
+            ema[i] = alpha * prices[i] + (1 - alpha) * ema[i-1]
+        return ema
 
 if __name__ == "__main__":
     monitor = RSIMonitor()

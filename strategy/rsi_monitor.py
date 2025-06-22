@@ -48,6 +48,7 @@ class RSIMonitor:
         self.alerted_strong_14 = set()  # 1m, 15m 동시 만족 강한 알림
         self.alerted_strong_7 = set()
         
+        
         # SL/TP 관련 설정
         self.investment_amount = 10  # 투자금액 (USDT)
         self.leverage = 10  # 레버리지 배수

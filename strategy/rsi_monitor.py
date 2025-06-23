@@ -228,7 +228,7 @@ class RSIMonitor:
                     conditions_met.append(f'가격 하락 {price_drop:.2%}')
         
         # 최소 2개 조건 만족 (거래량 스파이크는 이미 필수로 확인됨)
-        return len(conditions_met) >= 2, conditions_met
+        return len(conditions_met) >= 4, conditions_met
     
     def calculate_position_size(self, price):
         """

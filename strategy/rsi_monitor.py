@@ -224,7 +224,7 @@ class RSIMonitor:
             if len(self.price_data_15m.get(symbol, [])) >= 10:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
-                if price_drop >= self.buy_conditions['price_drop']:
+                #if price_drop >= self.buy_conditions['price_drop']:
                     #conditions_met.append(f'가격 하락 {price_drop:.2%}')
         
         # 최소 2개 조건 만족 (거래량 스파이크는 이미 필수로 확인됨)
@@ -1037,7 +1037,7 @@ class RSIMonitor:
             if len(self.price_data_15m.get(symbol, [])) >= 10:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_rise = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
-                if price_rise >= self.buy_conditions['price_drop']:
+                #if price_rise >= self.buy_conditions['price_drop']:
                     #conditions_met.append(f'가격 상승 {price_rise:.2%}')
         return len(conditions_met) >= 2, conditions_met
 

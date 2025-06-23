@@ -214,7 +214,7 @@ class RSIMonitor:
             
             if volume_spike_15m or volume_spike_1m:
                 max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-                conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
+                #conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
             else:
                 # 거래량 스파이크가 필수 조건이므로 만족하지 않으면 매수하지 않음
                 return False, []
@@ -225,10 +225,10 @@ class RSIMonitor:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
                 if price_drop >= self.buy_conditions['price_drop']:
-                    conditions_met.append(f'가격 하락 {price_drop:.2%}')
+                    #conditions_met.append(f'가격 하락 {price_drop:.2%}')
         
         # 최소 2개 조건 만족 (거래량 스파이크는 이미 필수로 확인됨)
-        return len(conditions_met) >= 4, conditions_met
+        return len(conditions_met) >= 2, conditions_met
     
     def calculate_position_size(self, price):
         """
@@ -1029,7 +1029,7 @@ class RSIMonitor:
             volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
             if volume_spike_15m or volume_spike_1m:
                 max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-                conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
+                #conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
             else:
                 return False, []
         # 가격 상승 조건 (최근 10개 캔들 기준)
@@ -1038,8 +1038,8 @@ class RSIMonitor:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_rise = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
                 if price_rise >= self.buy_conditions['price_drop']:
-                    conditions_met.append(f'가격 상승 {price_rise:.2%}')
-        return len(conditions_met) >= 4, conditions_met
+                    #conditions_met.append(f'가격 상승 {price_rise:.2%}')
+        return len(conditions_met) >= 2, conditions_met
 
     def get_futures_usdt_symbols(self):
         """

@@ -1039,7 +1039,7 @@ class RSIMonitor:
                 price_rise = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
                 if price_rise >= self.buy_conditions['price_drop']:
                     conditions_met.append(f'가격 상승 {price_rise:.2%}')
-        return len(conditions_met) >= 2, conditions_met
+        return len(conditions_met) >= 4, conditions_met
 
     def get_futures_usdt_symbols(self):
         """

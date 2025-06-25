@@ -116,27 +116,46 @@ class TelegramBot:
                 print("RSI 데이터 요청 중...")
                 self.send_message("RSI 데이터 요청 중...")
                 rsi_dict = self.rsi_monitor.get_current_rsi()
-                # 극단값 계산: 1분봉/15분봉 RSI(14) 중 |RSI-50|이 가장 큰 값
-                rsi_extremes = []
+                # 1분봉, 15분봉, 4시간봉 각각 극단치 TOP10 계산
+                # 1분봉
+                rsi_1m_extremes = []
                 for symbol, v in rsi_dict.items():
                     rsi_1m = v['1m']['rsi14']
-                    rsi_15m = v['15m']['rsi14']
-                    candidates = [x for x in [rsi_1m, rsi_15m] if x is not None]
-                    if candidates:
-                        extreme = max(candidates, key=lambda x: abs(x-50))
-                        rsi_extremes.append((symbol, extreme))
-                rsi_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
-                top10 = [x[0] for x in rsi_extremes[:10]]
-                message = "📊 <b>RSI 극단치 TOP10 (1분/15분봉)</b>\n\n"
-                for symbol in top10:
+                    if rsi_1m is not None:
+                        rsi_1m_extremes.append((symbol, rsi_1m))
+                rsi_1m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+                top10_1m = rsi_1m_extremes[:10]
+                message_1m = "📊 <b>1분봉 RSI(14) 극단치 TOP10</b>\n\n"
+                for symbol, rsi in top10_1m:
                     m1 = rsi_dict[symbol]['1m']
+                    message_1m += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n  RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n\n"
+                self.send_message(message_1m)
+                # 15분봉
+                rsi_15m_extremes = []
+                for symbol, v in rsi_dict.items():
+                    rsi_15m = v['15m']['rsi14']
+                    if rsi_15m is not None:
+                        rsi_15m_extremes.append((symbol, rsi_15m))
+                rsi_15m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+                top10_15m = rsi_15m_extremes[:10]
+                message_15m = "📊 <b>15분봉 RSI(14) 극단치 TOP10</b>\n\n"
+                for symbol, rsi in top10_15m:
                     m15 = rsi_dict[symbol]['15m']
-                    message += f"<b>{symbol}</b>\n"
-                    message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
-                    message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
-                    message += f"  15분봉 RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n"
-                    message += f"  15분봉 RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
-                self.send_message(message)
+                    message_15m += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n  RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
+                self.send_message(message_15m)
+                # 4시간봉
+                rsi_4h_extremes = []
+                for symbol, v in rsi_dict.items():
+                    rsi_4h = v['4h']['rsi14']
+                    if rsi_4h is not None:
+                        rsi_4h_extremes.append((symbol, rsi_4h))
+                rsi_4h_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+                top10_4h = rsi_4h_extremes[:10]
+                message_4h = "📊 <b>4시간봉 RSI(14) 극단치 TOP10</b>\n\n"
+                for symbol, rsi in top10_4h:
+                    m4h = rsi_dict[symbol]['4h']
+                    message_4h += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14'] if m4h['rsi14'] is not None else '-'}\n  RSI(7): {m4h['rsi7'] if m4h['rsi7'] is not None else '-'}\n\n"
+                self.send_message(message_4h)
                 print("메시지 전송 완료")
             except Exception as e:
                 print(f"Error handling status command: {e}")

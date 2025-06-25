@@ -37,14 +37,26 @@ class RSIMonitor:
         self.current_rsi_14 = {}  # 현재 RSI(14) 값 저장
         self.current_rsi_7 = {}  # 현재 RSI(7) 값 저장
         self.start_times = {}  # 각 심볼별 데이터 수집 시작 시간
-        self.price_data_1m = {}  # 1분봉 가격 데이터
-        self.price_data_15m = {} # 15분봉 가격 데이터
-        self.volume_data_1m = {}  # 1분봉 거래량 데이터
-        self.volume_data_15m = {} # 15분봉 거래량 데이터
+        self.price_data_1m = {}
+        self.price_data_15m = {}
+        self.price_data_4h = {}  # 4시간봉 가격 데이터
+        self.volume_data_1m = {}
+        self.volume_data_15m = {}
+        self.volume_data_4h = {}  # 4시간봉 거래량 데이터
         self.current_rsi_14_1m = {}
         self.current_rsi_7_1m = {}
         self.current_rsi_14_15m = {}
         self.current_rsi_7_15m = {}
+        self.current_rsi_14_4h = {}  # 4시간봉 RSI(14)
+        self.current_rsi_7_4h = {}   # 4시간봉 RSI(7)
+        self.alerted_overbought_14_4h = set()  # 4시간봉 RSI(14) 과매수 알림
+        self.alerted_oversold_14_4h = set()    # 4시간봉 RSI(14) 과매도 알림
+        self.alerted_overbought_7_4h = set()   # 4시간봉 RSI(7) 과매수 알림
+        self.alerted_oversold_7_4h = set()     # 4시간봉 RSI(7) 과매도 알림
+        self.alerted_warning_high_14_4h = set()  # 4시간봉 RSI(14) 주의 상단
+        self.alerted_warning_low_14_4h = set()   # 4시간봉 RSI(14) 주의 하단
+        self.alerted_warning_high_7_4h = set()   # 4시간봉 RSI(7) 주의 상단
+        self.alerted_warning_low_7_4h = set()    # 4시간봉 RSI(7) 주의 하단
         self.alerted_strong_14 = set()  # 1m, 15m 동시 만족 강한 알림
         self.alerted_strong_7 = set()
         
@@ -135,10 +147,13 @@ class RSIMonitor:
         print(f"\n{symbol} 초기 데이터 로드 시작...")
         prices_1m, volumes_1m = self.get_historical_data(symbol, interval='1m', limit=self.data_length)
         prices_15m, volumes_15m = self.get_historical_data(symbol, interval='15m', limit=self.data_length)
+        prices_4h, volumes_4h = self.get_historical_data(symbol, interval='4h', limit=self.data_length)
         self.price_data_1m[symbol] = deque(prices_1m, maxlen=self.data_length)
         self.price_data_15m[symbol] = deque(prices_15m, maxlen=self.data_length)
+        self.price_data_4h[symbol] = deque(prices_4h, maxlen=self.data_length)
         self.volume_data_1m[symbol] = deque(volumes_1m, maxlen=self.data_length)
         self.volume_data_15m[symbol] = deque(volumes_15m, maxlen=self.data_length)
+        self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
         if len(prices_1m) >= self.data_length:
             rsi_14_1m = calculate_rsi_binance(list(prices_1m), period=14)
             rsi_7_1m = calculate_rsi_binance(list(prices_1m), period=7)
@@ -149,6 +164,11 @@ class RSIMonitor:
             rsi_7_15m = calculate_rsi_binance(list(prices_15m), period=7)
             self.current_rsi_14_15m[symbol] = rsi_14_15m
             self.current_rsi_7_15m[symbol] = rsi_7_15m
+        if len(prices_4h) >= self.data_length:
+            rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
+            rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
+            self.current_rsi_14_4h[symbol] = rsi_14_4h
+            self.current_rsi_7_4h[symbol] = rsi_7_4h
         if len(prices_1m) >= self.data_length:
             rsi_14 = calculate_rsi_binance(list(prices_1m), period=14)
             rsi_7 = calculate_rsi_binance(list(prices_1m), period=7)
@@ -189,45 +209,36 @@ class RSIMonitor:
         
         return volume_ratio >= self.volume_spike_threshold, volume_ratio
         
-    def check_buy_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m):
-        """
-        매수 조건을 확인합니다.
-        """
+    def check_buy_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h):
         conditions_met = []
-        
+        # 4시간봉 RSI 과매도 조건
+        if self.buy_conditions.get('rsi_4h_oversold', True):
+            if (rsi_14_4h is not None and rsi_14_4h <= self.rsi_oversold) or \
+               (rsi_7_4h is not None and rsi_7_4h <= self.rsi_oversold):
+                conditions_met.append('4시간봉 RSI 과매도')
         # 15분봉 RSI 과매도 조건
         if self.buy_conditions['rsi_15m_oversold']:
             if (rsi_14_15m is not None and rsi_14_15m <= self.rsi_oversold) or \
                (rsi_7_15m is not None and rsi_7_15m <= self.rsi_oversold):
                 conditions_met.append('15분봉 RSI 과매도')
-        
         # 1분봉 RSI 과매도 조건
         if self.buy_conditions['rsi_1m_oversold']:
             if (rsi_14_1m is not None and rsi_14_1m <= self.rsi_oversold) or \
                (rsi_7_1m is not None and rsi_7_1m <= self.rsi_oversold):
                 conditions_met.append('1분봉 RSI 과매도')
-        
         # 거래량 스파이크 조건 (필수)
         if self.buy_conditions['volume_spike']:
             volume_spike_15m, volume_ratio_15m = self.check_volume_spike(symbol, '15m')
             volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
-            
             if volume_spike_15m or volume_spike_1m:
                 max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-                #conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
             else:
-                # 거래량 스파이크가 필수 조건이므로 만족하지 않으면 매수하지 않음
                 return False, []
-        
         # 가격 하락 조건 (최근 10개 캔들 기준)
         if self.buy_conditions['price_drop'] > 0:
             if len(self.price_data_15m.get(symbol, [])) >= 10:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
-                #if price_drop >= self.buy_conditions['price_drop']:
-                    #conditions_met.append(f'가격 하락 {price_drop:.2%}')
-        
-        # 최소 2개 조건 만족 (거래량 스파이크는 이미 필수로 확인됨)
         return len(conditions_met) >= 2, conditions_met
     
     def calculate_position_size(self, price):
@@ -473,7 +484,7 @@ class RSIMonitor:
         """
         print("\n=== 현재 RSI 상태 ===")
         result = {}
-        for symbol in set(list(self.current_rsi_14_1m.keys()) + list(self.current_rsi_14_15m.keys())):
+        for symbol in set(list(self.current_rsi_14_1m.keys()) + list(self.current_rsi_14_15m.keys()) + list(self.current_rsi_14_4h.keys())):
             result[symbol] = {
                 '1m': {
                     'rsi14': self.current_rsi_14_1m.get(symbol),
@@ -482,6 +493,10 @@ class RSIMonitor:
                 '15m': {
                     'rsi14': self.current_rsi_14_15m.get(symbol),
                     'rsi7': self.current_rsi_7_15m.get(symbol)
+                },
+                '4h': {
+                    'rsi14': self.current_rsi_14_4h.get(symbol),
+                    'rsi7': self.current_rsi_7_4h.get(symbol)
                 }
             }
             print(f"{symbol}:")
@@ -489,6 +504,8 @@ class RSIMonitor:
             print(f"  1분봉 RSI(7) = {result[symbol]['1m']['rsi7']}")
             print(f"  15분봉 RSI(14) = {result[symbol]['15m']['rsi14']}")
             print(f"  15분봉 RSI(7) = {result[symbol]['15m']['rsi7']}")
+            print(f"  4시간봉 RSI(14) = {result[symbol]['4h']['rsi14']}")
+            print(f"  4시간봉 RSI(7) = {result[symbol]['4h']['rsi7']}")
         print("===================\n")
         return result
         
@@ -507,7 +524,7 @@ class RSIMonitor:
             is_closed = kline.get('x', False)
             if not symbol or price == 0:
                 return
-            if symbol not in self.price_data_1m or symbol not in self.price_data_15m:
+            if symbol not in self.price_data_1m or symbol not in self.price_data_15m or symbol not in self.price_data_4h:
                 self.initialize_symbol_data(symbol)
             
             # 1분봉
@@ -530,21 +547,33 @@ class RSIMonitor:
                     rsi_7 = calculate_rsi_binance(prices, period=7)
                     self.current_rsi_14_15m[symbol] = rsi_14
                     self.current_rsi_7_15m[symbol] = rsi_7
+            # 4시간봉
+            if interval == '4h' and is_closed:
+                self.price_data_4h[symbol].append(price)
+                self.volume_data_4h[symbol].append(volume)
+                if len(self.price_data_4h[symbol]) >= self.data_length:
+                    prices = list(self.price_data_4h[symbol])
+                    rsi_14 = calculate_rsi_binance(prices, period=14)
+                    rsi_7 = calculate_rsi_binance(prices, period=7)
+                    self.current_rsi_14_4h[symbol] = rsi_14
+                    self.current_rsi_7_4h[symbol] = rsi_7
             # --- 항상 dict에서 값을 꺼내서 지역변수로 사용 ---
             rsi_14_1m = self.current_rsi_14_1m.get(symbol)
             rsi_7_1m = self.current_rsi_7_1m.get(symbol)
             rsi_14_15m = self.current_rsi_14_15m.get(symbol)
             rsi_7_15m = self.current_rsi_7_15m.get(symbol)
+            rsi_14_4h = self.current_rsi_14_4h.get(symbol)
+            rsi_7_4h = self.current_rsi_7_4h.get(symbol)
             
             # SL/TP 체크 (모든 가격 업데이트에서)
             self.check_sl_tp(symbol, price)
             
-            # 매수/매도 조건 확인 (15분봉 완료 시에만)
-            if interval == '15m' and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None:
+            # 매수/매도 조건 확인 (15분봉 or 4시간봉 완료 시에만)
+            if (interval == '15m') and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None and rsi_14_4h is not None and rsi_7_4h is not None:
                 # 롱 조건
-                long_signal, long_conditions = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m)
+                long_signal, long_conditions = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
                 # 숏 조건
-                short_signal, short_conditions = self.check_short_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m)
+                short_signal, short_conditions = self.check_short_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
                 # 롱 진입
                 if long_signal and symbol not in self.active_positions:
                     if self.auto_trading:
@@ -570,125 +599,101 @@ class RSIMonitor:
                         print(msg)
                         self.telegram_bot.send_message(msg)
             
-            # 15분봉 알림 로직 (15분봉이 업데이트된 경우에만)
-            if interval == '15m'  and rsi_14_15m is not None and rsi_7_15m is not None:
-                # 15분봉 RSI(14) 과매수/과매도 알림
-                if rsi_14_15m >= self.rsi_overbought and symbol not in self.alerted_overbought_14:
-                    message = f"🔥 <b>15분봉 RSI(14) 과매수 - {symbol}</b>\n\n" \
+            # 4시간봉 알림 로직 (4시간봉이 업데이트된 경우에만)
+            if interval == '4h' and rsi_14_4h is not None and rsi_7_4h is not None:
+                # 4시간봉 RSI(14) 과매수/과매도 알림
+                if rsi_14_4h >= self.rsi_overbought and symbol not in self.alerted_overbought_14_4h:
+                    message = f"🔥 <b>4시간봉 RSI(14) 과매수 - {symbol}</b>\n\n" \
                               f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
+                              f"4시간봉 RSI(14): {rsi_14_4h:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_overbought_14.add(symbol)
-                    print(f"15분봉 RSI(14) 과매수 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
-                
-                elif rsi_14_15m <= self.rsi_oversold and symbol not in self.alerted_oversold_14:
-                    message = f"🔥 <b>15분봉 RSI(14) 과매도 - {symbol}</b>\n\n" \
+                    self.alerted_overbought_14_4h.add(symbol)
+                    print(f"4시간봉 RSI(14) 과매수 알림 전송: {symbol} - RSI(14): {rsi_14_4h:.2f}")
+                elif rsi_14_4h <= self.rsi_oversold and symbol not in self.alerted_oversold_14_4h:
+                    message = f"🔥 <b>4시간봉 RSI(14) 과매도 - {symbol}</b>\n\n" \
                               f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                              f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"15분봉 RSI(14): {rsi_14_15m if rsi_14_15m is not None else '-'}\n" \
+                              f"4시간봉 RSI(14): {rsi_14_4h:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_oversold_14.add(symbol)
-                    print(f"15분봉 RSI(14) 과매도 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
-                
-                # 15분봉 RSI(7) 과매수/과매도 알림
-                if rsi_7_15m >= self.rsi_overbought and symbol not in self.alerted_overbought_7:
-                    message = f"🔥 <b>15분봉 RSI(7) 과매수 - {symbol}</b>\n\n" \
-                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
+                    self.alerted_oversold_14_4h.add(symbol)
+                    print(f"4시간봉 RSI(14) 과매도 알림 전송: {symbol} - RSI(14): {rsi_14_4h:.2f}")
+                # 4시간봉 RSI(7) 과매수/과매도 알림
+                if rsi_7_4h >= self.rsi_overbought and symbol not in self.alerted_overbought_7_4h:
+                    message = f"🔥 <b>4시간봉 RSI(7) 과매수 - {symbol}</b>\n\n" \
                               f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                              f"4시간봉 RSI(7): {rsi_7_4h:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_overbought_7.add(symbol)
-                    print(f"15분봉 RSI(7) 과매수 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
-                
-                elif rsi_7_15m <= self.rsi_oversold and symbol not in self.alerted_oversold_7:
-                    message = f"🔥 <b>15분봉 RSI(7) 과매도 - {symbol}</b>\n\n" \
-                              f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
+                    self.alerted_overbought_7_4h.add(symbol)
+                    print(f"4시간봉 RSI(7) 과매수 알림 전송: {symbol} - RSI(7): {rsi_7_4h:.2f}")
+                elif rsi_7_4h <= self.rsi_oversold and symbol not in self.alerted_oversold_7_4h:
+                    message = f"🔥 <b>4시간봉 RSI(7) 과매도 - {symbol}</b>\n\n" \
                               f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                              f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                              f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                              f"15분봉 RSI(7): {rsi_7_15m if rsi_7_15m is not None else '-'}\n" \
+                              f"4시간봉 RSI(7): {rsi_7_4h:.2f}\n" \
                               f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_oversold_7.add(symbol)
-                    print(f"15분봉 RSI(7) 과매도 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
-                
-                # 15분봉 RSI(14) 주의 알림
-                if rsi_14_15m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_14:
-                    message = f"⚠️ <b>15분봉 RSI(14) 주의 상단 - {symbol}</b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                    self.alerted_oversold_7_4h.add(symbol)
+                    print(f"4시간봉 RSI(7) 과매도 알림 전송: {symbol} - RSI(7): {rsi_7_4h:.2f}")
+                # 4시간봉 RSI(14) 주의 알림
+                if rsi_14_4h >= self.rsi_warning_high and symbol not in self.alerted_warning_high_14_4h:
+                    message = f"⚠️ <b>4시간봉 RSI(14) 주의 상단 - {symbol}</b>\n\n" \
+                             f"4시간봉 RSI(14): {rsi_14_4h:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_warning_high_14.add(symbol)
-                    print(f"15분봉 RSI(14) 주의 상단 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
-                
-                elif rsi_14_15m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_14:
-                    message = f"⚠️ <b>15분봉 RSI(14) 주의 하단 - {symbol}</b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                    self.alerted_warning_high_14_4h.add(symbol)
+                    print(f"4시간봉 RSI(14) 주의 상단 알림 전송: {symbol} - RSI(14): {rsi_14_4h:.2f}")
+                elif rsi_14_4h <= self.rsi_warning_low and symbol not in self.alerted_warning_low_14_4h:
+                    message = f"⚠️ <b>4시간봉 RSI(14) 주의 하단 - {symbol}</b>\n\n" \
+                             f"4시간봉 RSI(14): {rsi_14_4h:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_warning_low_14.add(symbol)
-                    print(f"15분봉 RSI(14) 주의 하단 알림 전송: {symbol} - RSI(14): {rsi_14_15m:.2f}")
-                
-                # 15분봉 RSI(7) 주의 알림
-                if rsi_7_15m >= self.rsi_warning_high and symbol not in self.alerted_warning_high_7:
-                    message = f"⚠️ <b>15분봉 RSI(7) 주의 상단 - {symbol}</b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                    self.alerted_warning_low_14_4h.add(symbol)
+                    print(f"4시간봉 RSI(14) 주의 하단 알림 전송: {symbol} - RSI(14): {rsi_14_4h:.2f}")
+                # 4시간봉 RSI(7) 주의 알림
+                if rsi_7_4h >= self.rsi_warning_high and symbol not in self.alerted_warning_high_7_4h:
+                    message = f"⚠️ <b>4시간봉 RSI(7) 주의 상단 - {symbol}</b>\n\n" \
+                             f"4시간봉 RSI(7): {rsi_7_4h:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_warning_high_7.add(symbol)
-                    print(f"15분봉 RSI(7) 주의 상단 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
-                
-                elif rsi_7_15m <= self.rsi_warning_low and symbol not in self.alerted_warning_low_7:
-                    message = f"⚠️ <b>15분봉 RSI(7) 주의 하단 - {symbol}</b>\n\n" \
-                             f"1분봉 RSI(14): {rsi_14_1m if rsi_14_1m is not None else '-'}\n" \
-                             f"1분봉 RSI(7): {rsi_7_1m if rsi_7_1m is not None else '-'}\n" \
-                             f"15분봉 RSI(14): {rsi_14_15m:.2f}\n" \
-                             f"15분봉 RSI(7): {rsi_7_15m:.2f}\n" \
+                    self.alerted_warning_high_7_4h.add(symbol)
+                    print(f"4시간봉 RSI(7) 주의 상단 알림 전송: {symbol} - RSI(7): {rsi_7_4h:.2f}")
+                elif rsi_7_4h <= self.rsi_warning_low and symbol not in self.alerted_warning_low_7_4h:
+                    message = f"⚠️ <b>4시간봉 RSI(7) 주의 하단 - {symbol}</b>\n\n" \
+                             f"4시간봉 RSI(7): {rsi_7_4h:.2f}\n" \
                              f"현재 가격: {price:.8f} USDT"
                     self.telegram_bot.send_message(message)
-                    self.alerted_warning_low_7.add(symbol)
-                    print(f"15분봉 RSI(7) 주의 하단 알림 전송: {symbol} - RSI(7): {rsi_7_15m:.2f}")
-                
-                # 15분봉 조건 해제시 알림 초기화
-                if rsi_14_15m < self.rsi_overbought and symbol in self.alerted_overbought_14:
-                    self.alerted_overbought_14.remove(symbol)
-                    print(f"15분봉 RSI(14) 과매수 알림 초기화: {symbol}")
-                if rsi_14_15m > self.rsi_oversold and symbol in self.alerted_oversold_14:
-                    self.alerted_oversold_14.remove(symbol)
-                    print(f"15분봉 RSI(14) 과매도 알림 초기화: {symbol}")
-                if rsi_7_15m < self.rsi_overbought and symbol in self.alerted_overbought_7:
-                    self.alerted_overbought_7.remove(symbol)
-                    print(f"15분봉 RSI(7) 과매수 알림 초기화: {symbol}")
-                if rsi_7_15m > self.rsi_oversold and symbol in self.alerted_oversold_7:
-                    self.alerted_oversold_7.remove(symbol)
-                    print(f"15분봉 RSI(7) 과매도 알림 초기화: {symbol}")
-                if rsi_14_15m < self.rsi_warning_high and symbol in self.alerted_warning_high_14:
-                    self.alerted_warning_high_14.remove(symbol)
-                    print(f"15분봉 RSI(14) 주의 상단 알림 초기화: {symbol}")
-                if rsi_14_15m > self.rsi_warning_low and symbol in self.alerted_warning_low_14:
-                    self.alerted_warning_low_14.remove(symbol)
-                    print(f"15분봉 RSI(14) 주의 하단 알림 초기화: {symbol}")
-                if rsi_7_15m < self.rsi_warning_high and symbol in self.alerted_warning_high_7:
-                    self.alerted_warning_high_7.remove(symbol)
-                    print(f"15분봉 RSI(7) 주의 상단 알림 초기화: {symbol}")
-                if rsi_7_15m > self.rsi_warning_low and symbol in self.alerted_warning_low_7:
-                    self.alerted_warning_low_7.remove(symbol)
-                    print(f"15분봉 RSI(7) 주의 하단 알림 초기화: {symbol}")
+                    self.alerted_warning_low_7_4h.add(symbol)
+                    print(f"4시간봉 RSI(7) 주의 하단 알림 전송: {symbol} - RSI(7): {rsi_7_4h:.2f}")
+                # 4시간봉 조건 해제시 알림 초기화
+                if rsi_14_4h < self.rsi_overbought and symbol in self.alerted_overbought_14_4h:
+                    self.alerted_overbought_14_4h.remove(symbol)
+                    print(f"4시간봉 RSI(14) 과매수 알림 초기화: {symbol}")
+                if rsi_14_4h > self.rsi_oversold and symbol in self.alerted_oversold_14_4h:
+                    self.alerted_oversold_14_4h.remove(symbol)
+                    print(f"4시간봉 RSI(14) 과매도 알림 초기화: {symbol}")
+                if rsi_7_4h < self.rsi_overbought and symbol in self.alerted_overbought_7_4h:
+                    self.alerted_overbought_7_4h.remove(symbol)
+                    print(f"4시간봉 RSI(7) 과매수 알림 초기화: {symbol}")
+                if rsi_7_4h > self.rsi_oversold and symbol in self.alerted_oversold_7_4h:
+                    self.alerted_oversold_7_4h.remove(symbol)
+                    print(f"4시간봉 RSI(7) 과매도 알림 초기화: {symbol}")
+                if rsi_14_4h < self.rsi_warning_high and symbol in self.alerted_warning_high_14_4h:
+                    self.alerted_warning_high_14_4h.remove(symbol)
+                    print(f"4시간봉 RSI(14) 주의 상단 알림 초기화: {symbol}")
+                if rsi_14_4h > self.rsi_warning_low and symbol in self.alerted_warning_low_14_4h:
+                    self.alerted_warning_low_14_4h.remove(symbol)
+                    print(f"4시간봉 RSI(14) 주의 하단 알림 초기화: {symbol}")
+                if rsi_7_4h < self.rsi_warning_high and symbol in self.alerted_warning_high_7_4h:
+                    self.alerted_warning_high_7_4h.remove(symbol)
+                    print(f"4시간봉 RSI(7) 주의 상단 알림 초기화: {symbol}")
+                if rsi_7_4h > self.rsi_warning_low and symbol in self.alerted_warning_low_7_4h:
+                    self.alerted_warning_low_7_4h.remove(symbol)
+                    print(f"4시간봉 RSI(7) 주의 하단 알림 초기화: {symbol}")
         except Exception as e:
             print(f"Error processing message: {e}")
             print(f"Raw message: {message}")
@@ -707,32 +712,48 @@ class RSIMonitor:
         symbols = get_top_coins(30)
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
-        # 초기 RSI 상태 메시지 전송 (극단치 TOP10)
-        if self.current_rsi_14_1m or self.current_rsi_14_15m:
-            # 15분봉 RSI(14) 극단치 TOP10만 선정
+        # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
+        if self.current_rsi_14_1m or self.current_rsi_14_15m or self.current_rsi_14_4h:
+            rsi_dict = self.get_current_rsi()
+            # 1분봉
+            rsi_1m_extremes = []
+            for symbol, v in rsi_dict.items():
+                rsi_1m = v['1m']['rsi14']
+                if rsi_1m is not None:
+                    rsi_1m_extremes.append((symbol, rsi_1m))
+            rsi_1m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+            top10_1m = rsi_1m_extremes[:10]
+            message_1m = "📊 <b>1분봉 RSI(14) 극단치 TOP10</b>\n\n"
+            for symbol, rsi in top10_1m:
+                m1 = rsi_dict[symbol]['1m']
+                message_1m += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n  RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n\n"
+            self.telegram_bot.send_message(message_1m)
+            # 15분봉
             rsi_15m_extremes = []
-            for symbol, rsi in self.current_rsi_14_15m.items():
-                if rsi is not None:
-                    rsi_15m_extremes.append((symbol, abs(rsi-50)))
-            rsi_15m_extremes.sort(key=lambda x: x[1], reverse=True)
-            top10 = [x[0] for x in rsi_15m_extremes[:10]]
-
-            message = "📊 <b>RSI 모니터링 시작 (15분봉 극단치 TOP10)</b>\n\n"
-            for symbol in top10:
-                m1 = {
-                    'rsi14': self.current_rsi_14_1m.get(symbol),
-                    'rsi7': self.current_rsi_7_1m.get(symbol)
-                }
-                m15 = {
-                    'rsi14': self.current_rsi_14_15m.get(symbol),
-                    'rsi7': self.current_rsi_7_15m.get(symbol)
-                }
-                message += f"<b>{symbol}</b>\n"
-                message += f"  1분봉 RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n"
-                message += f"  1분봉 RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n"
-                message += f"  15분봉 RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n"
-                message += f"  15분봉 RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
-            self.telegram_bot.send_message(message)
+            for symbol, v in rsi_dict.items():
+                rsi_15m = v['15m']['rsi14']
+                if rsi_15m is not None:
+                    rsi_15m_extremes.append((symbol, rsi_15m))
+            rsi_15m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+            top10_15m = rsi_15m_extremes[:10]
+            message_15m = "📊 <b>15분봉 RSI(14) 극단치 TOP10</b>\n\n"
+            for symbol, rsi in top10_15m:
+                m15 = rsi_dict[symbol]['15m']
+                message_15m += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n  RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
+            self.telegram_bot.send_message(message_15m)
+            # 4시간봉
+            rsi_4h_extremes = []
+            for symbol, v in rsi_dict.items():
+                rsi_4h = v['4h']['rsi14']
+                if rsi_4h is not None:
+                    rsi_4h_extremes.append((symbol, rsi_4h))
+            rsi_4h_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
+            top10_4h = rsi_4h_extremes[:10]
+            message_4h = "📊 <b>4시간봉 RSI(14) 극단치 TOP10</b>\n\n"
+            for symbol, rsi in top10_4h:
+                m4h = rsi_dict[symbol]['4h']
+                message_4h += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14'] if m4h['rsi14'] is not None else '-'}\n  RSI(7): {m4h['rsi7'] if m4h['rsi7'] is not None else '-'}\n\n"
+            self.telegram_bot.send_message(message_4h)
     
     def start_monitoring(self):
         """
@@ -745,7 +766,7 @@ class RSIMonitor:
         
         print(f"Monitoring symbols: {symbols}")
         
-        streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols]
+        streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols] + [f"{symbol.lower()}@kline_4h" for symbol in symbols]
         ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
         
         print(f"Connecting to WebSocket URL: {ws_url}")
@@ -1008,11 +1029,13 @@ class RSIMonitor:
         else:
             return self._make_request('GET', '/api/v3/order', params, signed=True)
 
-    def check_short_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m):
-        """
-        숏(Short) 진입 조건을 확인합니다.
-        """
+    def check_short_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h):
         conditions_met = []
+        # 4시간봉 RSI 과매수 조건
+        if self.buy_conditions.get('rsi_4h_oversold', True):
+            if (rsi_14_4h is not None and rsi_14_4h >= self.rsi_overbought) or \
+               (rsi_7_4h is not None and rsi_7_4h >= self.rsi_overbought):
+                conditions_met.append('4시간봉 RSI 과매수')
         # 15분봉 RSI 과매수 조건
         if self.buy_conditions['rsi_15m_oversold']:
             if (rsi_14_15m is not None and rsi_14_15m >= self.rsi_overbought) or \
@@ -1029,16 +1052,13 @@ class RSIMonitor:
             volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
             if volume_spike_15m or volume_spike_1m:
                 max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-                #conditions_met.append(f'거래량 스파이크 ({max_ratio:.1f}배)')
             else:
                 return False, []
-        # 가격 상승 조건 (최근 10개 캔들 기준)
+        # 가격 하락 조건 (최근 10개 캔들 기준)
         if self.buy_conditions['price_drop'] > 0:
             if len(self.price_data_15m.get(symbol, [])) >= 10:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
-                price_rise = (recent_prices[-1] - recent_prices[0]) / recent_prices[0]
-                #if price_rise >= self.buy_conditions['price_drop']:
-                    #conditions_met.append(f'가격 상승 {price_rise:.2%}')
+                price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
         return len(conditions_met) >= 2, conditions_met
 
     def get_futures_usdt_symbols(self):

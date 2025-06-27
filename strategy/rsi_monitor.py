@@ -639,45 +639,48 @@ class RSIMonitor:
         # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
         if self.current_rsi_14_1m or self.current_rsi_14_15m or self.current_rsi_14_4h:
             rsi_dict = self.get_current_rsi()
-            # 1분봉
-            rsi_1m_extremes = []
-            for symbol, v in rsi_dict.items():
-                rsi_1m = v['1m']['rsi14']
-                if rsi_1m is not None:
-                    rsi_1m_extremes.append((symbol, rsi_1m))
-            rsi_1m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
-            top10_1m = rsi_1m_extremes[:10]
-            message_1m = "📊 <b>1분봉 RSI(14) 극단치 TOP10</b>\n\n"
-            for symbol, rsi in top10_1m:
+            # 1분봉 과매수/과매도 TOP10
+            rsi_1m_list = [(symbol, v['1m']['rsi14']) for symbol, v in rsi_dict.items() if v['1m']['rsi14'] is not None]
+            rsi_1m_over = sorted(rsi_1m_list, key=lambda x: x[1], reverse=True)[:10]
+            rsi_1m_under = sorted(rsi_1m_list, key=lambda x: x[1])[:10]
+            msg_1m_over = "📊 <b>1분봉 RSI(14) 과매수 TOP10</b>\n\n"
+            for symbol, rsi in rsi_1m_over:
                 m1 = rsi_dict[symbol]['1m']
-                message_1m += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14'] if m1['rsi14'] is not None else '-'}\n  RSI(7): {m1['rsi7'] if m1['rsi7'] is not None else '-'}\n\n"
-            self.telegram_bot.send_message(message_1m)
-            # 15분봉
-            rsi_15m_extremes = []
-            for symbol, v in rsi_dict.items():
-                rsi_15m = v['15m']['rsi14']
-                if rsi_15m is not None:
-                    rsi_15m_extremes.append((symbol, rsi_15m))
-            rsi_15m_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
-            top10_15m = rsi_15m_extremes[:10]
-            message_15m = "📊 <b>15분봉 RSI(14) 극단치 TOP10</b>\n\n"
-            for symbol, rsi in top10_15m:
+                msg_1m_over += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']}\n  RSI(7): {m1['rsi7']}\n\n"
+            msg_1m_under = "📊 <b>1분봉 RSI(14) 과매도 TOP10</b>\n\n"
+            for symbol, rsi in rsi_1m_under:
+                m1 = rsi_dict[symbol]['1m']
+                msg_1m_under += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']}\n  RSI(7): {m1['rsi7']}\n\n"
+            self.telegram_bot.send_message(msg_1m_over)
+            self.telegram_bot.send_message(msg_1m_under)
+            # 15분봉 과매수/과매도 TOP10
+            rsi_15m_list = [(symbol, v['15m']['rsi14']) for symbol, v in rsi_dict.items() if v['15m']['rsi14'] is not None]
+            rsi_15m_over = sorted(rsi_15m_list, key=lambda x: x[1], reverse=True)[:10]
+            rsi_15m_under = sorted(rsi_15m_list, key=lambda x: x[1])[:10]
+            msg_15m_over = "📊 <b>15분봉 RSI(14) 과매수 TOP10</b>\n\n"
+            for symbol, rsi in rsi_15m_over:
                 m15 = rsi_dict[symbol]['15m']
-                message_15m += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14'] if m15['rsi14'] is not None else '-'}\n  RSI(7): {m15['rsi7'] if m15['rsi7'] is not None else '-'}\n\n"
-            self.telegram_bot.send_message(message_15m)
-            # 4시간봉
-            rsi_4h_extremes = []
-            for symbol, v in rsi_dict.items():
-                rsi_4h = v['4h']['rsi14']
-                if rsi_4h is not None:
-                    rsi_4h_extremes.append((symbol, rsi_4h))
-            rsi_4h_extremes.sort(key=lambda x: abs(x[1]-50), reverse=True)
-            top10_4h = rsi_4h_extremes[:10]
-            message_4h = "📊 <b>4시간봉 RSI(14) 극단치 TOP10</b>\n\n"
-            for symbol, rsi in top10_4h:
+                msg_15m_over += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']}\n  RSI(7): {m15['rsi7']}\n\n"
+            msg_15m_under = "📊 <b>15분봉 RSI(14) 과매도 TOP10</b>\n\n"
+            for symbol, rsi in rsi_15m_under:
+                m15 = rsi_dict[symbol]['15m']
+                msg_15m_under += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']}\n  RSI(7): {m15['rsi7']}\n\n"
+            self.telegram_bot.send_message(msg_15m_over)
+            self.telegram_bot.send_message(msg_15m_under)
+            # 4시간봉 과매수/과매도 TOP10
+            rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v['4h']['rsi14'] is not None]
+            rsi_4h_over = sorted(rsi_4h_list, key=lambda x: x[1], reverse=True)[:10]
+            rsi_4h_under = sorted(rsi_4h_list, key=lambda x: x[1])[:10]
+            msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10</b>\n\n"
+            for symbol, rsi in rsi_4h_over:
                 m4h = rsi_dict[symbol]['4h']
-                message_4h += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14'] if m4h['rsi14'] is not None else '-'}\n  RSI(7): {m4h['rsi7'] if m4h['rsi7'] is not None else '-'}\n\n"
-            self.telegram_bot.send_message(message_4h)
+                msg_4h_over += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']}\n  RSI(7): {m4h['rsi7']}\n\n"
+            msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10</b>\n\n"
+            for symbol, rsi in rsi_4h_under:
+                m4h = rsi_dict[symbol]['4h']
+                msg_4h_under += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']}\n  RSI(7): {m4h['rsi7']}\n\n"
+            self.telegram_bot.send_message(msg_4h_over)
+            self.telegram_bot.send_message(msg_4h_under)
     
     def start_monitoring(self):
         """

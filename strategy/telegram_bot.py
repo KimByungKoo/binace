@@ -115,55 +115,9 @@ class TelegramBot:
             try:
                 print("RSI 데이터 요청 중...")
                 self.send_message("RSI 데이터 요청 중...")
-                rsi_dict = self.rsi_monitor.get_current_rsi()
-                # 1분봉 과매수/과매도 TOP10 (20 이내만)
-                rsi_1m_list = [(symbol, v['1m']['rsi14']) for symbol, v in rsi_dict.items() if v['1m']['rsi14'] is not None]
-                rsi_1m_over = [x for x in rsi_1m_list if x[1] >= 80]
-                rsi_1m_over = sorted(rsi_1m_over, key=lambda x: x[1], reverse=True)[:10]
-                rsi_1m_under = [x for x in rsi_1m_list if x[1] <= 20]
-                rsi_1m_under = sorted(rsi_1m_under, key=lambda x: x[1])[:10]
-                msg_1m_over = "📊 <b>1분봉 RSI(14) 과매수 TOP10 (80~100)</b>\n\n"
-                for symbol, rsi in rsi_1m_over:
-                    m1 = rsi_dict[symbol]['1m']
-                    msg_1m_over += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']}\n  RSI(7): {m1['rsi7']}\n\n"
-                msg_1m_under = "📊 <b>1분봉 RSI(14) 과매도 TOP10 (0~20)</b>\n\n"
-                for symbol, rsi in rsi_1m_under:
-                    m1 = rsi_dict[symbol]['1m']
-                    msg_1m_under += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']}\n  RSI(7): {m1['rsi7']}\n\n"
-                self.send_message(msg_1m_over)
-                self.send_message(msg_1m_under)
-                # 15분봉 과매수/과매도 TOP10 (20 이내만)
-                rsi_15m_list = [(symbol, v['15m']['rsi14']) for symbol, v in rsi_dict.items() if v['15m']['rsi14'] is not None]
-                rsi_15m_over = [x for x in rsi_15m_list if x[1] >= 80]
-                rsi_15m_over = sorted(rsi_15m_over, key=lambda x: x[1], reverse=True)[:10]
-                rsi_15m_under = [x for x in rsi_15m_list if x[1] <= 20]
-                rsi_15m_under = sorted(rsi_15m_under, key=lambda x: x[1])[:10]
-                msg_15m_over = "📊 <b>15분봉 RSI(14) 과매수 TOP10 (80~100)</b>\n\n"
-                for symbol, rsi in rsi_15m_over:
-                    m15 = rsi_dict[symbol]['15m']
-                    msg_15m_over += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']}\n  RSI(7): {m15['rsi7']}\n\n"
-                msg_15m_under = "📊 <b>15분봉 RSI(14) 과매도 TOP10 (0~20)</b>\n\n"
-                for symbol, rsi in rsi_15m_under:
-                    m15 = rsi_dict[symbol]['15m']
-                    msg_15m_under += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']}\n  RSI(7): {m15['rsi7']}\n\n"
-                self.send_message(msg_15m_over)
-                self.send_message(msg_15m_under)
-                # 4시간봉 과매수/과매도 TOP10 (20 이내만)
-                rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v['4h']['rsi14'] is not None]
-                rsi_4h_over = [x for x in rsi_4h_list if x[1] >= 80]
-                rsi_4h_over = sorted(rsi_4h_over, key=lambda x: x[1], reverse=True)[:10]
-                rsi_4h_under = [x for x in rsi_4h_list if x[1] <= 20]
-                rsi_4h_under = sorted(rsi_4h_under, key=lambda x: x[1])[:10]
-                msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (80~100)</b>\n\n"
-                for symbol, rsi in rsi_4h_over:
-                    m4h = rsi_dict[symbol]['4h']
-                    msg_4h_over += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']}\n  RSI(7): {m4h['rsi7']}\n\n"
-                msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~20)</b>\n\n"
-                for symbol, rsi in rsi_4h_under:
-                    m4h = rsi_dict[symbol]['4h']
-                    msg_4h_under += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']}\n  RSI(7): {m4h['rsi7']}\n\n"
-                self.send_message(msg_4h_over)
-                self.send_message(msg_4h_under)
+                rsi_messages = self.rsi_monitor.get_rsi_summary_messages()
+                for message in rsi_messages:
+                    self.send_message(message)
                 print("메시지 전송 완료")
             except Exception as e:
                 print(f"Error handling status command: {e}")

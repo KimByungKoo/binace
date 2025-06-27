@@ -632,7 +632,8 @@ class RSIMonitor:
         print("WebSocket connection opened")
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         # 초기 데이터 로드
-        symbols = get_top_coins(30)
+        futures_symbols = set(self.get_futures_usdt_symbols())
+        symbols = [s for s in get_top_coins(30) if s in futures_symbols]
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
         # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
@@ -682,18 +683,15 @@ class RSIMonitor:
         """
         모니터링 시작
         """
-        symbols = get_top_coins(30)
+        futures_symbols = set(self.get_futures_usdt_symbols())
+        symbols = [s for s in get_top_coins(30) if s in futures_symbols]
         if not symbols:
             print("Failed to get top coins")
             return
-        
         print(f"Monitoring symbols: {symbols}")
-        
         streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols] + [f"{symbol.lower()}@kline_4h" for symbol in symbols]
         ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-        
         print(f"Connecting to WebSocket URL: {ws_url}")
-        
         ws = websocket.WebSocketApp(
             ws_url,
             on_message=self.on_message,
@@ -701,7 +699,6 @@ class RSIMonitor:
             on_close=self.on_close,
             on_open=self.on_open
         )
-        
         ws.run_forever()
 
     def _generate_signature(self, params):

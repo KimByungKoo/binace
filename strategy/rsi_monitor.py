@@ -600,52 +600,86 @@ class RSIMonitor:
 
             # 실시간 RSI 계산: 진행 중인 캔들 가격을 price_data에 임시로 반영
             if interval == '1m':
-                price_list = list(self.price_data_1m[symbol])
                 if is_closed:
                     # 봉 마감: deque에 append
                     self.price_data_1m[symbol].append(price)
                     self.volume_data_1m[symbol].append(volume)
+                    # 봉 마감 후 RSI 계산
+                    if len(self.price_data_1m[symbol]) >= self.data_length:
+                        price_list = list(self.price_data_1m[symbol])
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_1m[symbol] = rsi_14
+                        self.current_rsi_7_1m[symbol] = rsi_7
                 else:
-                    # 봉 진행 중: 마지막 값 임시 교체
+                    # 봉 진행 중: 현재 가격을 포함한 새로운 가격 리스트 생성
+                    price_list = list(self.price_data_1m[symbol])
                     if price_list:
+                        # 마지막 봉의 가격을 현재 가격으로 교체
                         price_list[-1] = price
                     else:
                         price_list = [price]
-                if len(price_list) >= self.data_length:
-                    rsi_14 = calculate_rsi_binance(price_list, period=14)
-                    rsi_7 = calculate_rsi_binance(price_list, period=7)
-                    self.current_rsi_14_1m[symbol] = rsi_14
-                    self.current_rsi_7_1m[symbol] = rsi_7
+                    
+                    # 실시간 RSI 계산
+                    if len(price_list) >= self.data_length:
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_1m[symbol] = rsi_14
+                        self.current_rsi_7_1m[symbol] = rsi_7
+            
             if interval == '15m':
-                price_list = list(self.price_data_15m[symbol])
                 if is_closed:
                     self.price_data_15m[symbol].append(price)
                     self.volume_data_15m[symbol].append(volume)
+                    # 봉 마감 후 RSI 계산
+                    if len(self.price_data_15m[symbol]) >= self.data_length:
+                        price_list = list(self.price_data_15m[symbol])
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_15m[symbol] = rsi_14
+                        self.current_rsi_7_15m[symbol] = rsi_7
                 else:
+                    # 봉 진행 중: 현재 가격을 포함한 새로운 가격 리스트 생성
+                    price_list = list(self.price_data_15m[symbol])
                     if price_list:
+                        # 마지막 봉의 가격을 현재 가격으로 교체
                         price_list[-1] = price
                     else:
                         price_list = [price]
-                if len(price_list) >= self.data_length:
-                    rsi_14 = calculate_rsi_binance(price_list, period=14)
-                    rsi_7 = calculate_rsi_binance(price_list, period=7)
-                    self.current_rsi_14_15m[symbol] = rsi_14
-                    self.current_rsi_7_15m[symbol] = rsi_7
+                    
+                    # 실시간 RSI 계산
+                    if len(price_list) >= self.data_length:
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_15m[symbol] = rsi_14
+                        self.current_rsi_7_15m[symbol] = rsi_7
+            
             if interval == '4h':
-                price_list = list(self.price_data_4h[symbol])
                 if is_closed:
                     self.price_data_4h[symbol].append(price)
                     self.volume_data_4h[symbol].append(volume)
+                    # 봉 마감 후 RSI 계산
+                    if len(self.price_data_4h[symbol]) >= self.data_length:
+                        price_list = list(self.price_data_4h[symbol])
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_4h[symbol] = rsi_14
+                        self.current_rsi_7_4h[symbol] = rsi_7
                 else:
+                    # 봉 진행 중: 현재 가격을 포함한 새로운 가격 리스트 생성
+                    price_list = list(self.price_data_4h[symbol])
                     if price_list:
+                        # 마지막 봉의 가격을 현재 가격으로 교체
                         price_list[-1] = price
                     else:
                         price_list = [price]
-                if len(price_list) >= self.data_length:
-                    rsi_14 = calculate_rsi_binance(price_list, period=14)
-                    rsi_7 = calculate_rsi_binance(price_list, period=7)
-                    self.current_rsi_14_4h[symbol] = rsi_14
-                    self.current_rsi_7_4h[symbol] = rsi_7
+                    
+                    # 실시간 RSI 계산
+                    if len(price_list) >= self.data_length:
+                        rsi_14 = calculate_rsi_binance(price_list, period=14)
+                        rsi_7 = calculate_rsi_binance(price_list, period=7)
+                        self.current_rsi_14_4h[symbol] = rsi_14
+                        self.current_rsi_7_4h[symbol] = rsi_7
             # --- 항상 dict에서 값을 꺼내서 지역변수로 사용 ---
             rsi_14_1m = self.current_rsi_14_1m.get(symbol)
             rsi_7_1m = self.current_rsi_7_1m.get(symbol)

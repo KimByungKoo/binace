@@ -19,7 +19,7 @@ load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
-        # 123456
+        # 123456a
         
         self.price_data = {}  # 각 심볼별 가격 데이터 저장
         self.rsi_overbought =90  # 과매수 RSI 임계값

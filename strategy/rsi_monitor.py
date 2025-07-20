@@ -801,7 +801,7 @@ class RSIMonitor:
         print("WebSocket connection opened")
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         # 초기 데이터 로드
-        symbols = get_top_coins(200)  # 시총(거래대금) 기준 상위 200개
+        symbols = get_top_coins(150)  # 시총(거래대금) 기준 상위 200개
         # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
         valid_symbols = []
         for symbol in symbols:
@@ -824,7 +824,7 @@ class RSIMonitor:
         """
         모니터링 시작
         """
-        symbols = get_top_coins(200)  # 시총(거래대금) 기준 상위 200개
+        symbols = get_top_coins(150)  # 시총(거래대금) 기준 상위 200개
         # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
         valid_symbols = []
         for symbol in symbols:

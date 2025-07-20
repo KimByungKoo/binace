@@ -791,14 +791,27 @@ class RSIMonitor:
         print(f"Error: {error}")
     
     def on_close(self, ws, close_status_code, close_msg):
-        print("WebSocket connection closed")
+        print(f"WebSocket connection closed (code={close_status_code}, msg={close_msg})")
         self.telegram_bot.stop()
+        print("5초 후 재연결 시도...")
+        time.sleep(5)
+        self.start_monitoring()
     
     def on_open(self, ws):
         print("WebSocket connection opened")
         print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         # 초기 데이터 로드
-        symbols = list(self.get_futures_usdt_symbols())
+        symbols = get_top_coins(200)  # 시총(거래대금) 기준 상위 200개
+        # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
+        valid_symbols = []
+        for symbol in symbols:
+            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
+            if prices_4h and len(prices_4h) > 0:
+                valid_symbols.append(symbol)
+            else:
+                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
+        symbols = valid_symbols
+        print(f"최종 모니터링 심볼: {symbols}")
         for symbol in symbols:
             self.initialize_symbol_data(symbol)
         # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
@@ -811,12 +824,23 @@ class RSIMonitor:
         """
         모니터링 시작
         """
-        symbols = list(self.get_futures_usdt_symbols())
+        symbols = get_top_coins(200)  # 시총(거래대금) 기준 상위 200개
+        # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
+        valid_symbols = []
+        for symbol in symbols:
+            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
+            if prices_4h and len(prices_4h) > 0:
+                valid_symbols.append(symbol)
+            else:
+                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
+        symbols = valid_symbols
+        print(f"최종 모니터링 심볼: {symbols}")
         if not symbols:
             print("Failed to get top coins")
             return
         print(f"Monitoring symbols: {symbols}")
-        streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols] + [f"{symbol.lower()}@kline_4h" for symbol in symbols]
+        # streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols] + [f"{symbol.lower()}@kline_4h" for symbol in symbols]
+        streams = [f"{symbol.lower()}@kline_4h" for symbol in symbols]
         ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
         print(f"Connecting to WebSocket URL: {ws_url}")
         ws = websocket.WebSocketApp(

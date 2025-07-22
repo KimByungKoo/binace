@@ -19,26 +19,15 @@ load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
-        # 123456aqtyhi
+        # 123456aq
         
         self.price_data = {}  # 각 심볼별 가격 데이터 저장
         self.rsi_overbought =90  # 과매수 RSI 임계값
         self.rsi_oversold = 10  # 과매도 RSI 임계값
-        self.rsi_warning_high = 85  # 주의 RSI 상단 임계값
-        self.rsi_warning_low =15   # 주의 RSI 하단 임계값
         self.data_length = 100  # RSI 계산을 위한 데이터 길이
         self.telegram_bot = TelegramBot(self)  # RSI 모니터 인스턴스 전달
-        self.alerted_overbought_14 = set()  # RSI(14) 과매수 알림을 보낸 심볼 추적
-        self.alerted_oversold_14 = set()  # RSI(14) 과매도 알림을 보낸 심볼 추적
-        self.alerted_overbought_7 = set()  # RSI(7) 과매수 알림을 보낸 심볼 추적
-        self.alerted_oversold_7 = set()  # RSI(7) 과매도 알림을 보낸 심볼 추적
-        self.alerted_warning_high_14 = set()  # RSI(14) 주의 상단 알림을 보낸 심볼 추적
-        self.alerted_warning_low_14 = set()   # RSI(14) 주의 하단 알림을 보낸 심볼 추적
-        self.alerted_warning_high_7 = set()   # RSI(7) 주의 상단 알림을 보낸 심볼 추적
-        self.alerted_warning_low_7 = set()    # RSI(7) 주의 하단 알림을 보낸 심볼 추적
         self.current_rsi_14 = {}  # 현재 RSI(14) 값 저장
         self.current_rsi_7 = {}  # 현재 RSI(7) 값 저장
-        self.start_times = {}  # 각 심볼별 데이터 수집 시작 시간
         self.price_data_1m = {}
         self.price_data_15m = {}
         self.price_data_4h = {}  # 4시간봉 가격 데이터
@@ -55,21 +44,13 @@ class RSIMonitor:
         self.alerted_oversold_14_4h = set()    # 4시간봉 RSI(14) 과매도 알림
         self.alerted_overbought_7_4h = set()   # 4시간봉 RSI(7) 과매수 알림
         self.alerted_oversold_7_4h = set()     # 4시간봉 RSI(7) 과매도 알림
-        self.alerted_warning_high_14_4h = set()  # 4시간봉 RSI(14) 주의 상단
-        self.alerted_warning_low_14_4h = set()   # 4시간봉 RSI(14) 주의 하단
-        self.alerted_warning_high_7_4h = set()   # 4시간봉 RSI(7) 주의 상단
-        self.alerted_warning_low_7_4h = set()    # 4시간봉 RSI(7) 주의 하단
-        self.alerted_strong_14 = set()  # 1m, 15m 동시 만족 강한 알림
-        self.alerted_strong_7 = set()
         
         
         # SL/TP 관련 설정
         self.investment_amount = 10  # 투자금액 (USDT)
         self.leverage = 10  # 레버리지 배수
-        self.position_size_usdt = self.investment_amount * self.leverage  # 실제 포지션 크기 (100 USDT)
         self.roi_threshold = 0.05  # ROI 5% 기준
         self.stop_loss_percent = 0.02  # 손절 2%
-        self.take_profit_percent = 0.05  # 익절 5%
         self.active_positions = {}  # 활성 포지션 관리
         self.position_history = []  # 거래 이력
         
@@ -144,33 +125,43 @@ class RSIMonitor:
 
     def initialize_symbol_data(self, symbol):
         """
-        심볼의 초기 데이터를 설정합니다.
+        심볼의 초기 데이터를 설정하고 성공 여부를 반환합니다.
         """
         print(f"\n{symbol} 초기 데이터 로드 시작...")
         prices_1m, volumes_1m = self.get_historical_data(symbol, interval='1m', limit=self.data_length)
         prices_15m, volumes_15m = self.get_historical_data(symbol, interval='15m', limit=self.data_length)
         prices_4h, volumes_4h = self.get_historical_data(symbol, interval='4h', limit=self.data_length)
+
+        # 4h 데이터 기준으로 유효성 검사 (기존 로직과 동일하게)
+        if not prices_4h:
+            print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
+            return False
+
         self.price_data_1m[symbol] = deque(prices_1m, maxlen=self.data_length)
         self.price_data_15m[symbol] = deque(prices_15m, maxlen=self.data_length)
         self.price_data_4h[symbol] = deque(prices_4h, maxlen=self.data_length)
         self.volume_data_1m[symbol] = deque(volumes_1m, maxlen=self.data_length)
         self.volume_data_15m[symbol] = deque(volumes_15m, maxlen=self.data_length)
         self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
+
         if len(prices_1m) >= self.data_length:
             rsi_14_1m = calculate_rsi_binance(list(prices_1m), period=14)
             rsi_7_1m = calculate_rsi_binance(list(prices_1m), period=7)
             self.current_rsi_14_1m[symbol] = rsi_14_1m
             self.current_rsi_7_1m[symbol] = rsi_7_1m
+
         if len(prices_15m) >= self.data_length:
             rsi_14_15m = calculate_rsi_binance(list(prices_15m), period=14)
             rsi_7_15m = calculate_rsi_binance(list(prices_15m), period=7)
             self.current_rsi_14_15m[symbol] = rsi_14_15m
             self.current_rsi_7_15m[symbol] = rsi_7_15m
+
         if len(prices_4h) >= self.data_length:
             rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
             rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
             self.current_rsi_14_4h[symbol] = rsi_14_4h
             self.current_rsi_7_4h[symbol] = rsi_7_4h
+
         if len(prices_1m) >= self.data_length:
             rsi_14 = calculate_rsi_binance(list(prices_1m), period=14)
             rsi_7 = calculate_rsi_binance(list(prices_1m), period=7)
@@ -181,7 +172,9 @@ class RSIMonitor:
             print(f"RSI(7): {rsi_7:.2f}")
         else:
             print(f"{symbol} 초기 데이터 부족: {len(prices_1m)}개")
+        
         self.price_data[symbol] = deque(prices_1m, maxlen=self.data_length)
+        return True
         
     def check_volume_spike(self, symbol, interval='15m'):
         """
@@ -486,26 +479,14 @@ class RSIMonitor:
         """
         print("\n=== 현재 RSI 상태 ===")
         result = {}
-        for symbol in set(list(self.current_rsi_14_1m.keys()) + list(self.current_rsi_14_15m.keys()) + list(self.current_rsi_14_4h.keys())):
+        for symbol in self.current_rsi_14_4h.keys():
             result[symbol] = {
-                '1m': {
-                    'rsi14': self.current_rsi_14_1m.get(symbol),
-                    'rsi7': self.current_rsi_7_1m.get(symbol)
-                },
-                '15m': {
-                    'rsi14': self.current_rsi_14_15m.get(symbol),
-                    'rsi7': self.current_rsi_7_15m.get(symbol)
-                },
                 '4h': {
                     'rsi14': self.current_rsi_14_4h.get(symbol),
                     'rsi7': self.current_rsi_7_4h.get(symbol)
                 }
             }
             print(f"{symbol}:")
-            print(f"  1분봉 RSI(14) = {result[symbol]['1m']['rsi14']}")
-            print(f"  1분봉 RSI(7) = {result[symbol]['1m']['rsi7']}")
-            print(f"  15분봉 RSI(14) = {result[symbol]['15m']['rsi14']}")
-            print(f"  15분봉 RSI(7) = {result[symbol]['15m']['rsi7']}")
             print(f"  4시간봉 RSI(14) = {result[symbol]['4h']['rsi14']}")
             print(f"  4시간봉 RSI(7) = {result[symbol]['4h']['rsi7']}")
         print("===================\n")
@@ -521,44 +502,6 @@ class RSIMonitor:
         
         if not rsi_dict:
             return ["⚠️ RSI 데이터가 없습니다."]
-        
-        # 1분봉 과매수/과매도 TOP10 (30 이내만)
-        rsi_1m_list = [(symbol, v['1m']['rsi14']) for symbol, v in rsi_dict.items() if v['1m']['rsi14'] is not None]
-        rsi_1m_over = [x for x in rsi_1m_list if x[1] >= 70]
-        rsi_1m_over = sorted(rsi_1m_over, key=lambda x: x[1], reverse=True)[:10]
-        rsi_1m_under = [x for x in rsi_1m_list if x[1] <= 30]
-        rsi_1m_under = sorted(rsi_1m_under, key=lambda x: x[1])[:10]
-        
-        msg_1m_over = "📊 <b>1분봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-        for symbol, rsi in rsi_1m_over:
-            m1 = rsi_dict[symbol]['1m']
-            msg_1m_over += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']:.2f}\n  RSI(7): {m1['rsi7']:.2f}\n\n"
-        messages.append(msg_1m_over)
-        
-        msg_1m_under = "📊 <b>1분봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-        for symbol, rsi in rsi_1m_under:
-            m1 = rsi_dict[symbol]['1m']
-            msg_1m_under += f"<b>{symbol}</b>\n  RSI(14): {m1['rsi14']:.2f}\n  RSI(7): {m1['rsi7']:.2f}\n\n"
-        messages.append(msg_1m_under)
-        
-        # 15분봉 과매수/과매도 TOP10 (30 이내만)
-        rsi_15m_list = [(symbol, v['15m']['rsi14']) for symbol, v in rsi_dict.items() if v['15m']['rsi14'] is not None]
-        rsi_15m_over = [x for x in rsi_15m_list if x[1] >= 70]
-        rsi_15m_over = sorted(rsi_15m_over, key=lambda x: x[1], reverse=True)[:10]
-        rsi_15m_under = [x for x in rsi_15m_list if x[1] <= 30]
-        rsi_15m_under = sorted(rsi_15m_under, key=lambda x: x[1])[:10]
-        
-        msg_15m_over = "📊 <b>15분봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-        for symbol, rsi in rsi_15m_over:
-            m15 = rsi_dict[symbol]['15m']
-            msg_15m_over += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']:.2f}\n  RSI(7): {m15['rsi7']:.2f}\n\n"
-        messages.append(msg_15m_over)
-        
-        msg_15m_under = "📊 <b>15분봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-        for symbol, rsi in rsi_15m_under:
-            m15 = rsi_dict[symbol]['15m']
-            msg_15m_under += f"<b>{symbol}</b>\n  RSI(14): {m15['rsi14']:.2f}\n  RSI(7): {m15['rsi7']:.2f}\n\n"
-        messages.append(msg_15m_under)
         
         # 4시간봉 과매수/과매도 TOP10 (30 이내만)
         rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v['4h']['rsi14'] is not None]
@@ -589,15 +532,18 @@ class RSIMonitor:
             data = json.loads(message)
             stream_data = data.get('data', {})
             symbol = stream_data.get('s', '')
+
+            # Tracked symbols are pre-loaded, ignore messages for others
+            if symbol not in self.price_data_1m:
+                return
+
             kline = stream_data.get('k', {})
-            interval = kline.get('i', '1m')
+            interval = kline.get('i', '')
             price = float(kline.get('c', 0))
             volume = float(kline.get('v', 0))
             is_closed = kline.get('x', False)
-            if not symbol or price == 0:
+            if not symbol or price == 0 or not interval:
                 return
-            if symbol not in self.price_data_1m or symbol not in self.price_data_15m or symbol not in self.price_data_4h:
-                self.initialize_symbol_data(symbol)
 
             # 실시간 RSI 계산: 진행 중인 캔들 가격을 price_data에 임시로 반영
             if interval == '1m':
@@ -745,14 +691,6 @@ class RSIMonitor:
                     if rsi_7_4h > self.rsi_oversold and symbol in self.alerted_oversold_7_4h:
                         self.alerted_oversold_7_4h.remove(symbol)
 
-            # 15분봉 RSI 알림 (비활성화)
-            # if rsi_14_15m is not None and rsi_7_15m is not None:
-            #     ... (기존 15분봉 알림 코드 주석처리)
-            
-            # 1분봉 RSI 알림 (비활성화)
-            # if rsi_14_1m is not None and rsi_7_1m is not None:
-            #     ... (기존 1분봉 알림 코드 주석처리)
-
             # 매수/매도 조건 확인 (15분봉 완료 시에만)
             if (interval == '15m') and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None and rsi_14_4h is not None and rsi_7_4h is not None:
                 # 롱 조건
@@ -792,65 +730,77 @@ class RSIMonitor:
     
     def on_close(self, ws, close_status_code, close_msg):
         print(f"WebSocket connection closed (code={close_status_code}, msg={close_msg})")
-        self.telegram_bot.stop()
         print("5초 후 재연결 시도...")
         time.sleep(5)
-        self.start_monitoring()
-    
-    def on_open(self, ws):
-        print("WebSocket connection opened")
-        print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        # 초기 데이터 로드
-        symbols = get_top_coins(100)  # 시총(거래대금) 기준 상위 200개
-        # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
-        valid_symbols = []
-        for symbol in symbols:
-            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
-            if prices_4h and len(prices_4h) > 0:
-                valid_symbols.append(symbol)
-            else:
-                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
-        symbols = valid_symbols
-        print(f"최종 모니터링 심볼: {symbols}")
-        for symbol in symbols:
-            self.initialize_symbol_data(symbol)
-        # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
-        if self.current_rsi_14_1m or self.current_rsi_14_15m or self.current_rsi_14_4h:
-            rsi_messages = self.get_rsi_summary_messages()
-            for message in rsi_messages:
-                self.telegram_bot.send_message(message)
-    
-    def start_monitoring(self):
-        """
-        모니터링 시작
-        """
-        symbols = get_top_coins(100)  # 시총(거래대금) 기준 상위 200개
-        # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
-        valid_symbols = []
-        for symbol in symbols:
-            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
-            if prices_4h and len(prices_4h) > 0:
-                valid_symbols.append(symbol)
-            else:
-                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
-        symbols = valid_symbols
-        print(f"최종 모니터링 심볼: {symbols}")
-        if not symbols:
-            print("Failed to get top coins")
-            return
-        print(f"Monitoring symbols: {symbols}")
-        # streams = [f"{symbol.lower()}@kline_1m" for symbol in symbols] + [f"{symbol.lower()}@kline_15m" for symbol in symbols] + [f"{symbol.lower()}@kline_4h" for symbol in symbols]
-        streams = [f"{symbol.lower()}@kline_4h" for symbol in symbols]
-        ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-        print(f"Connecting to WebSocket URL: {ws_url}")
-        ws = websocket.WebSocketApp(
-            ws_url,
+        
+        # Recreate and run the websocket connection in a new thread
+        new_ws = websocket.WebSocketApp(
+            ws.url,
             on_message=self.on_message,
             on_error=self.on_error,
             on_close=self.on_close,
             on_open=self.on_open
         )
-        ws.run_forever()
+        threading.Thread(
+            target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10),
+            daemon=True
+        ).start()
+    
+    def on_open(self, ws):
+        print("WebSocket connection opened")
+        print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # 이 함수는 이제 연결 상태만 출력합니다.
+        # 데이터 로딩 및 스트림 구독은 start_monitoring에서 처리합니다.
+
+    def start_monitoring(self):
+        print("모니터링 시작...")
+        symbols = get_top_coins(200)
+        symbols = list(dict.fromkeys(symbols))
+        
+        print("유효한 심볼 필터링 및 초기 데이터 로드 중...")
+        valid_symbols = []
+        for symbol in symbols:
+            if self.initialize_symbol_data(symbol):
+                valid_symbols.append(symbol)
+            time.sleep(0.3) # API rate limit 방지
+
+        print(f"최종 모니터링 심볼 ({len(valid_symbols)}개): {valid_symbols}")
+        if not valid_symbols:
+            print("모니터링할 유효한 심볼이 없습니다.")
+            return
+
+        # 초기 RSI 요약 메시지 전송
+        if self.current_rsi_14_1m or self.current_rsi_14_15m or self.current_rsi_14_4h:
+            rsi_messages = self.get_rsi_summary_messages()
+            for message in rsi_messages:
+                self.telegram_bot.send_message(message)
+
+        chunk_size = 30
+        symbol_chunks = [valid_symbols[i:i+chunk_size] for i in range(0, len(valid_symbols), chunk_size)]
+
+        for chunk in symbol_chunks:
+            streams = []
+            for symbol in chunk:
+                streams.append(f"{symbol.lower()}@kline_1m")
+                streams.append(f"{symbol.lower()}@kline_15m")
+                streams.append(f"{symbol.lower()}@kline_4h")
+            
+            ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
+            print(f"Connecting to WebSocket URL: {ws_url}")
+            ws = websocket.WebSocketApp(
+                ws_url,
+                on_message=self.on_message,
+                on_error=self.on_error,
+                on_close=self.on_close,
+                on_open=self.on_open
+            )
+            threading.Thread(
+                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10),
+                daemon=True
+            ).start()
+        
+        while True:
+            time.sleep(60)
 
     def _generate_signature(self, params):
         """
@@ -1131,67 +1081,6 @@ class RSIMonitor:
                 recent_prices = list(self.price_data_15m[symbol])[-10:]
                 price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
         return len(conditions_met) >= 2, conditions_met
-
-    def get_futures_usdt_symbols(self):
-        """
-        바이낸스 USDT-M 선물 마켓에서 실제 거래(TRADING) 중인 심볼 리스트 반환
-        """
-        try:
-            url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
-            response = requests.get(url)
-            if response.status_code != 200:
-                return []
-            data = response.json()
-            symbols = [
-                s['symbol']
-                for s in data['symbols']
-                if s['contractType'] == 'PERPETUAL'
-                and s['quoteAsset'] == 'USDT'
-                and s['status'] == 'TRADING'
-            ]
-            return symbols
-        except Exception as e:
-            print(f"선물 심볼 조회 오류: {e}")
-            return []
-
-    def get_ema_321_proximity(self, top_n=10):
-        """
-        4시간봉 321EMA와 현재가 이격률이 가장 작은 USDT-M 선물 코인 TOP N 반환
-        """
-        symbols = self.get_futures_usdt_symbols()
-        results = []
-        for symbol in symbols:
-            try:
-                url = "https://fapi.binance.com/fapi/v1/klines"
-                params = {'symbol': symbol, 'interval': '4h', 'limit': 350}
-                response = requests.get(url, params=params)
-                if response.status_code != 200:
-                    continue
-                data = response.json()
-                closes = [float(c[4]) for c in data]
-                if len(closes) < 321:
-                    continue
-                ema = self.calculate_ema(closes, 321)[-1]
-                current_price = closes[-1]
-                diff = abs(current_price - ema) / ema * 100
-                results.append((symbol, current_price, ema, diff))
-            except Exception as e:
-                print(f"{symbol} 321EMA 계산 오류: {e}")
-                continue
-        results.sort(key=lambda x: x[3])
-        return results[:top_n]
-
-    def calculate_ema(self, prices, period):
-        """
-        단순 EMA 계산 함수 (numpy 활용)
-        """
-        prices = np.array(prices)
-        ema = np.zeros_like(prices)
-        alpha = 2 / (period + 1)
-        ema[0] = prices[0]
-        for i in range(1, len(prices)):
-            ema[i] = alpha * prices[i] + (1 - alpha) * ema[i-1]
-        return ema
 
 if __name__ == "__main__":
     monitor = RSIMonitor()

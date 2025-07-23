@@ -22,8 +22,8 @@ class RSIMonitor:
         # 123456aq
         
         self.price_data = {}  # 각 심볼별 가격 데이터 저장
-        self.rsi_overbought =90  # 과매수 RSI 임계값
-        self.rsi_oversold = 10  # 과매도 RSI 임계값
+        self.rsi_overbought =93  # 과매수 RSI 임계값
+        self.rsi_oversold = 7  # 과매도 RSI 임계값
         self.data_length = 100  # RSI 계산을 위한 데이터 길이
         self.telegram_bot = TelegramBot(self)  # RSI 모니터 인스턴스 전달
         self.current_rsi_14 = {}  # 현재 RSI(14) 값 저장
@@ -144,34 +144,37 @@ class RSIMonitor:
         self.volume_data_15m[symbol] = deque(volumes_15m, maxlen=self.data_length)
         self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
 
-        if len(prices_1m) >= self.data_length:
-            rsi_14_1m = calculate_rsi_binance(list(prices_1m), period=14)
-            rsi_7_1m = calculate_rsi_binance(list(prices_1m), period=7)
-            self.current_rsi_14_1m[symbol] = rsi_14_1m
-            self.current_rsi_7_1m[symbol] = rsi_7_1m
+        # if len(prices_1m) >= self.data_length:
+        #     rsi_14_1m = calculate_rsi_binance(list(prices_1m), period=14)
+        #     rsi_7_1m = calculate_rsi_binance(list(prices_1m), period=7)
+        #     self.current_rsi_14_1m[symbol] = rsi_14_1m
+        #     self.current_rsi_7_1m[symbol] = rsi_7_1m
 
-        if len(prices_15m) >= self.data_length:
-            rsi_14_15m = calculate_rsi_binance(list(prices_15m), period=14)
-            rsi_7_15m = calculate_rsi_binance(list(prices_15m), period=7)
-            self.current_rsi_14_15m[symbol] = rsi_14_15m
-            self.current_rsi_7_15m[symbol] = rsi_7_15m
+        # if len(prices_15m) >= self.data_length:
+        #     rsi_14_15m = calculate_rsi_binance(list(prices_15m), period=14)
+        #     rsi_7_15m = calculate_rsi_binance(list(prices_15m), period=7)
+        #     self.current_rsi_14_15m[symbol] = rsi_14_15m
+        #     self.current_rsi_7_15m[symbol] = rsi_7_15m
 
         if len(prices_4h) >= self.data_length:
             rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
             rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
             self.current_rsi_14_4h[symbol] = rsi_14_4h
             self.current_rsi_7_4h[symbol] = rsi_7_4h
-
-        if len(prices_1m) >= self.data_length:
-            rsi_14 = calculate_rsi_binance(list(prices_1m), period=14)
-            rsi_7 = calculate_rsi_binance(list(prices_1m), period=7)
-            self.current_rsi_14[symbol] = rsi_14
-            self.current_rsi_7[symbol] = rsi_7
             print(f"{symbol} 초기 RSI 계산 완료:")
-            print(f"RSI(14): {rsi_14:.2f}")
-            print(f"RSI(7): {rsi_7:.2f}")
-        else:
-            print(f"{symbol} 초기 데이터 부족: {len(prices_1m)}개")
+            print(f"RSI(14): {rsi_14_4h:.2f}")
+            print(f"RSI(7): {rsi_7_4h:.2f}")
+
+        # if len(prices_1m) >= self.data_length:
+        #     rsi_14 = calculate_rsi_binance(list(prices_1m), period=14)
+        #     rsi_7 = calculate_rsi_binance(list(prices_1m), period=7)
+        #     self.current_rsi_14[symbol] = rsi_14
+        #     self.current_rsi_7[symbol] = rsi_7
+        #     print(f"{symbol} 초기 RSI 계산 완료:")
+        #     print(f"RSI(14): {rsi_14:.2f}")
+        #     print(f"RSI(7): {rsi_7:.2f}")
+        # else:
+        #     print(f"{symbol} 초기 데이터 부족: {len(prices_1m)}개")
         
         self.price_data[symbol] = deque(prices_1m, maxlen=self.data_length)
         return True
@@ -691,36 +694,36 @@ class RSIMonitor:
                     if rsi_7_4h > self.rsi_oversold and symbol in self.alerted_oversold_7_4h:
                         self.alerted_oversold_7_4h.remove(symbol)
 
-            # 매수/매도 조건 확인 (15분봉 완료 시에만)
-            if (interval == '15m') and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None and rsi_14_4h is not None and rsi_7_4h is not None:
-                # 롱 조건
-                long_signal, long_conditions = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
-                # 숏 조건
-                short_signal, short_conditions = self.check_short_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
-                # 롱 진입
-                if long_signal and symbol not in self.active_positions:
-                    if self.auto_trading:
-                        success, message = self.open_position(symbol, price, long_conditions, position_type='LONG')
-                        if success:
-                            print(f"롱 신호 감지: {symbol} - 조건: {long_conditions}")
-                        else:
-                            print(f"롱 진입 실패: {symbol} - {message}")
-                    else:
-                        msg = f"[자동주문 OFF] 롱 신호 감지: {symbol} - 조건: {', '.join(long_conditions)}"
-                        print(msg)
-                        self.telegram_bot.send_message(msg)
-                # 숏 진입
-                if short_signal and symbol not in self.active_positions:
-                    if self.auto_trading:
-                        success, message = self.open_position(symbol, price, short_conditions, position_type='SHORT')
-                        if success:
-                            print(f"숏 신호 감지: {symbol} - 조건: {short_conditions}")
-                        else:
-                            print(f"숏 진입 실패: {symbol} - {message}")
-                    else:
-                        msg = f"[자동주문 OFF] 숏 신호 감지: {symbol} - 조건: {', '.join(short_conditions)}"
-                        print(msg)
-                        self.telegram_bot.send_message(msg)
+            # # 매수/매도 조건 확인 (15분봉 완료 시에만)
+            # if (interval == '15m') and rsi_14_1m is not None and rsi_7_1m is not None and rsi_14_15m is not None and rsi_7_15m is not None and rsi_14_4h is not None and rsi_7_4h is not None:
+            #     # 롱 조건
+            #     long_signal, long_conditions = self.check_buy_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
+            #     # 숏 조건
+            #     short_signal, short_conditions = self.check_short_conditions(symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h)
+            #     # 롱 진입
+            #     if long_signal and symbol not in self.active_positions:
+            #         if self.auto_trading:
+            #             success, message = self.open_position(symbol, price, long_conditions, position_type='LONG')
+            #             if success:
+            #                 print(f"롱 신호 감지: {symbol} - 조건: {long_conditions}")
+            #             else:
+            #                 print(f"롱 진입 실패: {symbol} - {message}")
+            #         else:
+            #             msg = f"[자동주문 OFF] 롱 신호 감지: {symbol} - 조건: {', '.join(long_conditions)}"
+            #             print(msg)
+            #             self.telegram_bot.send_message(msg)
+            #     # 숏 진입
+            #     if short_signal and symbol not in self.active_positions:
+            #         if self.auto_trading:
+            #             success, message = self.open_position(symbol, price, short_conditions, position_type='SHORT')
+            #             if success:
+            #                 print(f"숏 신호 감지: {symbol} - 조건: {short_conditions}")
+            #             else:
+            #                 print(f"숏 진입 실패: {symbol} - {message}")
+            #         else:
+            #             msg = f"[자동주문 OFF] 숏 신호 감지: {symbol} - 조건: {', '.join(short_conditions)}"
+            #             print(msg)
+            #             self.telegram_bot.send_message(msg)
         except Exception as e:
             print(f"Error processing message: {e}")
             print(f"Raw message: {message}")
@@ -762,7 +765,7 @@ class RSIMonitor:
         for symbol in symbols:
             if self.initialize_symbol_data(symbol):
                 valid_symbols.append(symbol)
-            time.sleep(0.3) # API rate limit 방지
+            time.sleep(0.1) # API rate limit 방지
 
         print(f"최종 모니터링 심볼 ({len(valid_symbols)}개): {valid_symbols}")
         if not valid_symbols:
@@ -781,8 +784,8 @@ class RSIMonitor:
         for chunk in symbol_chunks:
             streams = []
             for symbol in chunk:
-                streams.append(f"{symbol.lower()}@kline_1m")
-                streams.append(f"{symbol.lower()}@kline_15m")
+                # streams.append(f"{symbol.lower()}@kline_1m")
+                # streams.append(f"{symbol.lower()}@kline_15m")
                 streams.append(f"{symbol.lower()}@kline_4h")
             
             ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"

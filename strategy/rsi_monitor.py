@@ -21,34 +21,16 @@ class RSIMonitor:
     def __init__(self):
         # 123456aq
         
-        self.price_data = {}  # 각 심볼별 가격 데이터 저장
-        self.rsi_overbought =90  # 과매수 RSI 임계값
-        self.rsi_oversold = 10  # 과매도 RSI 임계값
+        self.rsi_overbought =93  # 과매수 RSI 임계값
+        self.rsi_oversold = 7  # 과매도 RSI 임계값
         self.rsi_warning_high = 85  # 주의 RSI 상단 임계값
         self.rsi_warning_low =15   # 주의 RSI 하단 임계값
         self.data_length = 100  # RSI 계산을 위한 데이터 길이
         self.telegram_bot = TelegramBot(self)  # RSI 모니터 인스턴스 전달
-        self.alerted_overbought_14 = set()  # RSI(14) 과매수 알림을 보낸 심볼 추적
-        self.alerted_oversold_14 = set()  # RSI(14) 과매도 알림을 보낸 심볼 추적
-        self.alerted_overbought_7 = set()  # RSI(7) 과매수 알림을 보낸 심볼 추적
-        self.alerted_oversold_7 = set()  # RSI(7) 과매도 알림을 보낸 심볼 추적
-        self.alerted_warning_high_14 = set()  # RSI(14) 주의 상단 알림을 보낸 심볼 추적
-        self.alerted_warning_low_14 = set()   # RSI(14) 주의 하단 알림을 보낸 심볼 추적
-        self.alerted_warning_high_7 = set()   # RSI(7) 주의 상단 알림을 보낸 심볼 추적
-        self.alerted_warning_low_7 = set()    # RSI(7) 주의 하단 알림을 보낸 심볼 추적
-        self.current_rsi_14 = {}  # 현재 RSI(14) 값 저장
-        self.current_rsi_7 = {}  # 현재 RSI(7) 값 저장
+        
         self.start_times = {}  # 각 심볼별 데이터 수집 시작 시간
-        self.price_data_1m = {}
-        self.price_data_15m = {}
         self.price_data_4h = {}  # 4시간봉 가격 데이터
-        self.volume_data_1m = {}
-        self.volume_data_15m = {}
         self.volume_data_4h = {}  # 4시간봉 거래량 데이터
-        self.current_rsi_14_1m = {}
-        self.current_rsi_7_1m = {}
-        self.current_rsi_14_15m = {}
-        self.current_rsi_7_15m = {}
         self.current_rsi_14_4h = {}  # 4시간봉 RSI(14)
         self.current_rsi_7_4h = {}   # 4시간봉 RSI(7)
         self.alerted_overbought_14_4h = set()  # 4시간봉 RSI(14) 과매수 알림
@@ -59,9 +41,6 @@ class RSIMonitor:
         self.alerted_warning_low_14_4h = set()   # 4시간봉 RSI(14) 주의 하단
         self.alerted_warning_high_7_4h = set()   # 4시간봉 RSI(7) 주의 상단
         self.alerted_warning_low_7_4h = set()    # 4시간봉 RSI(7) 주의 하단
-        self.alerted_strong_14 = set()  # 1m, 15m 동시 만족 강한 알림
-        self.alerted_strong_7 = set()
-        
         
         # SL/TP 관련 설정
         self.investment_amount = 10  # 투자금액 (USDT)
@@ -538,11 +517,9 @@ class RSIMonitor:
             if not symbol or price == 0 or interval != '4h':
                 return
 
+            # 데이터가 초기화될 때까지 수신 메시지 무시
             if symbol not in self.price_data_4h:
-                self.initialize_symbol_data(symbol)
-                # 초기화 실패 시 처리 중단
-                if symbol not in self.price_data_4h:
-                    return
+                return
 
             # 실시간 RSI 계산: 진행 중인 캔들 가격을 price_data에 임시로 반영
             price_list = list(self.price_data_4h[symbol])
@@ -640,52 +617,66 @@ class RSIMonitor:
         self.start_monitoring()
     
     def on_open(self, ws):
-        print("WebSocket connection opened")
-        print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        # 초기 데이터 로드
-        symbols = get_top_coins(200)  # 시총(거래대금) 기준 상위 200개
-        # 유효하지 않은 심볼 자동 제거 (4시간봉 데이터 조회 성공하는 심볼만 사용)
-        valid_symbols = []
+        print(f"WebSocket connection opened. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    def _load_initial_data(self):
+        """
+        백그라운드에서 초기 데이터를 안전하게 로드하고 RSI를 계산합니다.
+        """
+        print("백그라운드에서 초기 데이터 로드를 시작합니다...")
+        symbols = get_top_coins(200)
+        symbols = list(dict.fromkeys(symbols)) # 중복 제거
+        
         for symbol in symbols:
-            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
-            if prices_4h and len(prices_4h) > 0:
-                valid_symbols.append(symbol)
-            else:
-                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
-        symbols = valid_symbols
-        print(f"최종 모니터링 심볼: {symbols}")
-        for symbol in symbols:
-            self.initialize_symbol_data(symbol)
-        # 초기 RSI 상태 메시지 전송 (각 봉별 극단치 TOP10)
-        if self.current_rsi_14_1m or self.current_rsi_14_15m or self.current_rsi_14_4h:
+            try:
+                # API 속도 제한을 피하기 위해 0.5초 딜레이
+                time.sleep(0.5)
+                print(f"{symbol} 데이터 로드 중...")
+                prices_4h, volumes_4h = self.get_historical_data(symbol, interval='4h', limit=self.data_length)
+                
+                if prices_4h and len(prices_4h) >= 14:
+                    self.price_data_4h[symbol] = deque(prices_4h, maxlen=self.data_length)
+                    self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
+                    
+                    rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
+                    rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
+                    
+                    self.current_rsi_14_4h[symbol] = rsi_14_4h
+                    self.current_rsi_7_4h[symbol] = rsi_7_4h
+                else:
+                    print(f"[데이터 부족] {symbol}: 데이터가 부족하여 모니터링에서 제외됩니다.")
+            except Exception as e:
+                print(f"{symbol} 데이터 로드 중 오류 발생: {e}")
+
+        print("\n초기 데이터 로드가 완료되었습니다.")
+        # 초기 RSI 상태 메시지 전송
+        if self.current_rsi_14_4h:
+            print("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
             rsi_messages = self.get_rsi_summary_messages()
             for message in rsi_messages:
                 self.telegram_bot.send_message(message)
-    
+        else:
+            print("전송할 초기 RSI 데이터가 없습니다.")
+
     def start_monitoring(self):
-        symbols = get_top_coins(200)
-        # 중복 제거 (순서 유지)
-        symbols = list(dict.fromkeys(symbols))
-        valid_symbols = []
-        for symbol in symbols:
-            prices_4h, _ = self.get_historical_data(symbol, interval='4h', limit=2)
-            if prices_4h and len(prices_4h) > 0:
-                valid_symbols.append(symbol)
-            else:
-                print(f"[심볼제거] {symbol} : 4시간봉 데이터 조회 실패, 리스트에서 제외")
-            time.sleep(0.3)  # 레이트 리밋 방지
-        symbols = valid_symbols
-        print(f"최종 모니터링 심볼: {symbols}")
-        if not symbols:
-            print("Failed to get top coins")
+        # 1. 모든 심볼 리스트 가져오기 (API 호출 최소화)
+        all_symbols = self.get_futures_usdt_symbols()
+        if not all_symbols:
+            print("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
             return
-        print(f"Monitoring symbols: {symbols}")
-        chunk_size = 20  # URL 길이 제한 때문에 20~30 추천
-        symbol_chunks = [symbols[i:i+chunk_size] for i in range(0, len(symbols), chunk_size)]
+
+        # 2. 백그라운드에서 데이터 로드 시작
+        threading.Thread(target=self._load_initial_data, daemon=True).start()
+
+        # 3. 웹소켓 연결 시작
+        print(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
+        chunk_size = 30
+        symbol_chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
+        
         for chunk in symbol_chunks:
-            streams = [f"{symbol.lower()}@kline_4h" for symbol in chunk]
+            streams = [f"{s.lower()}@kline_4h" for s in chunk]
             ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-            print(f"Connecting to WebSocket URL: {ws_url}")
+            print(f"Connecting to WebSocket for {len(chunk)} symbols...")
             ws = websocket.WebSocketApp(
                 ws_url,
                 on_message=self.on_message,
@@ -697,6 +688,8 @@ class RSIMonitor:
                 target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10),
                 daemon=True
             ).start()
+            
+        # 메인 스레드가 종료되지 않도록 유지
         while True:
             time.sleep(60)
 

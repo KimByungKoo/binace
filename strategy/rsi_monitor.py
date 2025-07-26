@@ -290,11 +290,16 @@ class RSIMonitor:
             rsi_14_4h = self.current_rsi_14_4h.get(symbol)
             rsi_7_4h = self.current_rsi_7_4h.get(symbol)
 
-            # SL/TP 체크 (모든 가격 업데이트에서)
-            self.check_sl_tp(symbol, price)
             
+            # SL/TP 체크 (모든 가격 업데이트에서)
+            # self.check_sl_tp(symbol, price)
+            
+
+            
+
             # RSI 알림 로직 (실시간 봉에서만 동작)
             if not is_closed and rsi_14_4h is not None and rsi_7_4h is not None:
+                print(f"symbol: {symbol} :  rsi_14_4h: {rsi_14_4h} , rsi_7_4h: {rsi_7_4h}")
                 # 4시간봉 RSI(14) 과매수 알림
                 if rsi_14_4h >= self.rsi_overbought and symbol not in self.alerted_overbought_14_4h:
                     msg = f"🔴 <b>4시간봉 RSI(14) 과매수 알림 - {symbol}</b>\n\n" \

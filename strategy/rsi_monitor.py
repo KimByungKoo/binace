@@ -52,6 +52,7 @@ class RSIMonitor:
         self.active_positions = {}  # 활성 포지션 관리
         self.position_history = []  # 거래 이력
         
+        self.futures_usdt_symbols = self.get_futures_usdt_symbols()
         # 자동주문 옵션
         self.auto_trading = False  # True: 자동주문 활성화, False: 자동주문 비활성화
         
@@ -173,274 +174,8 @@ class RSIMonitor:
         
         return volume_ratio >= self.volume_spike_threshold, volume_ratio
         
-    def check_buy_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h):
-        conditions_met = []
-        # 4시간봉 RSI 과매도 조건
-        if self.buy_conditions.get('rsi_4h_oversold', True):
-            if (rsi_14_4h is not None and rsi_14_4h <= self.rsi_oversold) or \
-               (rsi_7_4h is not None and rsi_7_4h <= self.rsi_oversold):
-                conditions_met.append('4시간봉 RSI 과매도')
-        # 15분봉 RSI 과매도 조건
-        if self.buy_conditions['rsi_15m_oversold']:
-            if (rsi_14_15m is not None and rsi_14_15m <= self.rsi_oversold) or \
-               (rsi_7_15m is not None and rsi_7_15m <= self.rsi_oversold):
-                conditions_met.append('15분봉 RSI 과매도')
-        # 1분봉 RSI 과매도 조건
-        if self.buy_conditions['rsi_1m_oversold']:
-            if (rsi_14_1m is not None and rsi_14_1m <= self.rsi_oversold) or \
-               (rsi_7_1m is not None and rsi_7_1m <= self.rsi_oversold):
-                conditions_met.append('1분봉 RSI 과매도')
-        # 거래량 스파이크 조건 (필수)
-        if self.buy_conditions['volume_spike']:
-            volume_spike_15m, volume_ratio_15m = self.check_volume_spike(symbol, '15m')
-            volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
-            if volume_spike_15m or volume_spike_1m:
-                max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-            else:
-                return False, []
-        # 가격 하락 조건 (최근 10개 캔들 기준)
-        if self.buy_conditions['price_drop'] > 0:
-            if len(self.price_data_15m.get(symbol, [])) >= 10:
-                recent_prices = list(self.price_data_15m[symbol])[-10:]
-                price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
-        return len(conditions_met) >= 2, conditions_met
     
-    def calculate_position_size(self, price):
-        """
-        투자금액 대비 ROI 5% 기준으로 매수 수량을 계산합니다.
-        """
-        # 실제 잔고 확인
-        available_balance = self.get_balance('USDT')
-        if available_balance < self.min_order_amount:
-            return 0, f"잔고 부족: {available_balance:.2f} USDT"
-        
-        # 투자 가능 금액 계산 (최대 포지션 수 고려)
-        max_investment = min(self.investment_amount, available_balance / self.max_positions)
-        
-        # 레버리지를 고려한 실제 포지션 크기
-        position_value = max_investment * self.leverage
-        
-        # ROI 기준으로 목표 수익 계산
-        target_profit_usdt = position_value * self.roi_threshold
-        
-        # 레버리지를 고려한 SL/TP 계산
-        # 예: 100$ 투자, 10배 레버리지 = 1000$ 포지션
-        # 5% ROI = 50$ 수익 (1000$ * 5%)
-        # 가격 변동 0.5% = 50$ 수익 (1000$ * 0.5%)
-        price_change_for_target = self.roi_threshold / self.leverage
-        
-        # 매수 수량 계산
-        position_size = position_value / price
-        
-        # 최소 주문 금액 확인
-        if position_size * price < self.min_order_amount:
-            position_size = self.min_order_amount / price
-        
-        return position_size, "계산 완료"
     
-    def calculate_sl_tp_prices(self, entry_price, position_value, position_type='LONG'):
-        """
-        ROI 기준으로 SL/TP 가격을 계산합니다. (롱/숏 구분)
-        """
-        price_change_for_target = self.roi_threshold / self.leverage
-        if position_type == 'LONG':
-            take_profit_price = entry_price * (1 + price_change_for_target)
-            stop_loss_price = entry_price * (1 - (self.stop_loss_percent / self.leverage))
-        else:  # SHORT
-            take_profit_price = entry_price * (1 - price_change_for_target)
-            stop_loss_price = entry_price * (1 + (self.stop_loss_percent / self.leverage))
-        return stop_loss_price, take_profit_price
-    
-    def open_position(self, symbol, price, conditions_met, position_type='LONG'):
-        """
-        포지션을 오픈합니다.
-        """
-        if symbol in self.active_positions:
-            return False, "이미 활성 포지션이 있습니다."
-        if len(self.active_positions) >= self.max_positions:
-            return False, f"최대 포지션 수({self.max_positions})에 도달했습니다."
-        # 매수 수량 계산
-        position_size, message = self.calculate_position_size(price)
-        if position_size == 0:
-            return False, message
-        # 레버리지 설정 (실제 거래 시)
-        if not self.simulation_mode and self.trading_type == 'FUTURES':
-            leverage_result = self.set_leverage(symbol, self.leverage)
-            if not leverage_result:
-                print(f"레버리지 설정 실패: {symbol}")
-        # 실제 주문 실행 (롱: BUY, 숏: SELL)
-        order_side = 'BUY' if position_type == 'LONG' else 'SELL'
-        order_result = self.place_order(symbol, order_side, position_size, price, 'MARKET')
-        if not order_result:
-            return False, "주문 실행 실패"
-        if order_result.get('status') != 'FILLED':
-            return False, f"주문 미체결: {order_result.get('status')}"
-        executed_price = float(order_result.get('price', price))
-        executed_quantity = float(order_result.get('executedQty', position_size))
-        position_value = executed_quantity * executed_price
-        # SL/TP 계산 (롱/숏 구분)
-        stop_loss_price, take_profit_price = self.calculate_sl_tp_prices(executed_price, position_value, position_type)
-        position = {
-            'symbol': symbol,
-            'entry_price': executed_price,
-            'position_size': executed_quantity,
-            'position_value': position_value,
-            'investment_amount': self.investment_amount,
-            'leverage': self.leverage,
-            'entry_time': datetime.now(),
-            'stop_loss': stop_loss_price,
-            'take_profit': take_profit_price,
-            'conditions_met': conditions_met,
-            'order_id': order_result.get('orderId'),
-            'position_type': position_type
-        }
-        self.active_positions[symbol] = position
-        # 알림
-        mode_text = "시뮬레이션" if self.simulation_mode else "실제 거래"
-        margin_text = "선물" if self.trading_type == 'FUTURES' else "마진"
-        pos_text = "롱" if position_type == 'LONG' else "숏"
-        message = f"💰 <b>{pos_text} 신호 ({mode_text} {margin_text}) - {symbol}</b>\n\n" \
-                  f"투자금액: {self.investment_amount} USDT\n" \
-                  f"레버리지: {self.leverage}배\n" \
-                  f"포지션 크기: {position_value:.2f} USDT\n" \
-                  f"진입가: {executed_price:.8f} USDT\n" \
-                  f"수량: {executed_quantity:.6f}\n" \
-                  f"손절가: {stop_loss_price:.8f} USDT\n" \
-                  f"익절가: {take_profit_price:.8f} USDT\n" \
-                  f"조건: {', '.join(conditions_met)}"
-        self.telegram_bot.send_message(message)
-        print(f"포지션 오픈: {symbol} - {pos_text}, 진입가: {executed_price:.8f}, 수량: {executed_quantity:.6f}, 레버리지: {self.leverage}배")
-        return True, "포지션 오픈 완료"
-    
-    def check_sl_tp(self, symbol, current_price):
-        """
-        손절/익절 조건을 확인합니다.
-        """
-        if symbol not in self.active_positions:
-            return
-        
-        position = self.active_positions[symbol]
-        entry_price = position['entry_price']
-        
-        # 손절 확인
-        if current_price <= position['stop_loss']:
-            self.close_position(symbol, current_price, '손절')
-            return
-        
-        # 익절 확인
-        if current_price >= position['take_profit']:
-            self.close_position(symbol, current_price, '익절')
-            return
-    
-    def close_position(self, symbol, exit_price, reason):
-        """
-        포지션을 종료합니다.
-        """
-        if symbol not in self.active_positions:
-            return
-        position = self.active_positions[symbol]
-        entry_price = position['entry_price']
-        position_size = position['position_size']
-        position_value = position['position_value']
-        investment_amount = position['investment_amount']
-        leverage = position['leverage']
-        position_type = position.get('position_type', 'LONG')
-        # 실제 주문 실행 (롱: SELL, 숏: BUY)
-        order_side = 'SELL' if position_type == 'LONG' else 'BUY'
-        order_result = self.place_order(symbol, order_side, position_size, exit_price, 'MARKET')
-        if not order_result:
-            print(f"청산 주문 실패: {symbol}")
-            return
-        if order_result.get('status') != 'FILLED':
-            print(f"청산 주문 미체결: {symbol} - {order_result.get('status')}")
-            return
-        executed_price = float(order_result.get('price', exit_price))
-        executed_quantity = float(order_result.get('executedQty', position_size))
-        # 손익 계산 (롱/숏 구분)
-        if position_type == 'LONG':
-            price_change_percent = (executed_price - entry_price) / entry_price
-        else:
-            price_change_percent = (entry_price - executed_price) / entry_price
-        roi_percent = price_change_percent * leverage
-        pnl = investment_amount * roi_percent
-        trade_record = {
-            'symbol': symbol,
-            'entry_price': entry_price,
-            'exit_price': executed_price,
-            'position_size': executed_quantity,
-            'position_value': position_value,
-            'investment_amount': investment_amount,
-            'leverage': leverage,
-            'entry_time': position['entry_time'],
-            'exit_time': datetime.now(),
-            'reason': reason,
-            'pnl': pnl,
-            'pnl_percent': roi_percent,
-            'price_change_percent': price_change_percent,
-            'conditions_met': position['conditions_met'],
-            'order_id': order_result.get('orderId'),
-            'position_type': position_type
-        }
-        self.position_history.append(trade_record)
-        del self.active_positions[symbol]
-        mode_text = "시뮬레이션" if self.simulation_mode else "실제 거래"
-        margin_text = "선물" if self.trading_type == 'FUTURES' else "마진"
-        pos_text = "롱" if position_type == 'LONG' else "숏"
-        emoji = "🔴" if reason == '손절' else "🟢"
-        message = f"{emoji} <b>{reason} ({mode_text} {margin_text} {pos_text}) - {symbol}</b>\n\n" \
-                  f"투자금액: {investment_amount} USDT\n" \
-                  f"레버리지: {leverage}배\n" \
-                  f"진입가: {entry_price:.8f} USDT\n" \
-                  f"청산가: {executed_price:.8f} USDT\n" \
-                  f"가격변동: {price_change_percent:.3%}\n" \
-                  f"수량: {executed_quantity:.6f}\n" \
-                  f"ROI: {roi_percent:.2%}\n" \
-                  f"손익: {pnl:.2f} USDT\n" \
-                  f"보유 시간: {trade_record['exit_time'] - trade_record['entry_time']}"
-        self.telegram_bot.send_message(message)
-        print(f"포지션 종료: {symbol} - {reason}, {pos_text}, ROI: {roi_percent:.2%}, 손익: {pnl:.2f} USDT")
-    
-    def get_position_summary(self):
-        """
-        현재 포지션 요약을 반환합니다.
-        """
-        if not self.active_positions:
-            return "현재 활성 포지션이 없습니다."
-        
-        summary = "📊 <b>현재 포지션 요약</b>\n\n"
-        total_invested = 0
-        
-        for symbol, position in self.active_positions.items():
-            current_price = self.get_current_price(symbol)
-            if current_price:
-                pnl = (current_price - position['entry_price']) * position['position_size']
-                pnl_percent = (current_price - position['entry_price']) / position['entry_price']
-                total_invested += position['position_value']
-                
-                summary += f"<b>{symbol}</b>\n"
-                summary += f"진입가: {position['entry_price']:.8f}\n"
-                summary += f"현재가: {current_price:.8f}\n"
-                summary += f"손익: {pnl:.2f} USDT ({pnl_percent:.2%})\n"
-                summary += f"손절가: {position['stop_loss']:.8f}\n"
-                summary += f"익절가: {position['take_profit']:.8f}\n\n"
-        
-        summary += f"총 투자금액: {total_invested:.2f} USDT"
-        return summary
-    
-    def get_current_price(self, symbol):
-        """
-        현재 가격을 가져옵니다.
-        """
-        try:
-            url = "https://api.binance.com/api/v3/ticker/price"
-            params = {'symbol': symbol}
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                return float(data['price'])
-        except Exception as e:
-            print(f"Error getting current price for {symbol}: {e}")
-        return None
 
     def get_current_rsi(self):
         """
@@ -523,6 +258,14 @@ class RSIMonitor:
 
             # 실시간 RSI 계산: 진행 중인 캔들 가격을 price_data에 임시로 반영
             price_list = list(self.price_data_4h[symbol])
+            
+            # if(symbol == 'REIUSDT'):
+
+            #     print(f"symbol: {symbol}")
+            #     print(f"price: {price}")
+            #     print(f"volume: {volume}")
+            # print(f"is_closed: {is_closed}")
+
             if is_closed:
                 # 봉 마감: 새로운 봉 데이터 추가
                 self.price_data_4h[symbol].append(price)
@@ -624,7 +367,7 @@ class RSIMonitor:
         백그라운드에서 초기 데이터를 안전하게 로드하고 RSI를 계산합니다.
         """
         print("백그라운드에서 초기 데이터 로드를 시작합니다...")
-        symbols = get_top_coins(200)
+        symbols = self.futures_usdt_symbols
         symbols = list(dict.fromkeys(symbols)) # 중복 제거
         
         for symbol in symbols:
@@ -660,7 +403,7 @@ class RSIMonitor:
 
     def start_monitoring(self):
         # 1. 모든 심볼 리스트 가져오기 (API 호출 최소화)
-        all_symbols = self.get_futures_usdt_symbols()
+        all_symbols = self.futures_usdt_symbols
         if not all_symbols:
             print("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
             return
@@ -736,243 +479,8 @@ class RSIMonitor:
             print(f"API 요청 중 오류: {e}")
             return None
     
-    def get_account_info(self):
-        """
-        계정 정보를 가져옵니다.
-        """
-        if self.simulation_mode:
-            return {
-                'balances': [
-                    {'asset': 'USDT', 'free': '1000.00', 'locked': '0.00'},
-                    {'asset': 'BTC', 'free': '0.00000000', 'locked': '0.00000000'}
-                ]
-            }
-        
-        if self.trading_type == 'FUTURES':
-            return self._make_request('GET', '/fapi/v1/account', signed=True)
-        else:
-            return self._make_request('GET', '/api/v3/account', signed=True)
     
-    def get_margin_account_info(self):
-        """
-        선물 계정 정보를 가져옵니다.
-        """
-        if self.simulation_mode:
-            return {
-                'totalWalletBalance': '1000.00',
-                'totalUnrealizedProfit': '0.00',
-                'totalMarginBalance': '1000.00',
-                'totalPositionInitialMargin': '0.00',
-                'totalOpenOrderInitialMargin': '0.00',
-                'totalCrossWalletBalance': '1000.00',
-                'totalCrossUnPnl': '0.00',
-                'availableBalance': '1000.00',
-                'maxWithdrawAmount': '1000.00',
-                'assets': [
-                    {
-                        'asset': 'USDT',
-                        'walletBalance': '1000.00',
-                        'unrealizedProfit': '0.00',
-                        'marginBalance': '1000.00',
-                        'maintMargin': '0.00',
-                        'initialMargin': '0.00',
-                        'positionInitialMargin': '0.00',
-                        'openOrderInitialMargin': '0.00',
-                        'crossWalletBalance': '1000.00',
-                        'crossUnPnl': '0.00',
-                        'availableBalance': '1000.00',
-                        'maxWithdrawAmount': '1000.00'
-                    }
-                ]
-            }
-        
-        return self._make_request('GET', '/fapi/v1/account', signed=True)
     
-    def set_leverage(self, symbol, leverage):
-        """
-        레버리지를 설정합니다.
-        """
-        if self.simulation_mode:
-            print(f"시뮬레이션 레버리지 설정: {symbol} - {leverage}배")
-            return {'leverage': leverage}
-        
-        params = {
-            'symbol': symbol,
-            'leverage': leverage
-        }
-        
-        return self._make_request('POST', '/fapi/v1/leverage', params, signed=True)
-    
-    def get_symbol_info(self, symbol):
-        """
-        심볼 정보를 가져옵니다.
-        """
-        params = {'symbol': symbol}
-        if self.trading_type == 'FUTURES':
-            return self._make_request('GET', '/fapi/v1/exchangeInfo', params)
-        else:
-            return self._make_request('GET', '/api/v3/exchangeInfo', params)
-    
-    def get_balance(self, asset='USDT'):
-        """
-        특정 자산의 잔고를 가져옵니다.
-        """
-        if self.trading_type == 'FUTURES':
-            account_info = self.get_margin_account_info()
-        else:
-            account_info = self.get_account_info()
-            
-        if not account_info:
-            return 0.0
-        
-        if self.trading_type == 'FUTURES':
-            for balance in account_info.get('assets', []):
-                if balance['asset'] == asset:
-                    return float(balance['availableBalance'])
-        else:
-            for balance in account_info.get('balances', []):
-                if balance['asset'] == asset:
-                    return float(balance['free'])
-        return 0.0
-    
-    def place_futures_order(self, symbol, side, quantity, price=None, order_type='MARKET'):
-        """
-        선물 주문을 실행합니다.
-        """
-        if self.simulation_mode:
-            # 시뮬레이션 모드
-            order_id = f"sim_{int(time.time() * 1000)}"
-            executed_price = price if price else self.get_current_price(symbol)
-            
-            print(f"시뮬레이션 선물 주문: {side} {quantity} {symbol} @ {executed_price}")
-            
-            return {
-                'orderId': order_id,
-                'symbol': symbol,
-                'side': side,
-                'quantity': quantity,
-                'price': executed_price,
-                'status': 'FILLED'
-            }
-        
-        # 실제 선물 주문
-        params = {
-            'symbol': symbol,
-            'side': side,
-            'type': order_type,
-            'quantity': quantity
-        }
-        
-        if price and order_type == 'LIMIT':
-            params['price'] = price
-            params['timeInForce'] = 'GTC'
-        
-        return self._make_request('POST', '/fapi/v1/order', params, signed=True)
-    
-    def place_order(self, symbol, side, quantity, price=None, order_type='MARKET'):
-        """
-        주문을 실행합니다.
-        """
-        if self.trading_type == 'FUTURES':
-            return self.place_futures_order(symbol, side, quantity, price, order_type)
-        
-        if self.simulation_mode:
-            # 시뮬레이션 모드
-            order_id = f"sim_{int(time.time() * 1000)}"
-            executed_price = price if price else self.get_current_price(symbol)
-            
-            print(f"시뮬레이션 주문: {side} {quantity} {symbol} @ {executed_price}")
-            
-            return {
-                'orderId': order_id,
-                'symbol': symbol,
-                'side': side,
-                'quantity': quantity,
-                'price': executed_price,
-                'status': 'FILLED'
-            }
-        
-        # 실제 주문
-        params = {
-            'symbol': symbol,
-            'side': side,
-            'type': order_type,
-            'quantity': quantity
-        }
-        
-        if price and order_type == 'LIMIT':
-            params['price'] = price
-            params['timeInForce'] = 'GTC'
-        
-        return self._make_request('POST', '/api/v3/order', params, signed=True)
-    
-    def cancel_order(self, symbol, order_id):
-        """
-        주문을 취소합니다.
-        """
-        if self.simulation_mode:
-            print(f"시뮬레이션 주문 취소: {order_id}")
-            return {'status': 'CANCELED'}
-        
-        params = {
-            'symbol': symbol,
-            'orderId': order_id
-        }
-        
-        if self.trading_type == 'FUTURES':
-            return self._make_request('DELETE', '/fapi/v1/order', params, signed=True)
-        else:
-            return self._make_request('DELETE', '/api/v3/order', params, signed=True)
-    
-    def get_order_status(self, symbol, order_id):
-        """
-        주문 상태를 확인합니다.
-        """
-        if self.simulation_mode:
-            return {'status': 'FILLED'}
-        
-        params = {
-            'symbol': symbol,
-            'orderId': order_id
-        }
-        
-        if self.trading_type == 'FUTURES':
-            return self._make_request('GET', '/fapi/v1/order', params, signed=True)
-        else:
-            return self._make_request('GET', '/api/v3/order', params, signed=True)
-
-    def check_short_conditions(self, symbol, price, rsi_14_1m, rsi_7_1m, rsi_14_15m, rsi_7_15m, rsi_14_4h, rsi_7_4h):
-        conditions_met = []
-        # 4시간봉 RSI 과매수 조건
-        if self.buy_conditions.get('rsi_4h_oversold', True):
-            if (rsi_14_4h is not None and rsi_14_4h >= self.rsi_overbought) or \
-               (rsi_7_4h is not None and rsi_7_4h >= self.rsi_overbought):
-                conditions_met.append('4시간봉 RSI 과매수')
-        # 15분봉 RSI 과매수 조건
-        if self.buy_conditions['rsi_15m_oversold']:
-            if (rsi_14_15m is not None and rsi_14_15m >= self.rsi_overbought) or \
-               (rsi_7_15m is not None and rsi_7_15m >= self.rsi_overbought):
-                conditions_met.append('15분봉 RSI 과매수')
-        # 1분봉 RSI 과매수 조건
-        if self.buy_conditions['rsi_1m_oversold']:
-            if (rsi_14_1m is not None and rsi_14_1m >= self.rsi_overbought) or \
-               (rsi_7_1m is not None and rsi_7_1m >= self.rsi_overbought):
-                conditions_met.append('1분봉 RSI 과매수')
-        # 거래량 스파이크 조건 (필수)
-        if self.buy_conditions['volume_spike']:
-            volume_spike_15m, volume_ratio_15m = self.check_volume_spike(symbol, '15m')
-            volume_spike_1m, volume_ratio_1m = self.check_volume_spike(symbol, '1m')
-            if volume_spike_15m or volume_spike_1m:
-                max_ratio = max(volume_ratio_15m, volume_ratio_1m)
-            else:
-                return False, []
-        # 가격 하락 조건 (최근 10개 캔들 기준)
-        if self.buy_conditions['price_drop'] > 0:
-            if len(self.price_data_15m.get(symbol, [])) >= 10:
-                recent_prices = list(self.price_data_15m[symbol])[-10:]
-                price_drop = (recent_prices[0] - recent_prices[-1]) / recent_prices[0]
-        return len(conditions_met) >= 2, conditions_met
-
     def get_futures_usdt_symbols(self):
         """
         바이낸스 USDT-M 선물 마켓에서 실제 거래(TRADING) 중인 심볼 리스트 반환
@@ -999,7 +507,7 @@ class RSIMonitor:
         """
         4시간봉 321EMA와 현재가 이격률이 가장 작은 USDT-M 선물 코인 TOP N 반환
         """
-        symbols = self.get_futures_usdt_symbols()
+        symbols = self.futures_usdt_symbols
         results = []
         for symbol in symbols:
             try:

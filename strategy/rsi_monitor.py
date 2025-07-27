@@ -21,8 +21,8 @@ class RSIMonitor:
     def __init__(self):
         # 123456aq
         
-        self.rsi_overbought =90  # 과매수 RSI 임계값
-        self.rsi_oversold = 10  # 과매도 RSI 임계값
+        self.rsi_overbought =93  # 과매수 RSI 임계값
+        self.rsi_oversold = 7  # 과매도 RSI 임계값
         # self.rsi_warning_high = 85  # 주의 RSI 상단 임계값
         # self.rsi_warning_low =15   # 주의 RSI 하단 임계값
         self.data_length = 100  # RSI 계산을 위한 데이터 길이

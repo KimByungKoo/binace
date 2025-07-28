@@ -15,73 +15,86 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 import pickle
+import logging
+import sys
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler("rsi_monitor.log"), # 파일로 로그 저장
+                        logging.StreamHandler(sys.stdout)       # 콘솔에도 출력
+                    ])
+
+# 전역 예외 핸들러
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logging.critical("예상치 못한 오류 발생", exc_info=(exc_type, exc_value, exc_traceback))
+    # 여기에 봇 재시작 로직을 추가할 수 있습니다.
+    # 예: time.sleep(5); os.execv(sys.executable, ['python'] + sys.argv)
+
+sys.excepthook = handle_exception
 
 load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
-        self.cache_file = "cache_data.pkl"
-        # 123456aq
+        self.cache_file = "kline_cache.pkl" # 캐시 파일 이름 변경
         
-        self.rsi_overbought = 95  # 과매수 RSI 임계값
-        self.rsi_oversold = 5  # 과매도 RSI 임계값
-        self.rsi_overbought_15m = 80 # 15분봉 과매수 RSI 임계값
-        self.rsi_oversold_15m = 20 # 15분봉 과매도 RSI 임계값
-        # self.rsi_warning_high = 85  # 주의 RSI 상단 임계값
-        # self.rsi_warning_low =15   # 주의 RSI 하단 임계값
-        self.data_length = 100  # RSI 계산을 위한 데이터 길이
-        self.telegram_bot = TelegramBot(self)  # RSI 모니터 인스턴스 전달
-        
-        self.start_times = {}  # 각 심볼별 데이터 수집 시작 시간
-        self.price_data_4h = {}  # 4시간봉 가격 데이터
-        self.volume_data_4h = {}  # 4시간봉 거래량 데이터
-        self.current_rsi_14_4h = {}  # 4시간봉 RSI(14)
-        self.current_rsi_7_4h = {}   # 4시간봉 RSI(7)
-        self.alerted_overbought_14_4h = set()  # 4시간봉 RSI(14) 과매수 알림
-        self.alerted_oversold_14_4h = set()    # 4시간봉 RSI(14) 과매도 알림
-        self.alerted_overbought_7_4h = set()   # 4시간봉 RSI(7) 과매수 알림
-        self.alerted_oversold_7_4h = set()     # 4시간봉 RSI(7) 과매도 알림
-        self.alerted_warning_high_14_4h = set()  # 4시간봉 RSI(14) 주의 상단
-        self.alerted_warning_low_14_4h = set()   # 4시간봉 RSI(14) 주의 하단
-        self.alerted_warning_high_7_4h = set()   # 4시간봉 RSI(7) 주의 상단
-        self.alerted_warning_low_7_4h = set()    # 4시간봉 RSI(7) 주의 하단
+        # RSI 임계값
+        self.rsi_overbought = 90
+        self.rsi_oversold = 10
+        self.rsi_overbought_15m = 80
+        self.rsi_oversold_15m = 20
 
-        self.price_data_15m = {}  # 15분봉 가격 데이터
-        self.volume_data_15m = {} # 15분봉 거래량 데이터
-        self.current_rsi_14_15m = {} # 15분봉 RSI(14)
-        self.current_rsi_7_15m = {} # 15분봉 RSI(7)
-        self.alerted_overbought_14_15m = set() # 15분봉 RSI(14) 과매수 알림
-        self.alerted_oversold_14_15m = set() # 15분봉 RSI(14) 과매도 알림
-        self.alerted_overbought_7_15m = set() # 15분봉 RSI(7) 과매수 알림
-        self.alerted_oversold_7_15m = set() # 15분봉 RSI(7) 과매도 알림
+        self.data_length = 200  # RSI 계산을 위한 데이터 길이 (조금 더 넉넉하게)
+        self.telegram_bot = TelegramBot(self)
         
-        # SL/TP 관련 설정
-        self.investment_amount = 10  # 투자금액 (USDT)
-        self.leverage = 10  # 레버리지 배수
-        self.position_size_usdt = self.investment_amount * self.leverage  # 실제 포지션 크기 (100 USDT)
-        self.roi_threshold = 0.05  # ROI 5% 기준
-        self.stop_loss_percent = 0.02  # 손절 2%
-        self.take_profit_percent = 0.05  # 익절 5%
-        self.active_positions = {}  # 활성 포지션 관리
-        self.position_history = []  # 거래 이력
+        # 데이터 저장 구조 변경: 캔들 전체 정보를 저장
+        self.kline_data_4h = {} # 4시간봉 캔들 데이터
+        self.kline_data_15m = {} # 15분봉 캔들 데이터
+
+        # 실시간 RSI 값 저장
+        self.current_rsi_14_4h = {}
+        self.current_rsi_7_4h = {}
+        self.current_rsi_14_15m = {}
+        self.current_rsi_7_15m = {}
+
+        # 알림 상태 관리
+        self.alerted_overbought_14_4h = set()
+        self.alerted_oversold_14_4h = set()
+        self.alerted_overbought_7_4h = set()
+        self.alerted_oversold_7_4h = set()
+        self.alerted_overbought_14_15m = set()
+        self.alerted_oversold_14_15m = set()
+
+        # ... (기존 나머지 설정들은 유지) ...
+        
+        self.investment_amount = 10
+        self.leverage = 10
+        self.position_size_usdt = self.investment_amount * self.leverage
+        self.roi_threshold = 0.05
+        self.stop_loss_percent = 0.02
+        self.take_profit_percent = 0.05
+        self.active_positions = {}
+        self.position_history = []
         
         self.futures_usdt_symbols = self.get_futures_usdt_symbols()
-        # 자동주문 옵션
-        self.auto_trading = False  # True: 자동주문 활성화, False: 자동주문 비활성화
+        self.auto_trading = False
         
-        # 매수 조건 설정
         self.buy_conditions = {
-            'rsi_15m_oversold': True,  # 15분봉 RSI 과매도
-            'rsi_1m_oversold': True,   # 1분봉 RSI 과매도
-            'volume_spike': True,      # 거래량 스파이크 (필수 조건)
-            'price_drop': 0.03         # 가격 하락 3% 이상
+            'rsi_15m_oversold': True,
+            'rsi_1m_oversold': True,
+            'volume_spike': True,
+            'price_drop': 0.03
         }
         
-        # 거래량 스파이크 설정
-        self.volume_spike_threshold = 10.0  # 평균 대비 2배 이상 거래량
-        self.volume_lookback_period = 20   # 거래량 평균 계산 기간
+        self.volume_spike_threshold = 10.0
+        self.volume_lookback_period = 20
         
-        # 바이낸스 API 설정
         self.api_key = os.getenv('BINANCE_API_KEY')
         self.api_secret = os.getenv('BINANCE_API_SECRET')
         self.base_url = 'https://api.binance.com'
@@ -93,7 +106,6 @@ class RSIMonitor:
         else:
             print("🚀 실제 거래 모드로 실행 중")
         
-        # API 키 확인
         if not self.api_key or not self.api_secret:
             print("⚠️ 경고: 바이낸스 API 키가 설정되지 않았습니다. 시뮬레이션 모드로 실행됩니다.")
             self.simulation_mode = True
@@ -101,39 +113,45 @@ class RSIMonitor:
             self.simulation_mode = False
             print("✅ 바이낸스 API 키가 설정되었습니다.")
         
-        # 거래 설정
-        self.min_order_amount = 10  # 최소 주문 금액 (USDT)
-        self.max_positions = 3      # 최대 동시 포지션 수
-        self.trading_type = 'FUTURES'  # 거래 타입 (FUTURES/MARGIN/SPOT)
+        self.min_order_amount = 10
+        self.max_positions = 3
+        self.trading_type = 'FUTURES'
         
-        # 선물 거래 설정
         if self.trading_type == 'FUTURES':
-            self.base_url = 'https://fapi.binance.com'  # 선물 거래 API
+            self.base_url = 'https://fapi.binance.com'
             print("📈 선물 거래 모드로 설정됨")
 
-    def get_historical_data(self, symbol, interval='1m', limit=100):
+    def get_historical_data(self, symbol, interval, limit=None, startTime=None):
         """
-        Binance API를 통해 과거 데이터를 가져옵니다.
+        Binance API를 통해 과거 KLINE 데이터를 가져옵니다.
+        startTime 파라미터를 지원하도록 수정되었습니다.
         """
         try:
             url = "https://fapi.binance.com/fapi/v1/klines"
             params = {
                 'symbol': symbol,
                 'interval': interval,
-                'limit': limit
             }
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                data = response.json()
-                prices = [float(candle[4]) for candle in data]  # 종가
-                volumes = [float(candle[5]) for candle in data]  # 거래량
-                return prices, volumes
-            else:
-                print(f"Error fetching historical data for {symbol}: {response.text}")
-                return [], []
+            if limit:
+                params['limit'] = limit
+            if startTime:
+                params['startTime'] = startTime
+
+            response = requests.get(url, params=params, timeout=10) # 타임아웃 추가
+            response.raise_for_status() # HTTP 오류 발생 시 예외 발생
+            return response.json() # 전체 kline 데이터 반환
+        except requests.exceptions.Timeout:
+            logging.error(f"[{symbol}-{interval}] 데이터 요청 타임아웃 발생.")
+            return []
+        except requests.exceptions.RequestException as e:
+            logging.error(f"[{symbol}-{interval}] 데이터 요청 중 네트워크 오류 발생: {e}")
+            return []
+        except json.JSONDecodeError:
+            logging.error(f"[{symbol}-{interval}] API 응답 JSON 디코딩 실패: {response.text}")
+            return []
         except Exception as e:
-            print(f"Error fetching historical data for {symbol}: {e}")
-            return [], []
+            logging.error(f"[{symbol}-{interval}] get_historical_data 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
+            return []
 
     def initialize_symbol_data(self, symbol):
         """
@@ -192,36 +210,41 @@ class RSIMonitor:
 
     def get_current_rsi(self):
         """
-        현재 모든 심볼의 4시간봉 RSI 값을 반환합니다.
+        현재 모든 심볼의 4시간봉 및 15분봉 RSI 값을 반환합니다.
         """
-        print("\n=== 현재 4시간봉 RSI 상태 ===")
+        print("\n=== 현재 RSI 상태 ===")
         result = {}
-        # 4시간봉 데이터가 있는 심볼만 순회
-        for symbol in self.current_rsi_14_4h.keys():
-            rsi14 = self.current_rsi_14_4h.get(symbol)
-            rsi7 = self.current_rsi_7_4h.get(symbol)
-            if rsi14 is not None and rsi7 is not None:
-                result[symbol] = {
-                    '4h': {
-                        'rsi14': rsi14,
-                        'rsi7': rsi7
-                    }
-                }
-                print(f"{symbol}:")
-                print(f"  4시간봉 RSI(14) = {rsi14:.2f}")
-                print(f"  4시간봉 RSI(7) = {rsi7:.2f}")
+        all_symbols = set(self.current_rsi_14_4h.keys()) | set(self.current_rsi_14_15m.keys())
+
+        for symbol in all_symbols:
+            result[symbol] = {}
+            
+            # 4시간봉 데이터
+            rsi14_4h = self.current_rsi_14_4h.get(symbol)
+            rsi7_4h = self.current_rsi_7_4h.get(symbol)
+            if rsi14_4h is not None and rsi7_4h is not None:
+                result[symbol]['4h'] = {'rsi14': rsi14_4h, 'rsi7': rsi7_4h}
+                print(f"{symbol} 4h: RSI(14)={rsi14_4h:.2f}, RSI(7)={rsi7_4h:.2f}")
+
+            # 15분봉 데이터
+            rsi14_15m = self.current_rsi_14_15m.get(symbol)
+            rsi7_15m = self.current_rsi_7_15m.get(symbol)
+            if rsi14_15m is not None and rsi7_15m is not None:
+                result[symbol]['15m'] = {'rsi14': rsi14_15m, 'rsi7': rsi7_15m}
+                # print(f"{symbol} 15m: RSI(14)={rsi14_15m:.2f}, RSI(7)={rsi7_15m:.2f}")
+
         print("===================\n")
         return result
 
     def get_rsi_summary_messages(self):
         """
-        4시간봉 RSI 요약 메시지들을 생성하여 반환합니다.
+        4시간봉 RSI 요약 메시지들을 생성하여 반환합니다. (15분봉 데이터 포함)
         """
         rsi_dict = self.get_current_rsi()
         messages = []
         
         if not rsi_dict:
-            return ["⚠️ 4시간봉 RSI 데이터가 없습니다."]
+            return ["⚠️ RSI 데이터가 없습니다."]
         
         # 4시간봉 과매수/과매도 TOP10
         rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
@@ -232,15 +255,31 @@ class RSIMonitor:
         if rsi_4h_over:
             msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
             for symbol, rsi in rsi_4h_over:
-                m4h = rsi_dict[symbol]['4h']
-                msg_4h_over += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']:.2f}\n  RSI(7): {m4h['rsi7']:.2f}\n\n"
+                m4h = rsi_dict[symbol].get('4h', {})
+                m15m = rsi_dict[symbol].get('15m', {})
+                rsi14_4h = m4h.get('rsi14', 'N/A')
+                rsi7_4h = m4h.get('rsi7', 'N/A')
+                rsi14_15m = m15m.get('rsi14', 'N/A')
+                rsi7_15m = m15m.get('rsi7', 'N/A')
+                
+                msg_4h_over += f"<b>{symbol}</b>\n" \
+                              f"  - 4h: {rsi14_4h:.2f} | {rsi7_4h:.2f}\n" \
+                              f"  - 15m: {rsi14_15m:.2f} | {rsi7_15m:.2f}\n\n"
             messages.append(msg_4h_over)
         
         if rsi_4h_under:
             msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
             for symbol, rsi in rsi_4h_under:
-                m4h = rsi_dict[symbol]['4h']
-                msg_4h_under += f"<b>{symbol}</b>\n  RSI(14): {m4h['rsi14']:.2f}\n  RSI(7): {m4h['rsi7']:.2f}\n\n"
+                m4h = rsi_dict[symbol].get('4h', {})
+                m15m = rsi_dict[symbol].get('15m', {})
+                rsi14_4h = m4h.get('rsi14', 'N/A')
+                rsi7_4h = m4h.get('rsi7', 'N/A')
+                rsi14_15m = m15m.get('rsi14', 'N/A')
+                rsi7_15m = m15m.get('rsi7', 'N/A')
+
+                msg_4h_under += f"<b>{symbol}</b>\n" \
+                               f"  - 4h: {rsi14_4h:.2f} | {rsi7_4h:.2f}\n" \
+                               f"  - 15m: {rsi14_15m:.2f} | {rsi7_15m:.2f}\n\n"
             messages.append(msg_4h_under)
             
         if not messages:
@@ -258,88 +297,89 @@ class RSIMonitor:
             symbol = stream_data.get('s', '')
             kline = stream_data.get('k', {})
             interval = kline.get('i', '')
-            price = float(kline.get('c', 0))
-            volume = float(kline.get('v', 0))
             is_closed = kline.get('x', False)
 
-            if not symbol or price == 0:
+            if not symbol or not kline:
+                logging.debug(f"유효하지 않은 웹소켓 메시지 수신: {message}")
                 return
+
+            # 실시간 kline 데이터를 self.kline_data에 반영
+            kline_data_deque = None
+            if interval == '4h':
+                kline_data_deque = self.kline_data_4h
+            elif interval == '15m':
+                kline_data_deque = self.kline_data_15m
+            
+            if kline_data_deque is None or symbol not in kline_data_deque:
+                logging.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
+                return
+
+            new_kline = [
+                kline['t'], kline['o'], kline['h'], kline['l'], kline['c'], kline['v'],
+                kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']
+            ]
+
+            if is_closed:
+                kline_data_deque[symbol].append(new_kline)
+                logging.debug(f"[{symbol}-{interval}] 캔들 마감: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
+            else:
+                if kline_data_deque[symbol]:
+                    kline_data_deque[symbol][-1] = new_kline
+                else:
+                    kline_data_deque[symbol].append(new_kline)
+                logging.debug(f"[{symbol}-{interval}] 캔들 업데이트: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
+
+            # RSI 계산을 위한 종가 리스트 추출
+            close_prices = [float(k[4]) for k in kline_data_deque[symbol]]
+            if len(close_prices) < 14:
+                logging.debug(f"[{symbol}-{interval}] RSI 계산을 위한 데이터 부족 ({len(close_prices)}/14)")
+                return
+
+            # 실시간 RSI 계산
+            rsi_14 = calculate_rsi_binance(close_prices, period=14)
+            rsi_7 = calculate_rsi_binance(close_prices, period=7)
 
             # 4시간봉 데이터 처리: 상태 업데이트
             if interval == '4h':
-                if symbol not in self.price_data_4h: return
-                
-                price_list_4h = list(self.price_data_4h[symbol])
-                if is_closed:
-                    self.price_data_4h[symbol].append(price)
-                    self.volume_data_4h[symbol].append(volume)
-                    price_list_4h = list(self.price_data_4h[symbol])
-                else:
-                    if price_list_4h: price_list_4h[-1] = price
-                    else: price_list_4h = [price]
-
-                if len(price_list_4h) >= 14:
-                    rsi_14_4h = calculate_rsi_binance(price_list_4h, period=14)
-                    rsi_7_4h = calculate_rsi_binance(price_list_4h, period=7)
-                    self.current_rsi_14_4h[symbol] = rsi_14_4h
-                    self.current_rsi_7_4h[symbol] = rsi_7_4h
-
-                    # 4시간봉 과매수/과매도 상태만 기록 (알림 X)
-                    if rsi_14_4h >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
-                    else: self.alerted_overbought_14_4h.discard(symbol)
-                    
-                    if rsi_14_4h <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
-                    else: self.alerted_oversold_14_4h.discard(symbol)
-
-                    if rsi_7_4h >= self.rsi_overbought: self.alerted_overbought_7_4h.add(symbol)
-                    else: self.alerted_overbought_7_4h.discard(symbol)
-
-                    if rsi_7_4h <= self.rsi_oversold: self.alerted_oversold_7_4h.add(symbol)
-                    else: self.alerted_oversold_7_4h.discard(symbol)
+                self.current_rsi_14_4h[symbol] = rsi_14
+                self.current_rsi_7_4h[symbol] = rsi_7
+                if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
+                else: self.alerted_overbought_14_4h.discard(symbol)
+                if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
+                else: self.alerted_oversold_14_4h.discard(symbol)
 
             # 15분봉 데이터 처리: 조건 결합 및 알림
             elif interval == '15m':
-                if symbol not in self.price_data_15m: return
+                self.current_rsi_14_15m[symbol] = rsi_14
+                self.current_rsi_7_15m[symbol] = rsi_7
+                price = float(kline['c'])
 
-                price_list_15m = list(self.price_data_15m[symbol])
-                if is_closed:
-                    self.price_data_15m[symbol].append(price)
-                    self.volume_data_15m[symbol].append(volume)
-                    price_list_15m = list(self.price_data_15m[symbol])
-                else:
-                    if price_list_15m: price_list_15m[-1] = price
-                    else: price_list_15m = [price]
+                # 조건 동시 만족 시 알림
+                if (rsi_14 >= self.rsi_overbought_15m and 
+                    symbol in self.alerted_overbought_14_4h and 
+                    symbol not in self.alerted_overbought_14_15m):
+                    msg = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
+                    self.telegram_bot.send_message(msg)
+                    self.alerted_overbought_14_15m.add(symbol)
+                    logging.info(f"[{symbol}] 4h 과매수 & 15m 과매수 동시 만족 알림 발송.")
 
-                if len(price_list_15m) >= 14:
-                    rsi_14_15m = calculate_rsi_binance(price_list_15m, period=14)
-                    rsi_7_15m = calculate_rsi_binance(price_list_15m, period=7)
-                    self.current_rsi_14_15m[symbol] = rsi_14_15m
-                    self.current_rsi_7_15m[symbol] = rsi_7_15m
+                elif (rsi_14 <= self.rsi_oversold_15m and
+                      symbol in self.alerted_oversold_14_4h and
+                      symbol not in self.alerted_oversold_14_15m):
+                    msg = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
+                    self.telegram_bot.send_message(msg)
+                    self.alerted_oversold_14_15m.add(symbol)
+                    logging.info(f"[{symbol}] 4h 과매도 & 15m 과매도 동시 만족 알림 발송.")
+                
+                # 15분봉 알림 상태 해제
+                if rsi_14 < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
+                if rsi_14 > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
 
-                    # --- 조건 동시 만족 시 알림 ---
-                    # 1. 4h 과매수 + 15m 과매수
-                    if (rsi_14_15m >= self.rsi_overbought_15m and 
-                        symbol in self.alerted_overbought_14_4h and 
-                        symbol not in self.alerted_overbought_14_15m):
-                        msg = self.create_alert_message(symbol, "과매수", price, rsi_14_15m, rsi_7_15m)
-                        self.telegram_bot.send_message(msg)
-                        self.alerted_overbought_14_15m.add(symbol)
-
-                    # 2. 4h 과매도 + 15m 과매도
-                    elif (rsi_14_15m <= self.rsi_oversold_15m and
-                          symbol in self.alerted_oversold_14_4h and
-                          symbol not in self.alerted_oversold_14_15m):
-                        msg = self.create_alert_message(symbol, "과매도", price, rsi_14_15m, rsi_7_15m)
-                        self.telegram_bot.send_message(msg)
-                        self.alerted_oversold_14_15m.add(symbol)
-                    
-                    # 15분봉 알림 상태 해제
-                    if rsi_14_15m < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
-                    if rsi_14_15m > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
-
+        except json.JSONDecodeError:
+            logging.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
         except Exception as e:
-            print(f"Error processing message: {e}")
-            print(f"Raw message: {message}")
+            logging.error(f"on_message 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
+            logging.error(f"Raw message: {message}")
 
     def create_alert_message(self, symbol, alert_type, price, rsi_14_15m, rsi_7_15m):
         """
@@ -378,123 +418,128 @@ class RSIMonitor:
 
     def _load_initial_data(self):
         """
-        백그라운드에서 초기 데이터를 안전하게 로드하고 RSI를 계산합니다.
-        캐시 파일이 있으면 캐시를 사용합니다.
+        백그라운드에서 초기 데이터를 로드하고, 데이터 갭을 채웁니다.
         """
+        logging.info("백그라운드 데이터 처리 시작...")
+        symbols = self.get_futures_usdt_symbols()
+        if not symbols:
+            logging.warning("모니터링할 심볼이 없습니다.")
+            return
+
+        cached_kline_data = {}
         if os.path.exists(self.cache_file):
-            print("캐시 파일에서 데이터를 로드합니다...")
+            logging.info(f"캐시 파일({self.cache_file}) 로드 중...")
             try:
                 with open(self.cache_file, 'rb') as f:
-                    cached_data = pickle.load(f)
-                self.price_data_4h = cached_data['price_data_4h']
-                self.volume_data_4h = cached_data['volume_data_4h']
-                self.price_data_15m = cached_data['price_data_15m']
-                self.volume_data_15m = cached_data['volume_data_15m']
-                self.current_rsi_14_4h = cached_data['current_rsi_14_4h']
-                self.current_rsi_7_4h = cached_data['current_rsi_7_4h']
-                self.current_rsi_14_15m = cached_data['current_rsi_14_15m']
-                self.current_rsi_7_15m = cached_data['current_rsi_7_15m']
-                print("캐시 로드 완료.")
-                # 초기 RSI 상태 메시지 전송
-                if self.current_rsi_14_4h:
-                    print("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
-                    rsi_messages = self.get_rsi_summary_messages()
-                    for message in rsi_messages:
-                        self.telegram_bot.send_message(message)
-                else:
-                    print("전송할 초기 RSI 데이터가 없습니다.")
-                return  # 캐시 로드 성공 시 함수 종료
+                    cached_kline_data = pickle.load(f)
+                logging.info("캐시 로드 완료.")
+            except (IOError, pickle.PickleError) as e:
+                logging.error(f"캐시 로드 실패: {e}. 캐시 파일을 삭제하고 다시 시도합니다.", exc_info=True)
+                if os.path.exists(self.cache_file):
+                    os.remove(self.cache_file)
             except Exception as e:
-                print(f"캐시 로드 실패: {e}")
-                # 캐시 파일이 손상되었을 수 있으므로 삭제
-                os.remove(self.cache_file)
+                logging.error(f"_load_initial_data 캐시 로드 중 예상치 못한 오류 발생: {e}", exc_info=True)
+                if os.path.exists(self.cache_file):
+                    os.remove(self.cache_file)
 
-        print("API를 통해 데이터를 로드합니다...")
-        symbols = self.futures_usdt_symbols
-        symbols = list(dict.fromkeys(symbols)) # 중복 제거
-        
         for symbol in symbols:
-            try:
-                # API 속도 제한을 피하기 위해 0.5초 딜레이
-                time.sleep(0.5)
-                print(f"{symbol} 데이터 로드 중...")
-                prices_4h, volumes_4h = self.get_historical_data(symbol, interval='4h', limit=self.data_length)
-                prices_15m, volumes_15m = self.get_historical_data(symbol, interval='15m', limit=self.data_length)
+            time.sleep(0.1) # API 요청 제한 방지
+            # Initialize deques once per symbol, outside the interval loop
+            self.kline_data_4h[symbol] = deque(maxlen=self.data_length)
+            self.kline_data_15m[symbol] = deque(maxlen=self.data_length)
+
+            for interval in ['4h', '15m']:
+                kline_data_key = f"kline_data_{interval}"
                 
-                if prices_4h and len(prices_4h) >= 14:
-                    self.price_data_4h[symbol] = deque(prices_4h, maxlen=self.data_length)
-                    self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
-                    
-                    rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
-                    rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
-                    
-                    self.current_rsi_14_4h[symbol] = rsi_14_4h
-                    self.current_rsi_7_4h[symbol] = rsi_7_4h
+                # Select the correct deque based on interval
+                target_kline_deque = None
+                if interval == '4h':
+                    target_kline_deque = self.kline_data_4h[symbol]
+                elif interval == '15m':
+                    target_kline_deque = self.kline_data_15m[symbol]
+                
+                if target_kline_deque is None:
+                    logging.error(f"Invalid interval {interval} for symbol {symbol}")
+                    continue
+
+                last_kline_time = 0
+                # 1. 캐시된 데이터가 있으면 마지막 시간 확인
+                if symbol in cached_kline_data and kline_data_key in cached_kline_data[symbol]:
+                    target_kline_deque.extend(cached_kline_data[symbol][kline_data_key])
+                    if target_kline_deque:
+                        last_kline_time = target_kline_deque[-1][0] # 캔들 시작 시간
+
+                # 2. 데이터 갭 채우기 또는 초기 데이터 로드
+                if last_kline_time > 0:
+                    # 마지막 시간 이후의 데이터만 요청 (갭 채우기)
+                    logging.info(f"[{symbol}-{interval}] 데이터 갭 채우는 중...")
+                    missing_data = self.get_historical_data(symbol, interval, startTime=last_kline_time + 1)
+                    if missing_data:
+                        target_kline_deque.extend(missing_data)
                 else:
-                    print(f"[데이터 부족] {symbol} (4h): 데이터가 부족하여 모니터링에서 제외됩니다.")
+                    # 캐시가 없으면 전체 데이터 요청 (초기 로드)
+                    logging.info(f"[{symbol}-{interval}] 초기 데이터 로드 중...")
+                    initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
+                    if initial_data:
+                        target_kline_deque.extend(initial_data)
 
-                if prices_15m and len(prices_15m) >= 14:
-                    self.price_data_15m[symbol] = deque(prices_15m, maxlen=self.data_length)
-                    self.volume_data_15m[symbol] = deque(volumes_15m, maxlen=self.data_length)
-
-                    rsi_14_15m = calculate_rsi_binance(list(prices_15m), period=14)
-                    rsi_7_15m = calculate_rsi_binance(list(prices_15m), period=7)
-
-                    self.current_rsi_14_15m[symbol] = rsi_14_15m
-                    self.current_rsi_7_15m[symbol] = rsi_7_15m
-                else:
-                    print(f"[데이터 부족] {symbol} (15m): 데이터가 부족하여 모니터링에서 제외됩니다.")
-
-            except Exception as e:
-                print(f"{symbol} 데이터 로드 중 오류 발생: {e}")
-
-        # 데이터 로드 완료 후 캐시 파일 저장
+                # 3. 초기 RSI 계산
+                if len(target_kline_deque) >= 14:
+                    close_prices = [float(k[4]) for k in target_kline_deque]
+                    if interval == '4h':
+                        self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
+                        self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
+                    elif interval == '15m':
+                        self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
+                        self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
+        
+        # 4. 최종 데이터를 캐시에 저장
+        logging.info("최신 데이터 캐싱 중...")
         try:
             with open(self.cache_file, 'wb') as f:
-                cached_data = {
-                    'price_data_4h': self.price_data_4h,
-                    'volume_data_4h': self.volume_data_4h,
-                    'price_data_15m': self.price_data_15m,
-                    'volume_data_15m': self.volume_data_15m,
-                    'current_rsi_14_4h': self.current_rsi_14_4h,
-                    'current_rsi_7_4h': self.current_rsi_7_4h,
-                    'current_rsi_14_15m': self.current_rsi_14_15m,
-                    'current_rsi_7_15m': self.current_rsi_7_15m
-                }
-                pickle.dump(cached_data, f)
-            print("데이터를 캐시 파일에 저장했습니다.")
+                data_to_cache = {}
+                for symbol in symbols:
+                    data_to_cache[symbol] = {
+                        "kline_data_4h": list(self.kline_data_4h.get(symbol, deque())),
+                        "kline_data_15m": list(self.kline_data_15m.get(symbol, deque()))
+                    }
+                pickle.dump(data_to_cache, f)
+            logging.info("캐싱 완료.")
+        except (IOError, pickle.PickleError) as e:
+            logging.error(f"캐시 파일 저장 실패: {e}", exc_info=True)
         except Exception as e:
-            print(f"캐시 파일 저장 실패: {e}")
+            logging.error(f"_load_initial_data 캐시 저장 중 예상치 못한 오류 발생: {e}", exc_info=True)
 
-        print("\n초기 데이터 로드가 완료되었습니다.")
+        logging.info("초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송
         if self.current_rsi_14_4h:
-            print("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
+            logging.info("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
             rsi_messages = self.get_rsi_summary_messages()
             for message in rsi_messages:
                 self.telegram_bot.send_message(message)
         else:
-            print("전송할 초기 RSI 데이터가 없습니다.")
+            logging.info("전송할 초기 RSI 데이터가 없습니다.")
 
     def start_monitoring(self):
+        logging.info("모니터링 시작...")
         # 1. 모든 심볼 리스트 가져오기 (API 호출 최소화)
         all_symbols = self.futures_usdt_symbols
         if not all_symbols:
-            print("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
+            logging.critical("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
             return
 
         # 2. 백그라운드에서 데이터 로드 시작
         threading.Thread(target=self._load_initial_data, daemon=True).start()
 
         # 3. 웹소켓 연결 시작
-        print(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
+        logging.info(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
         chunk_size = 20
         symbol_chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
         
         for chunk in symbol_chunks:
-            streams = [f"{s.lower()}@kline_4h" for s in chunk]
+            streams = [f"{s.lower()}@kline_4h" for s in chunk] + [f"{s.lower()}@kline_15m" for s in chunk]
             ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-            print(f"Connecting to WebSocket for {len(chunk)} symbols...")
+            logging.info(f"Connecting to WebSocket for {len(chunk)} symbols: {ws_url}")
             ws = websocket.WebSocketApp(
                 ws_url,
                 on_message=self.on_message,

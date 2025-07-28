@@ -320,7 +320,7 @@ class RSIMonitor:
                 kline_data_deque = self.kline_data_15m
             
             if kline_data_deque is None or symbol not in kline_data_deque:
-                # logging.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
+                logger.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
                 return
 
             new_kline = [

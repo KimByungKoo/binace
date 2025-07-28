@@ -272,8 +272,8 @@ class RSIMonitor:
                 rsi7_15m = m15m.get('rsi7', 'N/A')
                 
                 msg_4h_over += f"<b>{symbol}</b>\n" \
-                              f"  - 4h: {rsi14_4h:.2f} | {rsi7_4h:.2f}\n" \
-                              f"  - 15m: {rsi14_15m:.2f} | {rsi7_15m:.2f}\n\n"
+                              f"  - 4h: (14)-{rsi14_4h:.2f} | (7)-{rsi7_4h:.2f}\n" \
+                              f"  - 15m: (14)-{rsi14_15m:.2f} | (7)-{rsi7_15m:.2f}\n\n"
             messages.append(msg_4h_over)
         
         if rsi_4h_under:

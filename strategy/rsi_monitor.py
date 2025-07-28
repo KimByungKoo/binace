@@ -548,7 +548,7 @@ class RSIMonitor:
                 on_open=self.on_open
             )
             threading.Thread(
-                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10),
+                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=30),
                 daemon=True
             ).start()
             

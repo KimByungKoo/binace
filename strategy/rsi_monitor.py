@@ -575,7 +575,7 @@ class RSIMonitor:
             response_ticker = requests.get(url_ticker)
             if response_ticker.status_code != 200:
                 logging.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
-                return symbols[:200]  # 실패 시 기본 리스트로 대체
+                return symbols[:100]  # 실패 시 기본 리스트로 대체
             
             ticker_data = response_ticker.json()
             # 거래량 기준 정렬

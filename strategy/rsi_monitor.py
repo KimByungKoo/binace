@@ -14,11 +14,13 @@ import urllib.parse
 import os
 from dotenv import load_dotenv
 import numpy as np
+import pickle
 
 load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
+        self.cache_file = "cache_data.pkl"
         # 123456aq
         
         self.rsi_overbought = 95  # 과매수 RSI 임계값
@@ -377,8 +379,37 @@ class RSIMonitor:
     def _load_initial_data(self):
         """
         백그라운드에서 초기 데이터를 안전하게 로드하고 RSI를 계산합니다.
+        캐시 파일이 있으면 캐시를 사용합니다.
         """
-        print("백그라운드에서 초기 데이터 로드를 시작합니다...")
+        if os.path.exists(self.cache_file):
+            print("캐시 파일에서 데이터를 로드합니다...")
+            try:
+                with open(self.cache_file, 'rb') as f:
+                    cached_data = pickle.load(f)
+                self.price_data_4h = cached_data['price_data_4h']
+                self.volume_data_4h = cached_data['volume_data_4h']
+                self.price_data_15m = cached_data['price_data_15m']
+                self.volume_data_15m = cached_data['volume_data_15m']
+                self.current_rsi_14_4h = cached_data['current_rsi_14_4h']
+                self.current_rsi_7_4h = cached_data['current_rsi_7_4h']
+                self.current_rsi_14_15m = cached_data['current_rsi_14_15m']
+                self.current_rsi_7_15m = cached_data['current_rsi_7_15m']
+                print("캐시 로드 완료.")
+                # 초기 RSI 상태 메시지 전송
+                if self.current_rsi_14_4h:
+                    print("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
+                    rsi_messages = self.get_rsi_summary_messages()
+                    for message in rsi_messages:
+                        self.telegram_bot.send_message(message)
+                else:
+                    print("전송할 초기 RSI 데이터가 없습니다.")
+                return  # 캐시 로드 성공 시 함수 종료
+            except Exception as e:
+                print(f"캐시 로드 실패: {e}")
+                # 캐시 파일이 손상되었을 수 있으므로 삭제
+                os.remove(self.cache_file)
+
+        print("API를 통해 데이터를 로드합니다...")
         symbols = self.futures_usdt_symbols
         symbols = list(dict.fromkeys(symbols)) # 중복 제거
         
@@ -416,6 +447,24 @@ class RSIMonitor:
 
             except Exception as e:
                 print(f"{symbol} 데이터 로드 중 오류 발생: {e}")
+
+        # 데이터 로드 완료 후 캐시 파일 저장
+        try:
+            with open(self.cache_file, 'wb') as f:
+                cached_data = {
+                    'price_data_4h': self.price_data_4h,
+                    'volume_data_4h': self.volume_data_4h,
+                    'price_data_15m': self.price_data_15m,
+                    'volume_data_15m': self.volume_data_15m,
+                    'current_rsi_14_4h': self.current_rsi_14_4h,
+                    'current_rsi_7_4h': self.current_rsi_7_4h,
+                    'current_rsi_14_15m': self.current_rsi_14_15m,
+                    'current_rsi_7_15m': self.current_rsi_7_15m
+                }
+                pickle.dump(cached_data, f)
+            print("데이터를 캐시 파일에 저장했습니다.")
+        except Exception as e:
+            print(f"캐시 파일 저장 실패: {e}")
 
         print("\n초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송

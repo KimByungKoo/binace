@@ -148,7 +148,9 @@ class RSIMonitor:
 
             response = requests.get(url, params=params, timeout=10) # 타임아웃 추가
             response.raise_for_status() # HTTP 오류 발생 시 예외 발생
-            return response.json() # 전체 kline 데이터 반환
+            data = response.json()
+            logging.debug(f"[{symbol}-{interval}] get_historical_data 응답: {len(data)}개 데이터 수신")
+            return data # 전체 kline 데이터 반환
         except requests.exceptions.Timeout:
             logging.error(f"[{symbol}-{interval}] 데이터 요청 타임아웃 발생.")
             return []
@@ -162,29 +164,7 @@ class RSIMonitor:
             logging.error(f"[{symbol}-{interval}] get_historical_data 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
             return []
 
-    def initialize_symbol_data(self, symbol):
-        """
-        심볼의 초기 4시간봉 데이터를 설정합니다.
-        """
-        print(f"\n{symbol} 초기 데이터 로드 시작...")
-        prices_4h, volumes_4h = self.get_historical_data(symbol, interval='4h', limit=self.data_length)
-        
-        if len(prices_4h) < 14: # RSI 계산을 위한 최소 데이터 확인
-            print(f"{symbol} 초기 데이터 부족: {len(prices_4h)}개. 모니터링에서 제외될 수 있습니다.")
-            return
-
-        self.price_data_4h[symbol] = deque(prices_4h, maxlen=self.data_length)
-        self.volume_data_4h[symbol] = deque(volumes_4h, maxlen=self.data_length)
-        
-        rsi_14_4h = calculate_rsi_binance(list(prices_4h), period=14)
-        rsi_7_4h = calculate_rsi_binance(list(prices_4h), period=7)
-        
-        self.current_rsi_14_4h[symbol] = rsi_14_4h
-        self.current_rsi_7_4h[symbol] = rsi_7_4h
-        
-        print(f"{symbol} 초기 4시간봉 RSI 계산 완료:")
-        print(f"RSI(14): {rsi_14_4h:.2f}")
-        print(f"RSI(7): {rsi_7_4h:.2f}")
+    
         
     def check_volume_spike(self, symbol, interval='15m'):
         """
@@ -425,15 +405,18 @@ class RSIMonitor:
     def on_open(self, ws):
         print(f"WebSocket connection opened. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    def _load_initial_data(self):
+    def _load_initial_data(self, symbols):
         """
         백그라운드에서 초기 데이터를 로드하고, 데이터 갭을 채웁니다.
         """
         logging.info("백그라운드 데이터 처리 시작...")
-        symbols = self.get_futures_usdt_symbols()
+        # symbols = self.get_futures_usdt_symbols() # 이제 인자로 받으므로 주석 처리
         if not symbols:
             logging.warning("모니터링할 심볼이 없습니다.")
             return
+
+        total_symbols = len(symbols)
+        logging.info(f"총 {total_symbols}개 심볼의 초기 데이터 로드를 시작합니다.")
 
         cached_kline_data = {}
         if os.path.exists(self.cache_file):
@@ -451,7 +434,9 @@ class RSIMonitor:
                 if os.path.exists(self.cache_file):
                     os.remove(self.cache_file)
 
-        for symbol in symbols:
+        for i, symbol in enumerate(symbols):
+            progress = f"[{i + 1}/{total_symbols}]"
+            logging.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
             time.sleep(0.1) # API 요청 제한 방지
             # Initialize deques once per symbol, outside the interval loop
             self.kline_data_4h[symbol] = deque(maxlen=self.data_length)
@@ -474,23 +459,31 @@ class RSIMonitor:
                 last_kline_time = 0
                 # 1. 캐시된 데이터가 있으면 마지막 시간 확인
                 if symbol in cached_kline_data and kline_data_key in cached_kline_data[symbol]:
+                    logging.debug(f"[{symbol}-{interval}] 캐시된 데이터 로드 시도. 현재 덱 길이: {len(target_kline_deque)}")
                     target_kline_deque.extend(cached_kline_data[symbol][kline_data_key])
+                    logging.debug(f"[{symbol}-{interval}] 캐시된 데이터 로드 후 덱 길이: {len(target_kline_deque)}")
                     if target_kline_deque:
                         last_kline_time = target_kline_deque[-1][0] # 캔들 시작 시간
+                        logging.debug(f"[{symbol}-{interval}] 마지막 캐시 캔들 시간: {datetime.fromtimestamp(last_kline_time/1000)}")
 
                 # 2. 데이터 갭 채우기 또는 초기 데이터 로드
                 if last_kline_time > 0:
                     # 마지막 시간 이후의 데이터만 요청 (갭 채우기)
-                    logging.info(f"[{symbol}-{interval}] 데이터 갭 채우는 중...")
+                    logging.info(f"{progress} [{symbol}-{interval}] 데이터 갭 채우는 중...")
+                    logging.debug(f"[{symbol}-{interval}] {datetime.fromtimestamp(last_kline_time/1000)} 이후 데이터 요청.")
                     missing_data = self.get_historical_data(symbol, interval, startTime=last_kline_time + 1)
+                    logging.debug(f"[{symbol}-{interval}] 갭 데이터 {len(missing_data)}개 수신.")
                     if missing_data:
                         target_kline_deque.extend(missing_data)
+                        logging.debug(f"[{symbol}-{interval}] 갭 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
                 else:
                     # 캐시가 없으면 전체 데이터 요청 (초기 로드)
-                    logging.info(f"[{symbol}-{interval}] 초기 데이터 로드 중...")
+                    logging.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
                     initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
+                    logging.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
                     if initial_data:
                         target_kline_deque.extend(initial_data)
+                        logging.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
 
                 # 3. 초기 RSI 계산
                 if len(target_kline_deque) >= 14:
@@ -531,14 +524,15 @@ class RSIMonitor:
 
     def start_monitoring(self):
         logging.info("모니터링 시작...")
-        # 1. 모든 심볼 리스트 가져오기 (API 호출 최소화)
-        all_symbols = self.futures_usdt_symbols
+        # 1. 모든 심볼 리스트 가져오기
+        all_symbols = self.get_futures_usdt_symbols()
         if not all_symbols:
             logging.critical("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
             return
+        logging.info(f"총 {len(all_symbols)}개의 심볼을 모니터링합니다.")
 
         # 2. 백그라운드에서 데이터 로드 시작
-        threading.Thread(target=self._load_initial_data, daemon=True).start()
+        threading.Thread(target=self._load_initial_data, args=(all_symbols,), daemon=True).start()
 
         # 3. 웹소켓 연결 시작
         logging.info(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
@@ -618,6 +612,7 @@ class RSIMonitor:
             url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
             response = requests.get(url)
             if response.status_code != 200:
+                logging.error(f"거래소 정보 조회 실패: {response.status_code} - {response.text}")
                 return []
             data = response.json()
             symbols = [
@@ -627,9 +622,10 @@ class RSIMonitor:
                 and s['quoteAsset'] == 'USDT'
                 and s['status'] == 'TRADING'
             ]
+            logging.info(f"총 {len(symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
             return symbols
         except Exception as e:
-            print(f"선물 심볼 조회 오류: {e}")
+            logging.error(f"선물 심볼 조회 오류: {e}", exc_info=True)
             return []
 
     def get_ema_321_proximity(self, top_n=10):

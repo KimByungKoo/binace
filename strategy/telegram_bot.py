@@ -1,3 +1,4 @@
+import logging
 import requests
 import os
 from dotenv import load_dotenv
@@ -14,14 +15,14 @@ class TelegramBot:
         
         # 설정 확인
         if not self.token:
-            print("Error: TELEGRAM_TOKEN is not set in .env file")
+            logging.error(f"Error: TELEGRAM_TOKEN is not set in .env file")
             return
         if not self.chat_id:
-            print("Error: TELEGRAM_CHAT_ID is not set in .env file")
+            logging.error(f"Error: TELEGRAM_CHAT_ID is not set in .env file")
             return
             
-        print(f"Telegram Bot initialized with token: {self.token[:5]}...")
-        print(f"Chat ID: {self.chat_id}")
+        logging.info(f"Telegram Bot initialized with token: {self.token[:5]}...")
+        logging.info(f"Chat ID: {self.chat_id}")
         
         self.base_url = f"https://api.telegram.org/bot{self.token}"
         self.rsi_monitor = rsi_monitor
@@ -46,15 +47,15 @@ class TelegramBot:
             if response.status_code == 200:
                 bot_info = response.json()
                 if bot_info.get('ok'):
-                    print(f"Successfully connected to bot: {bot_info['result']['username']}")
+                    logging.info(f"Successfully connected to bot: {bot_info['result']['username']}")
                     # 테스트 메시지 전송
                     self.send_message("🤖 RSI 모니터링 봇이 시작되었습니다.")
                 else:
-                    print("Error: Failed to get bot information")
+                    logging.error(f"Error: Failed to get bot information")
             else:
-                print(f"Error: Failed to connect to bot (Status code: {response.status_code})")
+                logging.error(f"Error: Failed to connect to bot (Status code: {response.status_code})")
         except Exception as e:
-            print(f"Error testing bot connection: {e}")
+            logging.error(f"Error testing bot connection: {e}")
     
     def send_message(self, message):
         """
@@ -69,10 +70,10 @@ class TelegramBot:
             }
             response = requests.post(url, data=data)
             if response.status_code != 200:
-                print(f"Error sending message: {response.text}")
+                logging.error(f"Error sending message: {response.text}")
             return response.json()
         except Exception as e:
-            print(f"Error sending telegram message: {e}")
+            logging.error(f"Error sending telegram message: {e}")
             return None
     
     def process_commands(self):
@@ -95,32 +96,33 @@ class TelegramBot:
                             self.last_update_id = update['update_id']
                             if 'message' in update and 'text' in update['message']:
                                 command = update['message']['text']
-                                print(f"수신된 명령어: {command}")  # 디버그 로그 추가
+                                logging.info(f"수신된 명령어: {command}")  # 디버그 로그 추가
                                 self.handle_command(command)
                 else:
-                    print(f"Error getting updates: {response.text}")
+                    logging.error(f"Error getting updates: {response.text}")
                     time.sleep(5)
                     
             except Exception as e:
-                print(f"Error processing updates: {e}")
+                logging.error(f"Error processing updates: {e}")
                 time.sleep(5)
     
     def handle_command(self, command):
         """
         텔레그램 명령어를 처리합니다.
         """
-        print(f"명령어 처리 시작: {command}")
+        logging.info(f"명령어 처리 시작: {command}")
         
         if command in ['/status', '/rsi']:
             try:
-                print("RSI 데이터 요청 중...")
+                logging.info("RSI 데이터 요청 중...")
                 self.send_message("RSI 데이터 요청 중...")
                 rsi_messages = self.rsi_monitor.get_rsi_summary_messages()
+                logging.info(f"RSI 요약 메시지 {len(rsi_messages)}개 생성됨.")
                 for message in rsi_messages:
                     self.send_message(message)
-                print("메시지 전송 완료")
+                logging.info("메시지 전송 완료")
             except Exception as e:
-                print(f"Error handling status command: {e}")
+                logging.error(f"Error handling status command: {e}")
                 self.send_message("⚠️ RSI 데이터를 가져오는 중 오류가 발생했습니다.")
         
         elif command == '/help':
@@ -140,7 +142,7 @@ class TelegramBot:
                 summary = self.rsi_monitor.get_position_summary()
                 self.send_message(summary)
             except Exception as e:
-                print(f"Error handling position command: {e}")
+                logging.error(f"Error handling position command: {e}")
                 self.send_message("⚠️ 포지션 정보를 가져오는 중 오류가 발생했습니다.")
         
         elif command == '/history':
@@ -175,7 +177,7 @@ class TelegramBot:
                 
                 self.send_message(message)
             except Exception as e:
-                print(f"Error handling history command: {e}")
+                logging.error(f"Error handling history command: {e}")
                 self.send_message("⚠️ 거래 이력을 가져오는 중 오류가 발생했습니다.")
         
         elif command == '/settings':
@@ -206,7 +208,7 @@ class TelegramBot:
                 
                 self.send_message(message)
             except Exception as e:
-                print(f"Error handling settings command: {e}")
+                logging.error(f"Error handling settings command: {e}")
                 self.send_message("⚠️ 설정 정보를 가져오는 중 오류가 발생했습니다.")
         
         elif command == '/auto_on':
@@ -227,7 +229,7 @@ class TelegramBot:
                 
                 self.send_message(message)
             except Exception as e:
-                print(f"Error handling balance command: {e}")
+                logging.error(f"Error handling balance command: {e}")
                 self.send_message("⚠️ 잔고 정보를 가져오는 중 오류가 발생했습니다.")
         
         elif command == '/cancel':
@@ -248,7 +250,7 @@ class TelegramBot:
                 mode_text = "시뮬레이션" if self.rsi_monitor.simulation_mode else "실제 거래"
                 self.send_message(f"✅ {canceled_count}개 포지션 취소 완료 ({mode_text})")
             except Exception as e:
-                print(f"Error handling cancel command: {e}")
+                logging.error(f"Error handling cancel command: {e}")
                 self.send_message("⚠️ 포지션 취소 중 오류가 발생했습니다.")
         
         elif command == '/testnet':
@@ -262,7 +264,7 @@ class TelegramBot:
                 else:
                     self.send_message("🚀 현재 실제 거래 모드입니다.")
             except Exception as e:
-                print(f"Error handling testnet command: {e}")
+                logging.error(f"Error handling testnet command: {e}")
                 self.send_message("⚠️ 모드 확인 중 오류가 발생했습니다.")
         
         elif command == '/321':
@@ -277,7 +279,7 @@ class TelegramBot:
                     message += f"<b>{symbol}</b>\n현재가: {price:.4f}\n321EMA: {ema:.4f}\n이격률: {diff:.3f}%\n\n"
                 self.send_message(message)
             except Exception as e:
-                print(f"Error handling /321 command: {e}")
+                logging.error(f"Error handling /321 command: {e}")
                 self.send_message("⚠️ 321EMA 계산 중 오류가 발생했습니다.")
     
     def stop(self):

@@ -14,7 +14,7 @@ import urllib.parse
 import os
 from dotenv import load_dotenv
 import numpy as np
-import pickle
+
 import sys
 import logging.handlers
 
@@ -51,7 +51,7 @@ load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
-        self.cache_file = "kline_cache.pkl" # 캐시 파일 이름 변경
+        
         
         # RSI 임계값
         self.rsi_overbought = 90
@@ -418,22 +418,6 @@ class RSIMonitor:
         total_symbols = len(symbols)
         logging.info(f"총 {total_symbols}개 심볼의 초기 데이터 로드를 시작합니다.")
 
-        cached_kline_data = {}
-        if os.path.exists(self.cache_file):
-            logging.info(f"캐시 파일({self.cache_file}) 로드 중...")
-            try:
-                with open(self.cache_file, 'rb') as f:
-                    cached_kline_data = pickle.load(f)
-                logging.info("캐시 로드 완료.")
-            except (IOError, pickle.PickleError) as e:
-                logging.error(f"캐시 로드 실패: {e}. 캐시 파일을 삭제하고 다시 시도합니다.", exc_info=True)
-                if os.path.exists(self.cache_file):
-                    os.remove(self.cache_file)
-            except Exception as e:
-                logging.error(f"_load_initial_data 캐시 로드 중 예상치 못한 오류 발생: {e}", exc_info=True)
-                if os.path.exists(self.cache_file):
-                    os.remove(self.cache_file)
-
         for i, symbol in enumerate(symbols):
             progress = f"[{i + 1}/{total_symbols}]"
             logging.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
@@ -456,34 +440,13 @@ class RSIMonitor:
                     logging.error(f"Invalid interval {interval} for symbol {symbol}")
                     continue
 
-                last_kline_time = 0
-                # 1. 캐시된 데이터가 있으면 마지막 시간 확인
-                if symbol in cached_kline_data and kline_data_key in cached_kline_data[symbol]:
-                    logging.debug(f"[{symbol}-{interval}] 캐시된 데이터 로드 시도. 현재 덱 길이: {len(target_kline_deque)}")
-                    target_kline_deque.extend(cached_kline_data[symbol][kline_data_key])
-                    logging.debug(f"[{symbol}-{interval}] 캐시된 데이터 로드 후 덱 길이: {len(target_kline_deque)}")
-                    if target_kline_deque:
-                        last_kline_time = target_kline_deque[-1][0] # 캔들 시작 시간
-                        logging.debug(f"[{symbol}-{interval}] 마지막 캐시 캔들 시간: {datetime.fromtimestamp(last_kline_time/1000)}")
-
-                # 2. 데이터 갭 채우기 또는 초기 데이터 로드
-                if last_kline_time > 0:
-                    # 마지막 시간 이후의 데이터만 요청 (갭 채우기)
-                    logging.info(f"{progress} [{symbol}-{interval}] 데이터 갭 채우는 중...")
-                    logging.debug(f"[{symbol}-{interval}] {datetime.fromtimestamp(last_kline_time/1000)} 이후 데이터 요청.")
-                    missing_data = self.get_historical_data(symbol, interval, startTime=last_kline_time + 1)
-                    logging.debug(f"[{symbol}-{interval}] 갭 데이터 {len(missing_data)}개 수신.")
-                    if missing_data:
-                        target_kline_deque.extend(missing_data)
-                        logging.debug(f"[{symbol}-{interval}] 갭 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
-                else:
-                    # 캐시가 없으면 전체 데이터 요청 (초기 로드)
-                    logging.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
-                    initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
-                    logging.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
-                    if initial_data:
-                        target_kline_deque.extend(initial_data)
-                        logging.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
+                # 캐시가 없으면 전체 데이터 요청 (초기 로드)
+                logging.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
+                initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
+                logging.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
+                if initial_data:
+                    target_kline_deque.extend(initial_data)
+                    logging.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
 
                 # 3. 초기 RSI 계산
                 if len(target_kline_deque) >= 14:
@@ -494,23 +457,6 @@ class RSIMonitor:
                     elif interval == '15m':
                         self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
                         self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
-        
-        # 4. 최종 데이터를 캐시에 저장
-        logging.info("최신 데이터 캐싱 중...")
-        try:
-            with open(self.cache_file, 'wb') as f:
-                data_to_cache = {}
-                for symbol in symbols:
-                    data_to_cache[symbol] = {
-                        "kline_data_4h": list(self.kline_data_4h.get(symbol, deque())),
-                        "kline_data_15m": list(self.kline_data_15m.get(symbol, deque()))
-                    }
-                pickle.dump(data_to_cache, f)
-            logging.info("캐싱 완료.")
-        except (IOError, pickle.PickleError) as e:
-            logging.error(f"캐시 파일 저장 실패: {e}", exc_info=True)
-        except Exception as e:
-            logging.error(f"_load_initial_data 캐시 저장 중 예상치 못한 오류 발생: {e}", exc_info=True)
 
         logging.info("초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송

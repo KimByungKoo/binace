@@ -289,7 +289,7 @@ class RSIMonitor:
                 msg_4h_under += f"<b>{symbol}</b>\n" \
                                f"  - 4h: {rsi14_4h:.2f} | {rsi7_4h:.2f}\n" \
                                f"  - 15m: {rsi14_15m:.2f} | {rsi7_15m:.2f}\n\n"
-            messages.append(msg_4h_under)
+            # messages.append(msg_4h_under)
             
         if not messages:
             messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")

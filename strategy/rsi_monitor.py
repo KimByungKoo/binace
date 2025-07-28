@@ -15,16 +15,27 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 import pickle
-import logging
 import sys
+import logging.handlers
 
 # 로깅 설정
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s',
-                    handlers=[
-                        logging.FileHandler("rsi_monitor.log"), # 파일로 로그 저장
-                        logging.StreamHandler(sys.stdout)       # 콘솔에도 출력
-                    ])
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# 파일 핸들러 (최대 10MB, 7개 백업 유지)
+file_handler = logging.handlers.RotatingFileHandler(
+    "rsi_monitor.log",
+    maxBytes=10*1024*1024, # 10MB
+    backupCount=7,
+    encoding="utf-8"
+)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
+
+# 콘솔 핸들러
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(console_handler)
 
 # 전역 예외 핸들러
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -32,9 +43,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
 
-    logging.critical("예상치 못한 오류 발생", exc_info=(exc_type, exc_value, exc_traceback))
-    # 여기에 봇 재시작 로직을 추가할 수 있습니다.
-    # 예: time.sleep(5); os.execv(sys.executable, ['python'] + sys.argv)
+    logger.critical("예상치 못한 오류 발생", exc_info=(exc_type, exc_value, exc_traceback))
 
 sys.excepthook = handle_exception
 
@@ -311,7 +320,7 @@ class RSIMonitor:
                 kline_data_deque = self.kline_data_15m
             
             if kline_data_deque is None or symbol not in kline_data_deque:
-                logging.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
+                # logging.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
                 return
 
             new_kline = [
@@ -548,7 +557,7 @@ class RSIMonitor:
                 on_open=self.on_open
             )
             threading.Thread(
-                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=30),
+                target=lambda: ws.run_forever(ping_interval=60, ping_timeout=30),
                 daemon=True
             ).start()
             

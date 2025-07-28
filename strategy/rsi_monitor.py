@@ -18,7 +18,7 @@ import numpy as np
 import sys
 import logging.handlers
 
-# 로깅 설정1
+# 로깅 설정1q
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 

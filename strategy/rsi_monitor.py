@@ -630,7 +630,7 @@ class RSIMonitor:
                 if s['contractType'] == 'PERPETUAL'
                 and s['quoteAsset'] == 'USDT'
                 and s['status'] == 'TRADING'
-            # ]
+            ]
             
             # # 2. 거래량 정보 가져오기
             # url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"

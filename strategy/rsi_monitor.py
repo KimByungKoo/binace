@@ -288,9 +288,9 @@ class RSIMonitor:
             interval = kline.get('i', '')
             is_closed = kline.get('x', False)
 
-            if not symbol or not kline:
-                logging.debug(f"유효하지 않은 웹소켓 메시지 수신: {message}")
-                return
+            # if not symbol or not kline:
+                # logging.debug(f"유효하지 않은 웹소켓 메시지 수신: {message}")
+                # return
 
             # 실시간 kline 데이터를 self.kline_data에 반영
             kline_data_deque = None
@@ -583,7 +583,7 @@ class RSIMonitor:
             sorted_symbols = sorted(symbols, key=lambda x: volume_map.get(x, 0), reverse=True)
             
             # 상위 200개만 반환
-            sorted_symbols = sorted_symbols[:100]
+            sorted_symbols = sorted_symbols[:200]
             logging.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
             return sorted_symbols
         except Exception as e:

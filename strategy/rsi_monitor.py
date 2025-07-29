@@ -630,23 +630,23 @@ class RSIMonitor:
                 if s['contractType'] == 'PERPETUAL'
                 and s['quoteAsset'] == 'USDT'
                 and s['status'] == 'TRADING'
-            ]
+            # ]
             
-            # 2. 거래량 정보 가져오기
-            url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"
-            response_ticker = requests.get(url_ticker)
-            if response_ticker.status_code != 200:
-                logging.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
-                return symbols[:100]  # 실패 시 기본 리스트로 대체
+            # # 2. 거래량 정보 가져오기
+            # url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+            # response_ticker = requests.get(url_ticker)
+            # if response_ticker.status_code != 200:
+            #     logging.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
+            #     return symbols[:100]  # 실패 시 기본 리스트로 대체
             
-            ticker_data = response_ticker.json()
-            # 거래량 기준 정렬
-            volume_map = {t['symbol']: float(t['quoteVolume']) for t in ticker_data if t['symbol'] in symbols}
+            # ticker_data = response_ticker.json()
+            # # 거래량 기준 정렬
+            # volume_map = {t['symbol']: float(t['quoteVolume']) for t in ticker_data if t['symbol'] in symbols}
             sorted_symbols = sorted(symbols, key=lambda x: volume_map.get(x, 0), reverse=True)
             
-            # 상위 200개만 반환
-            sorted_symbols = sorted_symbols[:200]
-            logging.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
+            # # 상위 200개만 반환
+            # sorted_symbols = sorted_symbols[:200]
+            # logging.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
             return sorted_symbols
         except Exception as e:
             logging.error(f"선물 심볼 조회 오류: {e}", exc_info=True)

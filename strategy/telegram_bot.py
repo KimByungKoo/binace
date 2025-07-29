@@ -80,31 +80,40 @@ class TelegramBot:
         """
         텔레그램 명령어를 처리합니다.
         """
+        logging.info("명령어 처리 스레드 시작...")
         while self.running:
             try:
                 url = f"https://api.telegram.org/bot{self.token}/getUpdates"
                 params = {
                     "offset": self.last_update_id + 1,
-                    "timeout": 30
+                    "timeout": 10 # 타임아웃 증가
                 }
-                response = requests.get(url, params=params)
+                logging.debug(f"getUpdates 요청: {url} with offset {params['offset']}")
+                response = requests.get(url, params=params, timeout=15)
                 
+                logging.debug(f"getUpdates 응답: {response.status_code}")
                 if response.status_code == 200:
                     updates = response.json()
+                    logging.debug(f"getUpdates JSON: {updates}")
                     if updates.get('ok'):
+                        if not updates.get('result'):
+                            logging.debug("새로운 메시지 없음.")
                         for update in updates.get('result', []):
                             self.last_update_id = update['update_id']
                             if 'message' in update and 'text' in update['message']:
                                 command = update['message']['text']
-                                logging.info(f"수신된 명령어: {command}")  # 디버그 로그 추가
+                                logging.info(f"수신된 명령어: {command}")
                                 self.handle_command(command)
                 else:
-                    logging.error(f"Error getting updates: {response.text}")
-                    time.sleep(5)
+                    logging.error(f"getUpdates 오류: {response.status_code} - {response.text}")
+                    time.sleep(10)
                     
+            except requests.exceptions.RequestException as e:
+                logging.error(f"getUpdates 요청 중 네트워크 오류: {e}")
+                time.sleep(10)
             except Exception as e:
-                logging.error(f"Error processing updates: {e}")
-                time.sleep(5)
+                logging.error(f"명령어 처리 중 예상치 못한 오류: {e}", exc_info=True)
+                time.sleep(10)
     
     def handle_command(self, command):
         """
@@ -115,7 +124,7 @@ class TelegramBot:
         if command in ['/status', '/rsi']:
             try:
                 logging.info("RSI 데이터 요청 중...")
-                self.send_message("RSI 데이터 요청 중...")
+                # self.send_message("RSI 데이터 요청 중...")
                 rsi_messages = self.rsi_monitor.get_rsi_summary_messages()
                 logging.info(f"RSI 요약 메시지 {len(rsi_messages)}개 생성됨.")
                 for message in rsi_messages:

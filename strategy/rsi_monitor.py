@@ -60,7 +60,9 @@ class RSIMonitor:
         self.rsi_oversold_15m = 20
 
         self.data_length = 200  # RSI 계산을 위한 데이터 길이 (조금 더 넉넉하게)
-        self.telegram_bot = TelegramBot(self)
+        self.lock = threading.Lock()
+        self.message_count = 0 # 처리된 웹소켓 메시지 카운터
+        self.telegram_bot = None # TelegramBot 인스턴스를 저장할 변수
         
         # 데이터 저장 구조 변경: 캔들 전체 정보를 저장
         self.kline_data_4h = {} # 4시간봉 캔들 데이터
@@ -71,6 +73,9 @@ class RSIMonitor:
         self.current_rsi_7_4h = {}
         self.current_rsi_14_15m = {}
         self.current_rsi_7_15m = {}
+
+        # RSI 마지막 업데이트 시간 저장
+        self.last_update_time = {}
 
         # 알림 상태 관리
         self.alerted_overbought_14_4h = set()
@@ -203,6 +208,7 @@ class RSIMonitor:
         """
         print("\n=== 현재 RSI 상태 ===")
         result = {}
+        # with self.lock: # 교착 상태를 유발하므로 제거
         all_symbols = set(self.current_rsi_14_4h.keys()) | set(self.current_rsi_14_15m.keys())
 
         for symbol in all_symbols:
@@ -228,53 +234,78 @@ class RSIMonitor:
     def get_rsi_summary_messages(self):
         """
         4시간봉 RSI 요약 메시지들을 생성하여 반환합니다. (15분봉 데이터 포함)
-        """
-        rsi_dict = self.get_current_rsi()
-        messages = []
-        
-        if not rsi_dict:
-            return ["⚠️ RSI 데이터가 없습니다."]
-        
-        # 4시간봉 과매수/과매도 TOP10
-        rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
-        
-        rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
-        rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
-        
-        if rsi_4h_over:
-            msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-            for symbol, rsi in rsi_4h_over:
-                m4h = rsi_dict[symbol].get('4h', {})
-                m15m = rsi_dict[symbol].get('15m', {})
-                rsi14_4h = m4h.get('rsi14', 'N/A')
-                rsi7_4h = m4h.get('rsi7', 'N/A')
-                rsi14_15m = m15m.get('rsi14', 'N/A')
-                rsi7_15m = m15m.get('rsi7', 'N/A')
-                
-                msg_4h_over += f"<b>{symbol}</b>\n" \
-                              f"  - 4h: (14)-{rsi14_4h:.2f} | (7)-{rsi7_4h:.2f}\n" \
-                              f"  - 15m: (14)-{rsi14_15m:.2f} | (7)-{rsi7_15m:.2f}\n\n"
-            messages.append(msg_4h_over)
-        
-        if rsi_4h_under:
-            msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-            for symbol, rsi in rsi_4h_under:
-                m4h = rsi_dict[symbol].get('4h', {})
-                m15m = rsi_dict[symbol].get('15m', {})
-                rsi14_4h = m4h.get('rsi14', 'N/A')
-                rsi7_4h = m4h.get('rsi7', 'N/A')
-                rsi14_15m = m15m.get('rsi14', 'N/A')
-                rsi7_15m = m15m.get('rsi7', 'N/A')
-
-                msg_4h_under += f"<b>{symbol}</b>\n" \
-                               f"  - 4h: {rsi14_4h:.2f} | {rsi7_4h:.2f}\n" \
-                               f"  - 15m: {rsi14_15m:.2f} | {rsi7_15m:.2f}\n\n"
-            # messages.append(msg_4h_under)
+        """ 
+        with self.lock:
+            rsi_dict = self.get_current_rsi()
+            messages = []
             
-        if not messages:
-            messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
+            if not rsi_dict:
+                return ["⚠️ RSI 데이터가 없습니다."]
+            
+            # 4시간봉 과매수/과매도 TOP10
+            rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
+            
+            rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
+            rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
+            
+            if rsi_4h_over:
+                msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
+                for symbol, rsi in rsi_4h_over:
+                    m4h = rsi_dict[symbol].get('4h', {})
+                    m15m = rsi_dict[symbol].get('15m', {})
+                    
+                    rsi14_4h = m4h.get('rsi14')
+                    rsi7_4h = m4h.get('rsi7')
+                    rsi14_15m = m15m.get('rsi14')
+                    rsi7_15m = m15m.get('rsi7')
 
-        return messages
+                    rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
+                    rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
+                    rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
+                    rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
+                    
+                    update_time_4h = self.last_update_time.get(f"{symbol}_4h")
+                    update_time_15m = self.last_update_time.get(f"{symbol}_15m")
+
+                    update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
+                    update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
+                    
+                    msg_4h_over += f"<b>{symbol}</b>\n" \
+                                  f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
+                                  f"  - 15m: (14)-{rsi14_15m_str} | (7)-{rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
+                messages.append(msg_4h_over)
+            
+            if rsi_4h_under:
+                msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
+                for symbol, rsi in rsi_4h_under:
+                    m4h = rsi_dict[symbol].get('4h', {})
+                    m15m = rsi_dict[symbol].get('15m', {})
+
+                    rsi14_4h = m4h.get('rsi14')
+                    rsi7_4h = m4h.get('rsi7')
+                    rsi14_15m = m15m.get('rsi14')
+                    rsi7_15m = m15m.get('rsi7')
+
+                    rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
+                    rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
+                    rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
+                    rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
+
+                    update_time_4h = self.last_update_time.get(f"{symbol}_4h")
+                    update_time_15m = self.last_update_time.get(f"{symbol}_15m")
+
+                    update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
+                    update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
+
+                    msg_4h_under += f"<b>{symbol}</b>\n" \
+                                   f"  - 4h: {rsi14_4h_str} | {rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
+                                   f"  - 15m: {rsi14_15m_str} | {rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
+                # messages.append(msg_4h_under)
+                
+            if not messages:
+                messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
+
+            return messages
 
     def on_message(self, ws, message):
         """
@@ -308,15 +339,16 @@ class RSIMonitor:
                 kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']
             ]
 
-            if is_closed:
-                kline_data_deque[symbol].append(new_kline)
-                logging.debug(f"[{symbol}-{interval}] 캔들 마감: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
-            else:
-                if kline_data_deque[symbol]:
-                    kline_data_deque[symbol][-1] = new_kline
-                else:
+            with self.lock:
+                if is_closed:
                     kline_data_deque[symbol].append(new_kline)
-                logging.debug(f"[{symbol}-{interval}] 캔들 업데이트: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
+                    logging.debug(f"[{symbol}-{interval}] 캔들 마감: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
+                else:
+                    if kline_data_deque[symbol]:
+                        kline_data_deque[symbol][-1] = new_kline
+                    else:
+                        kline_data_deque[symbol].append(new_kline)
+                    logging.debug(f"[{symbol}-{interval}] 캔들 업데이트: {datetime.fromtimestamp(kline['t']/1000)} 종가: {float(kline['c']):.2f}")
 
             # RSI 계산을 위한 종가 리스트 추출
             close_prices = [float(k[4]) for k in kline_data_deque[symbol]]
@@ -329,40 +361,43 @@ class RSIMonitor:
             rsi_7 = calculate_rsi_binance(close_prices, period=7)
 
             # 4시간봉 데이터 처리: 상태 업데이트
-            if interval == '4h':
-                self.current_rsi_14_4h[symbol] = rsi_14
-                self.current_rsi_7_4h[symbol] = rsi_7
-                if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
-                else: self.alerted_overbought_14_4h.discard(symbol)
-                if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
-                else: self.alerted_oversold_14_4h.discard(symbol)
+            with self.lock:
+                if interval == '4h':
+                    self.current_rsi_14_4h[symbol] = rsi_14
+                    self.current_rsi_7_4h[symbol] = rsi_7
+                    self.last_update_time[f"{symbol}_4h"] = datetime.now()
+                    if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
+                    else: self.alerted_overbought_14_4h.discard(symbol)
+                    if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
+                    else: self.alerted_oversold_14_4h.discard(symbol)
 
-            # 15분봉 데이터 처리: 조건 결합 및 알림
-            elif interval == '15m':
-                self.current_rsi_14_15m[symbol] = rsi_14
-                self.current_rsi_7_15m[symbol] = rsi_7
-                price = float(kline['c'])
+                # 15분봉 데이터 처리: 조건 결합 및 알림
+                elif interval == '15m':
+                    self.current_rsi_14_15m[symbol] = rsi_14
+                    self.current_rsi_7_15m[symbol] = rsi_7
+                    self.last_update_time[f"{symbol}_15m"] = datetime.now()
+                    price = float(kline['c'])
 
-                # 조건 동시 만족 시 알림
-                if (rsi_14 >= self.rsi_overbought_15m and 
-                    symbol in self.alerted_overbought_14_4h and 
-                    symbol not in self.alerted_overbought_14_15m):
-                    msg = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
-                    self.telegram_bot.send_message(msg)
-                    self.alerted_overbought_14_15m.add(symbol)
-                    logging.info(f"[{symbol}] 4h 과매수 & 15m 과매수 동시 만족 알림 발송.")
+                    # 조건 동시 만족 시 알림
+                    if (rsi_14 >= self.rsi_overbought_15m and 
+                        symbol in self.alerted_overbought_14_4h and 
+                        symbol not in self.alerted_overbought_14_15m):
+                        msg = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
+                        self.telegram_bot.send_message(msg)
+                        self.alerted_overbought_14_15m.add(symbol)
+                        logging.info(f"[{symbol}] 4h 과매수 & 15m 과매수 동시 만족 알림 발송.")
 
-                elif (rsi_14 <= self.rsi_oversold_15m and
-                      symbol in self.alerted_oversold_14_4h and
-                      symbol not in self.alerted_oversold_14_15m):
-                    msg = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
-                    self.telegram_bot.send_message(msg)
-                    self.alerted_oversold_14_15m.add(symbol)
-                    logging.info(f"[{symbol}] 4h 과매도 & 15m 과매도 동시 만족 알림 발송.")
-                
-                # 15분봉 알림 상태 해제
-                if rsi_14 < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
-                if rsi_14 > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
+                    elif (rsi_14 <= self.rsi_oversold_15m and
+                          symbol in self.alerted_oversold_14_4h and
+                          symbol not in self.alerted_oversold_14_15m):
+                        msg = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
+                        self.telegram_bot.send_message(msg)
+                        self.alerted_oversold_14_15m.add(symbol)
+                        logging.info(f"[{symbol}] 4h 과매도 & 15m 과매도 동시 만족 알림 발송.")
+                    
+                    # 15분봉 알림 상태 해제
+                    if rsi_14 < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
+                    if rsi_14 > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
 
         except json.JSONDecodeError:
             logging.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
@@ -374,8 +409,9 @@ class RSIMonitor:
         """
         조건 동시 만족 시 텔레그램 메시지를 생성합니다.
         """
-        rsi_14_4h = self.current_rsi_14_4h.get(symbol, 'N/A')
-        rsi_7_4h = self.current_rsi_7_4h.get(symbol, 'N/A')
+        with self.lock:
+            rsi_14_4h = self.current_rsi_14_4h.get(symbol, 'N/A')
+            rsi_7_4h = self.current_rsi_7_4h.get(symbol, 'N/A')
         
         # 'N/A'가 아닐 경우에만 소수점 포매팅
         rsi_14_4h_str = f"{rsi_14_4h:.2f}" if isinstance(rsi_14_4h, float) else rsi_14_4h
@@ -393,17 +429,34 @@ class RSIMonitor:
         return msg
     
     def on_error(self, ws, error):
-        print(f"Error: {error}")
-    
+        if isinstance(error, Exception):
+            logging.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}", exc_info=True)
+        else:
+            logging.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}")
+
     def on_close(self, ws, close_status_code, close_msg):
-        print(f"WebSocket connection closed (code={close_status_code}, msg={close_msg})")
-        self.telegram_bot.stop()
-        print("5초 후 재연결 시도...")
+        logging.warning(f"WebSocket connection closed: url='{ws.url}' code={close_status_code}, msg={close_msg}")
+        self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어졌습니다 (code={close_status_code}). 5초 후 재연결을 시도합니다.")
+        
+        # 재연결 로직
         time.sleep(5)
-        self.start_monitoring()
-    
+        ws_url = ws.url
+        
+        new_ws = websocket.WebSocketApp(
+            ws_url,
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close,
+            on_open=self.on_open
+        )
+        
+        logging.info(f"Attempting to reconnect to {ws_url}")
+        wst = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
+        wst.start()
+
     def on_open(self, ws):
-        print(f"WebSocket connection opened. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logging.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        self.telegram_bot.send_message(f"🚀 웹소켓 연결이 성공적으로 열렸습니다: {ws.url}")
 
     def _load_initial_data(self, symbols):
         """
@@ -423,8 +476,9 @@ class RSIMonitor:
             logging.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
             time.sleep(0.1) # API 요청 제한 방지
             # Initialize deques once per symbol, outside the interval loop
-            self.kline_data_4h[symbol] = deque(maxlen=self.data_length)
-            self.kline_data_15m[symbol] = deque(maxlen=self.data_length)
+            with self.lock:
+                self.kline_data_4h[symbol] = deque(maxlen=self.data_length)
+                self.kline_data_15m[symbol] = deque(maxlen=self.data_length)
 
             for interval in ['4h', '15m']:
                 kline_data_key = f"kline_data_{interval}"
@@ -445,18 +499,20 @@ class RSIMonitor:
                 initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
                 logging.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
                 if initial_data:
-                    target_kline_deque.extend(initial_data)
+                    with self.lock:
+                        target_kline_deque.extend(initial_data)
                     logging.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
 
                 # 3. 초기 RSI 계산
                 if len(target_kline_deque) >= 14:
                     close_prices = [float(k[4]) for k in target_kline_deque]
-                    if interval == '4h':
-                        self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
-                        self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
-                    elif interval == '15m':
-                        self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
-                        self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
+                    with self.lock:
+                        if interval == '4h':
+                            self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
+                            self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
+                        elif interval == '15m':
+                            self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
+                            self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
 
         logging.info("초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송
@@ -469,13 +525,19 @@ class RSIMonitor:
             logging.info("전송할 초기 RSI 데이터가 없습니다.")
 
     def start_monitoring(self):
+        if not self.telegram_bot:
+            self.telegram_bot = TelegramBot(self)
+            
         logging.info("모니터링 시작...")
+        self.telegram_bot.send_message("🔔 RSI 모니터링을 시작합니다.")
         # 1. 모든 심볼 리스트 가져오기
         all_symbols = self.get_futures_usdt_symbols()
         if not all_symbols:
             logging.critical("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
+            self.telegram_bot.send_message("❌ 모니터링할 심볼을 가져오지 못해 프로그램을 종료합니다.")
             return
         logging.info(f"총 {len(all_symbols)}개의 심볼을 모니터링합니다.")
+        self.telegram_bot.send_message(f"✅ 총 {len(all_symbols)}개 심볼에 대한 모니터링을 시작합니다.")
 
         # 2. 백그라운드에서 데이터 로드 시작
         threading.Thread(target=self._load_initial_data, args=(all_symbols,), daemon=True).start()
@@ -497,7 +559,7 @@ class RSIMonitor:
                 on_open=self.on_open
             )
             threading.Thread(
-                target=lambda: ws.run_forever(ping_interval=60, ping_timeout=30),
+                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10), # Ping/Pong 인터벌 조정
                 daemon=True
             ).start()
             

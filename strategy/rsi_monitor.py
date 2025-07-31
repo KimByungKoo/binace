@@ -700,7 +700,7 @@ class RSIMonitor:
     
     def get_futures_usdt_symbols(self):
         """
-        바이낸스 USDT-M 선물 마켓에서 거래량 기준 상위 200개 심볼 반환
+        바이낸스 USDT-M 선물 마켓에서 24시간 가격 변화율 기준 상위 100개 심볼 반환
         """
         try:
             # 1. 심볼 리스트 가져오기
@@ -718,22 +718,23 @@ class RSIMonitor:
                 and s['status'] == 'TRADING'
             ]
             
-            # 2. 거래량 정보 가져오기
+            # 2. 24시간 Ticker 정보 가져오기
             url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"
             response_ticker = requests.get(url_ticker)
             if response_ticker.status_code != 200:
                 logger.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
-                return symbols[:100]  # 실패 시 기본 리스트로 대체
-            
+                return [] # 실패 시 빈 리스트 반환
+
             ticker_data = response_ticker.json()
-            # 거래량 기준 정렬
-            volume_map = {t['symbol']: float(t['quoteVolume']) for t in ticker_data if t['symbol'] in symbols}
-            sorted_symbols = sorted(symbols, key=lambda x: volume_map.get(x, 0), reverse=True)
             
-            # # 상위 200개만 반환
-            # sorted_symbols = sorted_symbols[:200]
-            logger.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
-            return sorted_symbols
+            # 가격 변화율 기준 정렬
+            change_rate_map = {t['symbol']: float(t['priceChangePercent']) for t in ticker_data if t['symbol'] in symbols}
+            sorted_symbols = sorted(symbols, key=lambda x: change_rate_map.get(x, -9999), reverse=True)
+
+            # 상위 100개만 반환
+            top_100_symbols = sorted_symbols[:100]
+            logger.info(f"총 {len(top_100_symbols)}개의 USDT 선물 심볼을 가져왔습니다. (24시간 변화율 상위)")
+            return top_100_symbols
         except Exception as e:
             logger.error(f"선물 심볼 조회 오류: {e}", exc_info=True)
             return []

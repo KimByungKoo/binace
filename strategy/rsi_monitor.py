@@ -60,7 +60,7 @@ class RSIMonitor:
         self.rsi_oversold_15m = 20
 
         self.data_length = 200  # RSI 계산을 위한 데이터 길이 (조금 더 넉넉하게)
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.message_count = 0 # 처리된 웹소켓 메시지 카운터
         self.telegram_bot = None # TelegramBot 인스턴스를 저장할 변수
 
@@ -389,6 +389,7 @@ class RSIMonitor:
             rsi_7 = calculate_rsi_binance(close_prices, period=7)
 
             # 4시간봉 데이터 처리: 상태 업데이트
+            alert_message = None
             with self.lock:
                 if interval == '4h':
                     self.current_rsi_14_4h[symbol] = rsi_14
@@ -410,22 +411,23 @@ class RSIMonitor:
                     if (rsi_14 >= self.rsi_overbought_15m and 
                         symbol in self.alerted_overbought_14_4h and 
                         symbol not in self.alerted_overbought_14_15m):
-                        msg = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
-                        self.telegram_bot.send_message(msg)
+                        alert_message = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
                         self.alerted_overbought_14_15m.add(symbol)
                         logging.info(f"[{symbol}] 4h 과매수 & 15m 과매수 동시 만족 알림 발송.")
 
                     elif (rsi_14 <= self.rsi_oversold_15m and
                           symbol in self.alerted_oversold_14_4h and
                           symbol not in self.alerted_oversold_14_15m):
-                        msg = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
-                        self.telegram_bot.send_message(msg)
+                        alert_message = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
                         self.alerted_oversold_14_15m.add(symbol)
                         logging.info(f"[{symbol}] 4h 과매도 & 15m 과매도 동시 만족 알림 발송.")
                     
                     # 15분봉 알림 상태 해제
                     if rsi_14 < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
                     if rsi_14 > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
+            
+            if alert_message:
+                self.telegram_bot.send_message(alert_message)
 
         except json.JSONDecodeError:
             logging.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")

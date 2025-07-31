@@ -618,7 +618,7 @@ class RSIMonitor:
 
         # 3. 웹소켓 연결 시작
         logging.info(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
-        chunk_size = 10
+        chunk_size = 25
         symbol_chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
         
         with self.lock:

@@ -538,9 +538,11 @@ class RSIMonitor:
                         if interval == '4h':
                             self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
                             self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
+                            self.last_update_time[f"{symbol}_4h"] = datetime.now()
                         elif interval == '15m':
                             self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
                             self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
+                            self.last_update_time[f"{symbol}_15m"] = datetime.now()
 
         logging.info("초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송

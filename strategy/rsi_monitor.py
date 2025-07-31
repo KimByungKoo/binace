@@ -162,19 +162,19 @@ class RSIMonitor:
             response = requests.get(url, params=params, timeout=10) # 타임아웃 추가
             response.raise_for_status() # HTTP 오류 발생 시 예외 발생
             data = response.json()
-            logging.debug(f"[{symbol}-{interval}] get_historical_data 응답: {len(data)}개 데이터 수신")
+            logger.debug(f"[{symbol}-{interval}] get_historical_data 응답: {len(data)}개 데이터 수신")
             return data # 전체 kline 데이터 반환
         except requests.exceptions.Timeout:
-            logging.error(f"[{symbol}-{interval}] 데이터 요청 타임아웃 발생.")
+            logger.error(f"[{symbol}-{interval}] 데이터 요청 타임아웃 발생.")
             return []
         except requests.exceptions.RequestException as e:
-            logging.error(f"[{symbol}-{interval}] 데이터 요청 중 네트워크 오류 발생: {e}")
+            logger.error(f"[{symbol}-{interval}] 데이터 요청 중 네트워크 오류 발생: {e}")
             return []
         except json.JSONDecodeError:
-            logging.error(f"[{symbol}-{interval}] API 응답 JSON 디코딩 실패: {response.text}")
+            logger.error(f"[{symbol}-{interval}] API 응답 JSON 디코딩 실패: {response.text}")
             return []
         except Exception as e:
-            logging.error(f"[{symbol}-{interval}] get_historical_data 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
+            logger.error(f"[{symbol}-{interval}] get_historical_data 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
             return []
 
     
@@ -368,25 +368,24 @@ class RSIMonitor:
     
     def on_error(self, ws, error):
         if isinstance(error, Exception):
-            logging.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}", exc_info=True)
+            logger.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}", exc_info=True)
         else:
-            logging.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}")
+            logger.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
         url = ws.url
-        logging.warning(f"WebSocket connection closed: url='{url}' code={close_status_code}, msg={close_msg}")
+        logger.warning(f"WebSocket connection closed: url='{url}' code={close_status_code}, msg={close_msg}")
         with self.lock:
             self.ws_should_run[url] = False # 해당 웹소켓을 중지 상태로 표시
 
     def on_open(self, ws):
-        logging.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        # self.telegram_bot.send_message(f"🚀 웹소켓 연결이 성공적으로 열렸습니다: {ws.url}")
+        logger.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     def manage_websockets(self):
         """
         웹소켓 연결을 관리하고, 비정상 종료 시 재연결합니다.
         """
-        logging.info("웹소켓 관리자 스레드 시작...")
+        logger.info("웹소켓 관리자 스레드 시작...")
         while True:
             time.sleep(30) # 30초마다 확인
             
@@ -394,7 +393,7 @@ class RSIMonitor:
             with self.lock:
                 for url, ws_thread in list(self.ws_threads.items()):
                     if not ws_thread.is_alive() or not self.ws_should_run.get(url, True):
-                        logging.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결 목록에 추가합니다.")
+                        logger.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결 목록에 추가합니다.")
                         reconnect_targets.append(url)
 
             if not reconnect_targets:
@@ -414,7 +413,7 @@ class RSIMonitor:
                         if ws_app:
                             ws_app.close()
                     except Exception as e:
-                        logging.error(f"웹소켓 종료 중 오류 발생: {e}")
+                        logger.error(f"웹소켓 종료 중 오류 발생: {e}")
                 
                 # 새 웹소켓 생성 및 시작
                 new_ws = websocket.WebSocketApp(
@@ -433,25 +432,25 @@ class RSIMonitor:
                     self.ws_threads[url] = new_thread
                 
                 new_thread.start()
-                logging.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
+                logger.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
                 self.telegram_bot.send_message(f"✅ 웹소켓이 성공적으로 재연결되었습니다: {url}")
 
     def _load_initial_data(self, symbols):
         """
         백그라운드에서 초기 데이터를 로드하고, 데이터 갭을 채웁니다.
         """
-        logging.info("백그라운드 데이터 처리 시작...")
+        logger.info("백그라운드 데이터 처리 시작...")
         # symbols = self.get_futures_usdt_symbols() # 이제 인자로 받으므로 주석 처리
         if not symbols:
-            logging.warning("모니터링할 심볼이 없습니다.")
+            logger.warning("모니터링할 심볼이 없습니다.")
             return
 
         total_symbols = len(symbols)
-        logging.info(f"총 {total_symbols}개 심볼의 초기 데이터 로드를 시작합니다.")
+        logger.info(f"총 {total_symbols}개 심볼의 초기 데이터 로드를 시작합니다.")
 
         for i, symbol in enumerate(symbols):
             progress = f"[{i + 1}/{total_symbols}]"
-            logging.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
+            logger.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
             time.sleep(0.1) # API 요청 제한 방지
             # Initialize deques once per symbol, outside the interval loop
             with self.lock:
@@ -469,17 +468,17 @@ class RSIMonitor:
                     target_kline_deque = self.kline_data_15m[symbol]
                 
                 if target_kline_deque is None:
-                    logging.error(f"Invalid interval {interval} for symbol {symbol}")
+                    logger.error(f"Invalid interval {interval} for symbol {symbol}")
                     continue
 
                 # 캐시가 없으면 전체 데이터 요청 (초기 로드)
-                logging.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
+                logger.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
                 initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
-                logging.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
+                logger.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
                 if initial_data:
                     with self.lock:
                         target_kline_deque.extend(initial_data)
-                    logging.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
+                    logger.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
 
                 # 3. 초기 RSI 계산
                 if len(target_kline_deque) >= 14:
@@ -494,15 +493,15 @@ class RSIMonitor:
                             self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
                             self.last_update_time[f"{symbol}_15m"] = datetime.now()
 
-        logging.info("초기 데이터 로드가 완료되었습니다.")
+        logger.info("초기 데이터 로드가 완료되었습니다.")
         # 초기 RSI 상태 메시지 전송
         if self.current_rsi_14_4h:
-            logging.info("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
+            logger.info("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
             rsi_messages = self.get_rsi_summary_messages()
             for message in rsi_messages:
                 self.telegram_bot.send_message(message)
         else:
-            logging.info("전송할 초기 RSI 데이터가 없습니다.")
+            logger.info("전송할 초기 RSI 데이터가 없습니다.")
 
     def _process_message_queue(self):
         """
@@ -522,7 +521,7 @@ class RSIMonitor:
                 if not symbol or not kline:
                     continue
 
-                logging.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
+                logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
 
                 kline_data_deque = None
                 if interval == '4h':
@@ -591,9 +590,9 @@ class RSIMonitor:
                     self.telegram_bot.send_message(alert_message)
 
             except json.JSONDecodeError:
-                logging.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
+                logger.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
             except Exception as e:
-                logging.error(f"메시지 처리 중 예상치 못한 오류 발생: {e}", exc_info=True)
+                logger.error(f"메시지 처리 중 예상치 못한 오류 발생: {e}", exc_info=True)
 
     def start_monitoring(self):
         if not self.telegram_bot:
@@ -652,7 +651,7 @@ class RSIMonitor:
             time.sleep(60)
             active_threads = threading.active_count()
             queue_size = self.message_queue.qsize()
-            logging.info(f"[상태] 활성 스레드: {active_threads}개, 메시지 큐 크기: {queue_size}")
+            logger.info(f"[상태] 활성 스레드: {active_threads}개, 메시지 큐 크기: {queue_size}")
 
     def _generate_signature(self, params):
         """
@@ -708,7 +707,7 @@ class RSIMonitor:
             url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
             response = requests.get(url)
             if response.status_code != 200:
-                logging.error(f"거래소 정보 조회 실패: {response.status_code} - {response.text}")
+                logger.error(f"거래소 정보 조회 실패: {response.status_code} - {response.text}")
                 return []
             data = response.json()
             symbols = [
@@ -723,7 +722,7 @@ class RSIMonitor:
             url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"
             response_ticker = requests.get(url_ticker)
             if response_ticker.status_code != 200:
-                logging.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
+                logger.error(f"틱커 정보 조회 실패: {response_ticker.status_code} - {response_ticker.text}")
                 return symbols[:100]  # 실패 시 기본 리스트로 대체
             
             ticker_data = response_ticker.json()
@@ -733,10 +732,10 @@ class RSIMonitor:
             
             # # 상위 200개만 반환
             sorted_symbols = sorted_symbols[:200]
-            logging.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
+            logger.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
             return sorted_symbols
         except Exception as e:
-            logging.error(f"선물 심볼 조회 오류: {e}", exc_info=True)
+            logger.error(f"선물 심볼 조회 오류: {e}", exc_info=True)
             return []
         
     def get_ema_321_proximity(self, top_n=10):

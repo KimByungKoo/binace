@@ -467,7 +467,8 @@ class RSIMonitor:
     def on_close(self, ws, close_status_code, close_msg):
         url = ws.url
         logging.warning(f"WebSocket connection closed: url='{url}' code={close_status_code}, msg={close_msg}")
-        self.ws_should_run[url] = False # 해당 웹소켓을 중지 상태로 표시
+        with self.lock:
+            self.ws_should_run[url] = False # 해당 웹소켓을 중지 상태로 표시
 
     def on_open(self, ws):
         logging.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -480,35 +481,52 @@ class RSIMonitor:
         logging.info("웹소켓 관리자 스레드 시작...")
         while True:
             time.sleep(30) # 30초마다 확인
+            
+            reconnect_targets = []
             with self.lock:
                 for url, ws_thread in list(self.ws_threads.items()):
                     if not ws_thread.is_alive() or not self.ws_should_run.get(url, True):
-                        logging.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결을 시도합니다.")
-                        self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어져 재연결을 시도합니다: {url}")
-                        
-                        # 기존 스레드 정리
-                        if ws_thread.is_alive():
-                            try:
-                                self.ws_apps[url].close()
-                            except Exception as e:
-                                logging.error(f"웹소켓 종료 중 오류 발생: {e}")
-                        
-                        # 새 웹소켓 생성 및 시작
-                        new_ws = websocket.WebSocketApp(
-                            url,
-                            on_message=self.on_message,
-                            on_error=self.on_error,
-                            on_close=self.on_close,
-                            on_open=self.on_open
-                        )
-                        self.ws_apps[url] = new_ws
-                        self.ws_should_run[url] = True
-                        
-                        new_thread = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
-                        self.ws_threads[url] = new_thread
-                        new_thread.start()
-                        logging.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
-                        self.telegram_bot.send_message(f"✅ 웹소켓이 성공적으로 재연결되었습니다: {url}")
+                        logging.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결 목록에 추가합니다.")
+                        reconnect_targets.append(url)
+
+            if not reconnect_targets:
+                continue
+
+            # 락 외부에서 알림 및 재연결 처리
+            for url in reconnect_targets:
+                self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어져 재연결을 시도합니다: {url}")
+                
+                # 기존 스레드와 웹소켓 앱 정리
+                with self.lock:
+                    ws_thread = self.ws_threads.pop(url, None)
+                    ws_app = self.ws_apps.pop(url, None)
+                
+                if ws_thread and ws_thread.is_alive():
+                    try:
+                        if ws_app:
+                            ws_app.close()
+                    except Exception as e:
+                        logging.error(f"웹소켓 종료 중 오류 발생: {e}")
+                
+                # 새 웹소켓 생성 및 시작
+                new_ws = websocket.WebSocketApp(
+                    url,
+                    on_message=self.on_message,
+                    on_error=self.on_error,
+                    on_close=self.on_close,
+                    on_open=self.on_open
+                )
+                
+                new_thread = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
+                
+                with self.lock:
+                    self.ws_apps[url] = new_ws
+                    self.ws_should_run[url] = True
+                    self.ws_threads[url] = new_thread
+                
+                new_thread.start()
+                logging.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
+                self.telegram_bot.send_message(f"✅ 웹소켓이 성공적으로 재연결되었습니다: {url}")
 
     def _load_initial_data(self, symbols):
         """

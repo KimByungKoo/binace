@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 import threading
 import time
-from get_top_coins import get_top_coins
+
 
 load_dotenv()
 

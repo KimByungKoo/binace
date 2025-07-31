@@ -731,7 +731,7 @@ class RSIMonitor:
             sorted_symbols = sorted(symbols, key=lambda x: volume_map.get(x, 0), reverse=True)
             
             # # 상위 200개만 반환
-            sorted_symbols = sorted_symbols[:200]
+            # sorted_symbols = sorted_symbols[:200]
             logger.info(f"총 {len(sorted_symbols)}개의 USDT 선물 심볼을 가져왔습니다.")
             return sorted_symbols
         except Exception as e:

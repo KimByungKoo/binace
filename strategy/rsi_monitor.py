@@ -521,7 +521,7 @@ class RSIMonitor:
                 if not symbol or not kline:
                     continue
 
-                logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
+                # logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
 
                 kline_data_deque = None
                 if interval == '4h':

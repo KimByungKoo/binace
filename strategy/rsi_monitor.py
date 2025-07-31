@@ -240,78 +240,100 @@ class RSIMonitor:
     def get_rsi_summary_messages(self):
         """
         4시간봉 RSI 요약 메시지들을 생성하여 반환합니다. (15분봉 데이터 포함)
-        """ 
+        데이터의 일관성을 유지하고 UI 블로킹을 최소화하기 위해 데이터를 복사한 후 처리합니다.
+        """
         with self.lock:
-            rsi_dict = self.get_current_rsi()
-            messages = []
-            
-            if not rsi_dict:
-                return ["⚠️ RSI 데이터가 없습니다."]
-            
-            # 4시간봉 과매수/과매도 TOP10
-            rsi_4h_list = [(symbol, v['4h']['rsi14']) for symbol, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
-            
-            rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
-            rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
-            
-            if rsi_4h_over:
-                msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-                for symbol, rsi in rsi_4h_over:
-                    m4h = rsi_dict[symbol].get('4h', {})
-                    m15m = rsi_dict[symbol].get('15m', {})
-                    
-                    rsi14_4h = m4h.get('rsi14')
-                    rsi7_4h = m4h.get('rsi7')
-                    rsi14_15m = m15m.get('rsi14')
-                    rsi7_15m = m15m.get('rsi7')
+            # 데이터의 스냅샷을 빠르게 생성
+            rsi_14_4h_copy = dict(self.current_rsi_14_4h)
+            rsi_7_4h_copy = dict(self.current_rsi_7_4h)
+            rsi_14_15m_copy = dict(self.current_rsi_14_15m)
+            rsi_7_15m_copy = dict(self.current_rsi_7_15m)
+            last_update_time_copy = dict(self.last_update_time)
 
-                    rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
-                    rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-                    rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
-                    rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
-                    
-                    update_time_4h = self.last_update_time.get(f"{symbol}_4h")
-                    update_time_15m = self.last_update_time.get(f"{symbol}_15m")
+        # 락을 해제한 후, 복사된 데이터를 기반으로 rsi_dict 생성
+        rsi_dict = {}
+        all_symbols = set(rsi_14_4h_copy.keys()) | set(rsi_14_15m_copy.keys())
+        for symbol in all_symbols:
+            rsi_dict[symbol] = {}
+            if symbol in rsi_14_4h_copy:
+                rsi_dict[symbol]['4h'] = {
+                    'rsi14': rsi_14_4h_copy.get(symbol),
+                    'rsi7': rsi_7_4h_copy.get(symbol)
+                }
+            if symbol in rsi_14_15m_copy:
+                rsi_dict[symbol]['15m'] = {
+                    'rsi14': rsi_14_15m_copy.get(symbol),
+                    'rsi7': rsi_7_15m_copy.get(symbol)
+                }
+        
+        messages = []
+        if not rsi_dict:
+            return ["⚠️ RSI 데이터가 없습니다."]
 
-                    update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-                    update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
-                    
-                    msg_4h_over += f"<b>{symbol}</b>\n" \
-                                  f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
-                                  f"  - 15m: (14)-{rsi14_15m_str} | (7)-{rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
-                messages.append(msg_4h_over)
-            
-            if rsi_4h_under:
-                msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-                for symbol, rsi in rsi_4h_under:
-                    m4h = rsi_dict[symbol].get('4h', {})
-                    m15m = rsi_dict[symbol].get('15m', {})
-
-                    rsi14_4h = m4h.get('rsi14')
-                    rsi7_4h = m4h.get('rsi7')
-                    rsi14_15m = m15m.get('rsi14')
-                    rsi7_15m = m15m.get('rsi7')
-
-                    rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
-                    rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-                    rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
-                    rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
-
-                    update_time_4h = self.last_update_time.get(f"{symbol}_4h")
-                    update_time_15m = self.last_update_time.get(f"{symbol}_15m")
-
-                    update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-                    update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
-
-                    msg_4h_under += f"<b>{symbol}</b>\n" \
-                                   f"  - 4h: {rsi14_4h_str} | {rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
-                                   f"  - 15m: {rsi14_15m_str} | {rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
-                # messages.append(msg_4h_under)
+        # 4시간봉 과매수/과매도 TOP10
+        rsi_4h_list = [(s, v['4h']['rsi14']) for s, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
+        
+        rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
+        rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
+        
+        if rsi_4h_over:
+            msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
+            for symbol, rsi in rsi_4h_over:
+                m4h = rsi_dict[symbol].get('4h', {})
+                m15m = rsi_dict[symbol].get('15m', {})
                 
-            if not messages:
-                messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
+                rsi14_4h = m4h.get('rsi14')
+                rsi7_4h = m4h.get('rsi7')
+                rsi14_15m = m15m.get('rsi14')
+                rsi7_15m = m15m.get('rsi7')
 
-            return messages
+                rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
+                rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
+                rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
+                rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
+                
+                update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
+                update_time_15m = last_update_time_copy.get(f"{symbol}_15m")
+
+                update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
+                update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
+                
+                msg_4h_over += f"<b>{symbol}</b>\n" \
+                              f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
+                              f"  - 15m: (14)-{rsi14_15m_str} | (7)-{rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
+            messages.append(msg_4h_over)
+        
+        if rsi_4h_under:
+            msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
+            for symbol, rsi in rsi_4h_under:
+                m4h = rsi_dict[symbol].get('4h', {})
+                m15m = rsi_dict[symbol].get('15m', {})
+
+                rsi14_4h = m4h.get('rsi14')
+                rsi7_4h = m4h.get('rsi7')
+                rsi14_15m = m15m.get('rsi14')
+                rsi7_15m = m15m.get('rsi7')
+
+                rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
+                rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
+                rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
+                rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
+
+                update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
+                update_time_15m = last_update_time_copy.get(f"{symbol}_15m")
+
+                update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
+                update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
+
+                msg_4h_under += f"<b>{symbol}</b>\n" \
+                               f"  - 4h: {rsi14_4h_str} | {rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
+                               f"  - 15m: {rsi14_15m_str} | {rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
+            # messages.append(msg_4h_under)
+            
+        if not messages:
+            messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
+
+        return messages
 
     def on_message(self, ws, message):
         """

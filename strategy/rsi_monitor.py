@@ -273,18 +273,38 @@ class RSIMonitor:
             logger.info("RSI 데이터가 비어있습니다. 요약 메시지를 생성할 수 없습니다.")
             return ["⚠️ RSI 데이터가 없습니다."]
 
-        logger.info(f"모든 심볼의 현재 RSI 데이터: {json.dumps(rsi_dict, indent=2)}")
+        # 4시간봉 과매수/과매도 TOP10 후보를 위한 리스트 생성
+        # (symbol, rsi14_4h, rsi7_4h) 형태로 저장
+        rsi_4h_candidates = []
+        for symbol, v in rsi_dict.items():
+            if v.get('4h'):
+                rsi14_4h = v['4h'].get('rsi14')
+                rsi7_4h = v['4h'].get('rsi7')
+                if rsi14_4h is not None or rsi7_4h is not None:
+                    rsi_4h_candidates.append((symbol, rsi14_4h, rsi7_4h))
 
-        # 4시간봉 과매수/과매도 TOP10
-        rsi_4h_list = [(s, v['4h']['rsi14']) for s, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
-        
-        logger.info(f"4시간봉 RSI(14) 전체 리스트 (정렬 전): {rsi_4h_list}")
+        logger.info(f"4시간봉 RSI 전체 후보 리스트: {rsi_4h_candidates}")
 
-        rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
-        rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
-        
-        logger.info(f"4시간봉 RSI(14) 과매수 TOP10 후보: {rsi_4h_over}")
-        logger.info(f"4시간봉 RSI(14) 과매도 TOP10 후보: {rsi_4h_under}")
+        # 과매수 종목 필터링 및 정렬 (RSI14 우선, 없으면 RSI7)
+        rsi_4h_over = []
+        for symbol, rsi14, rsi7 in rsi_4h_candidates:
+            if rsi14 is not None and rsi14 >= 70:
+                rsi_4h_over.append((symbol, rsi14, 'rsi14'))
+            elif rsi7 is not None and rsi7 >= 70: # If rsi14 is not overbought, check rsi7
+                rsi_4h_over.append((symbol, rsi7, 'rsi7'))
+        rsi_4h_over = sorted(rsi_4h_over, key=lambda x: x[1], reverse=True)[:10]
+
+        # 과매도 종목 필터링 및 정렬 (RSI14 우선, 없으면 RSI7)
+        rsi_4h_under = []
+        for symbol, rsi14, rsi7 in rsi_4h_candidates:
+            if rsi14 is not None and rsi14 <= 30:
+                rsi_4h_under.append((symbol, rsi14, 'rsi14'))
+            elif rsi7 is not None and rsi7 <= 30: # If rsi14 is not oversold, check rsi7
+                rsi_4h_under.append((symbol, rsi7, 'rsi7'))
+        rsi_4h_under = sorted(rsi_4h_under, key=lambda x: x[1])[:10]
+
+        logger.info(f"4시간봉 RSI 과매수 TOP10 후보: {rsi_4h_over}")
+        logger.info(f"4시간봉 RSI 과매도 TOP10 후보: {rsi_4h_under}")
 
         if rsi_4h_over:
             msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"

@@ -308,7 +308,7 @@ class RSIMonitor:
 
         if rsi_4h_over:
             msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-            for symbol, rsi in rsi_4h_over:
+            for symbol, _, _ in rsi_4h_over:
                 m4h = rsi_dict[symbol].get('4h', {})
                 m15m = rsi_dict[symbol].get('15m', {})
                 
@@ -335,7 +335,7 @@ class RSIMonitor:
         
         if rsi_4h_under:
             msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-            for symbol, rsi in rsi_4h_under:
+            for symbol, _, _ in rsi_4h_under:
                 m4h = rsi_dict[symbol].get('4h', {})
                 m15m = rsi_dict[symbol].get('15m', {})
 

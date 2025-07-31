@@ -4,12 +4,6 @@ import threading
 import time
 from collections import deque
 import queue
-import queue
-import queue
-import queue
-import queue
-import queue
-import queue
 
 from rsi_utils import calculate_rsi_binance
 from telegram_bot import TelegramBot
@@ -528,6 +522,8 @@ class RSIMonitor:
                 if not symbol or not kline:
                     continue
 
+                logging.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
+
                 kline_data_deque = None
                 if interval == '4h':
                     kline_data_deque = self.kline_data_4h
@@ -651,9 +647,12 @@ class RSIMonitor:
             self.ws_manager_thread = threading.Thread(target=self.manage_websockets, daemon=True)
             self.ws_manager_thread.start()
             
-        # 메인 스레드가 종료되지 않도록 유지
+        # 메인 스레드가 종료되지 않도록 유지 및 상태 로깅
         while True:
             time.sleep(60)
+            active_threads = threading.active_count()
+            queue_size = self.message_queue.qsize()
+            logging.info(f"[상태] 활성 스레드: {active_threads}개, 메시지 큐 크기: {queue_size}")
 
     def _generate_signature(self, params):
         """

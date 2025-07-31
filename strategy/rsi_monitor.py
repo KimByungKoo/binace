@@ -270,14 +270,22 @@ class RSIMonitor:
         
         messages = []
         if not rsi_dict:
+            logger.info("RSI 데이터가 비어있습니다. 요약 메시지를 생성할 수 없습니다.")
             return ["⚠️ RSI 데이터가 없습니다."]
+
+        logger.info(f"모든 심볼의 현재 RSI 데이터: {json.dumps(rsi_dict, indent=2)}")
 
         # 4시간봉 과매수/과매도 TOP10
         rsi_4h_list = [(s, v['4h']['rsi14']) for s, v in rsi_dict.items() if v.get('4h') and v['4h'].get('rsi14') is not None]
         
+        logger.info(f"4시간봉 RSI(14) 전체 리스트 (정렬 전): {rsi_4h_list}")
+
         rsi_4h_over = sorted([x for x in rsi_4h_list if x[1] >= 70], key=lambda x: x[1], reverse=True)[:10]
         rsi_4h_under = sorted([x for x in rsi_4h_list if x[1] <= 30], key=lambda x: x[1])[:10]
         
+        logger.info(f"4시간봉 RSI(14) 과매수 TOP10 후보: {rsi_4h_over}")
+        logger.info(f"4시간봉 RSI(14) 과매도 TOP10 후보: {rsi_4h_under}")
+
         if rsi_4h_over:
             msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
             for symbol, rsi in rsi_4h_over:
@@ -521,7 +529,7 @@ class RSIMonitor:
                 if not symbol or not kline:
                     continue
 
-                # logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
+                logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
 
                 kline_data_deque = None
                 if interval == '4h':

@@ -1,3 +1,0 @@
-"""
-crypto-bot package
-""" 

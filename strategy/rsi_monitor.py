@@ -3,7 +3,7 @@ import json
 import threading
 import time
 from collections import deque
-from get_top_coins import get_top_coins
+
 from rsi_utils import calculate_rsi_binance
 from telegram_bot import TelegramBot
 from datetime import datetime
@@ -63,6 +63,12 @@ class RSIMonitor:
         self.lock = threading.Lock()
         self.message_count = 0 # 처리된 웹소켓 메시지 카운터
         self.telegram_bot = None # TelegramBot 인스턴스를 저장할 변수
+
+        # 웹소켓 관리
+        self.ws_apps = {}
+        self.ws_threads = {}
+        self.ws_should_run = {}
+        self.ws_manager_thread = None
         
         # 데이터 저장 구조 변경: 캔들 전체 정보를 저장
         self.kline_data_4h = {} # 4시간봉 캔들 데이터
@@ -331,7 +337,7 @@ class RSIMonitor:
                 kline_data_deque = self.kline_data_15m
             
             if kline_data_deque is None or symbol not in kline_data_deque:
-                # logger.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
+                logger.warning(f"[{symbol}-{interval}] 해당 심볼/인터벌에 대한 데이터 덱이 초기화되지 않았습니다. 메시지 무시.")
                 return
 
             new_kline = [
@@ -435,28 +441,50 @@ class RSIMonitor:
             logging.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
-        logging.warning(f"WebSocket connection closed: url='{ws.url}' code={close_status_code}, msg={close_msg}")
-        self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어졌습니다 (code={close_status_code}). 5초 후 재연결을 시도합니다.")
-        
-        # 재연결 로직
-        time.sleep(5)
-        ws_url = ws.url
-        
-        new_ws = websocket.WebSocketApp(
-            ws_url,
-            on_message=self.on_message,
-            on_error=self.on_error,
-            on_close=self.on_close,
-            on_open=self.on_open
-        )
-        
-        logging.info(f"Attempting to reconnect to {ws_url}")
-        wst = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
-        wst.start()
+        url = ws.url
+        logging.warning(f"WebSocket connection closed: url='{url}' code={close_status_code}, msg={close_msg}")
+        self.ws_should_run[url] = False # 해당 웹소켓을 중지 상태로 표시
 
     def on_open(self, ws):
         logging.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        self.telegram_bot.send_message(f"🚀 웹소켓 연결이 성공적으로 열렸습니다: {ws.url}")
+        # self.telegram_bot.send_message(f"🚀 웹소켓 연결이 성공적으로 열렸습니다: {ws.url}")
+
+    def manage_websockets(self):
+        """
+        웹소켓 연결을 관리하고, 비정상 종료 시 재연결합니다.
+        """
+        logging.info("웹소켓 관리자 스레드 시작...")
+        while True:
+            time.sleep(30) # 30초마다 확인
+            with self.lock:
+                for url, ws_thread in list(self.ws_threads.items()):
+                    if not ws_thread.is_alive() or not self.ws_should_run.get(url, True):
+                        logging.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결을 시도합니다.")
+                        self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어져 재연결을 시도합니다: {url}")
+                        
+                        # 기존 스레드 정리
+                        if ws_thread.is_alive():
+                            try:
+                                self.ws_apps[url].close()
+                            except Exception as e:
+                                logging.error(f"웹소켓 종료 중 오류 발생: {e}")
+                        
+                        # 새 웹소켓 생성 및 시작
+                        new_ws = websocket.WebSocketApp(
+                            url,
+                            on_message=self.on_message,
+                            on_error=self.on_error,
+                            on_close=self.on_close,
+                            on_open=self.on_open
+                        )
+                        self.ws_apps[url] = new_ws
+                        self.ws_should_run[url] = True
+                        
+                        new_thread = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
+                        self.ws_threads[url] = new_thread
+                        new_thread.start()
+                        logging.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
+                        self.telegram_bot.send_message(f"✅ 웹소켓이 성공적으로 재연결되었습니다: {url}")
 
     def _load_initial_data(self, symbols):
         """
@@ -547,21 +575,30 @@ class RSIMonitor:
         chunk_size = 20
         symbol_chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
         
-        for chunk in symbol_chunks:
-            streams = [f"{s.lower()}@kline_4h" for s in chunk] + [f"{s.lower()}@kline_15m" for s in chunk]
-            ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-            logging.info(f"Connecting to WebSocket for {len(chunk)} symbols: {ws_url}")
-            ws = websocket.WebSocketApp(
-                ws_url,
-                on_message=self.on_message,
-                on_error=self.on_error,
-                on_close=self.on_close,
-                on_open=self.on_open
-            )
-            threading.Thread(
-                target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10), # Ping/Pong 인터벌 조정
-                daemon=True
-            ).start()
+        with self.lock:
+            for chunk in symbol_chunks:
+                streams = [f"{s.lower()}@kline_4h" for s in chunk] + [f"{s.lower()}@kline_15m" for s in chunk]
+                ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
+                logging.info(f"Connecting to WebSocket for {len(chunk)} symbols: {ws_url}")
+                
+                ws = websocket.WebSocketApp(
+                    ws_url,
+                    on_message=self.on_message,
+                    on_error=self.on_error,
+                    on_close=self.on_close,
+                    on_open=self.on_open
+                )
+                self.ws_apps[ws_url] = ws
+                self.ws_should_run[ws_url] = True
+                
+                wst = threading.Thread(target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
+                self.ws_threads[ws_url] = wst
+                wst.start()
+
+        # 4. 웹소켓 관리자 스레드 시작
+        if not self.ws_manager_thread or not self.ws_manager_thread.is_alive():
+            self.ws_manager_thread = threading.Thread(target=self.manage_websockets, daemon=True)
+            self.ws_manager_thread.start()
             
         # 메인 스레드가 종료되지 않도록 유지
         while True:

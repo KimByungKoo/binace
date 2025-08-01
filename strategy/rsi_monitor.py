@@ -52,32 +52,26 @@ load_dotenv()
 
 class RSIMonitor:
     def __init__(self):
-        
-        
         # RSI 임계값
         self.rsi_overbought = 90
         self.rsi_oversold = 10
+        self.data_length = 200
 
-        self.data_length = 200  # RSI 계산을 위한 데이터 길이 (조금 더 넉넉하게)
-        self.lock = threading.RLock() # 재진입 가능한 락으로 변경
-        self.message_queue = queue.Queue() # 웹소켓 메시지 처리를 위한 큐
-        self.message_count = 0 # 처리된 웹소켓 메시지 카운터
-        self.telegram_bot = None # TelegramBot 인스턴스를 저장할 변수
+        # 스레딩 및 동시성 관리
+        self.lock = threading.RLock()
+        self.message_queue = queue.Queue()
+        self.telegram_bot = None
 
         # 웹소켓 관리
-        self.ws_apps = {}
-        self.ws_threads = {}
-        self.ws_should_run = {}
+        self.ws_app = None
+        self.ws_thread = None
+        self.ws_should_run = True
         self.ws_manager_thread = None
-        
-        # 데이터 저장 구조 변경: 캔들 전체 정보를 저장
-        self.kline_data_4h = {} # 4시간봉 캔들 데이터
 
-        # 실시간 RSI 값 저장
+        # 데이터 저장 구조
+        self.kline_data_4h = {}
         self.current_rsi_14_4h = {}
         self.current_rsi_7_4h = {}
-
-        # RSI 마지막 업데이트 시간 저장
         self.last_update_time = {}
 
         # 알림 상태 관리
@@ -87,7 +81,6 @@ class RSIMonitor:
         self.alerted_oversold_7_4h = set()
 
         # ... (기존 나머지 설정들은 유지) ...
-        
         self.investment_amount = 10
         self.leverage = 10
         self.position_size_usdt = self.investment_amount * self.leverage
@@ -138,7 +131,6 @@ class RSIMonitor:
     def get_historical_data(self, symbol, interval, limit=None, startTime=None):
         """
         Binance API를 통해 과거 KLINE 데이터를 가져옵니다.
-        startTime 파라미터를 지원하도록 수정되었습니다.
         """
         try:
             url = "https://fapi.binance.com/fapi/v1/klines"
@@ -151,11 +143,11 @@ class RSIMonitor:
             if startTime:
                 params['startTime'] = startTime
 
-            response = requests.get(url, params=params, timeout=10) # 타임아웃 추가
-            response.raise_for_status() # HTTP 오류 발생 시 예외 발생
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
             data = response.json()
             logger.debug(f"[{symbol}-{interval}] get_historical_data 응답: {len(data)}개 데이터 수신")
-            return data # 전체 kline 데이터 반환
+            return data
         except requests.exceptions.Timeout:
             logger.error(f"[{symbol}-{interval}] 데이터 요청 타임아웃 발생.")
             return []
@@ -175,7 +167,6 @@ class RSIMonitor:
         """
         print("\n=== 현재 RSI 상태 ===")
         with self.lock:
-            # 데이터의 스냅샷(복사본)을 만들어 락 점유 시간을 최소화
             rsi_14_4h_copy = dict(self.current_rsi_14_4h)
             rsi_7_4h_copy = dict(self.current_rsi_7_4h)
 
@@ -196,15 +187,15 @@ class RSIMonitor:
     def get_rsi_summary_messages(self):
         """
         4시간봉 RSI 요약 메시지들을 생성하여 반환합니다.
-        데이터의 일관성을 유지하고 UI 블로킹을 최소화하기 위해 데이터를 복사한 후 처리합니다.
         """
         with self.lock:
-            # 데이터의 스냅샷을 빠르게 생성
             rsi_14_4h_copy = dict(self.current_rsi_14_4h)
             rsi_7_4h_copy = dict(self.current_rsi_7_4h)
             last_update_time_copy = dict(self.last_update_time)
 
-        # 락을 해제한 후, 복사된 데이터를 기반으로 rsi_dict 생성
+        # 데이터의 스냅샷을 기준으로 메시지 생성 시간을 기록
+        generation_time_str = datetime.now().strftime('%H:%M:%S')
+
         rsi_dict = {}
         all_symbols = set(rsi_14_4h_copy.keys())
         for symbol in all_symbols:
@@ -217,350 +208,199 @@ class RSIMonitor:
         
         messages = []
         if not rsi_dict:
-            logger.info("RSI 데이터가 비어있습니다. 요약 메시지를 생성할 수 없습니다.")
-            return ["⚠️ RSI 데이터가 없습니다."]
+            return [f"⚠️ RSI 데이터가 없습니다. (생성: {generation_time_str})"]
 
-        # 4시간봉 과매수/과매도 TOP10 후보를 위한 리스트 생성
-        # (symbol, rsi14_4h, rsi7_4h) 형태로 저장
         rsi_4h_candidates = []
         for symbol, v in rsi_dict.items():
             if v.get('4h'):
                 rsi14_4h = v['4h'].get('rsi14')
                 rsi7_4h = v['4h'].get('rsi7')
-                if rsi14_4h is not None or rsi7_4h is not None:
+                if rsi14_4h is not None and rsi7_4h is not None:
                     rsi_4h_candidates.append((symbol, rsi14_4h, rsi7_4h))
 
-        logger.info(f"4시간봉 RSI 전체 후보 리스트: {rsi_4h_candidates}")
-
-        # 과매수 종목 필터링 및 정렬 (RSI14 우선, 없으면 RSI7)
-        rsi_4h_over = []
-        for symbol, rsi14, rsi7 in rsi_4h_candidates:
-            if rsi14 is not None and rsi14 >= 70:
-                rsi_4h_over.append((symbol, rsi14, 'rsi14'))
-            elif rsi7 is not None and rsi7 >= 70: # If rsi14 is not overbought, check rsi7
-                rsi_4h_over.append((symbol, rsi7, 'rsi7'))
-        rsi_4h_over = sorted(rsi_4h_over, key=lambda x: x[1], reverse=True)[:10]
-
-        # 과매도 종목 필터링 및 정렬 (RSI14 우선, 없으면 RSI7)
-        rsi_4h_under = []
-        for symbol, rsi14, rsi7 in rsi_4h_candidates:
-            if rsi14 is not None and rsi14 <= 30:
-                rsi_4h_under.append((symbol, rsi14, 'rsi14'))
-            elif rsi7 is not None and rsi7 <= 30: # If rsi14 is not oversold, check rsi7
-                rsi_4h_under.append((symbol, rsi7, 'rsi7'))
-        rsi_4h_under = sorted(rsi_4h_under, key=lambda x: x[1])[:10]
-
-        logger.info(f"4시간봉 RSI 과매수 TOP10 후보: {rsi_4h_over}")
-        logger.info(f"4시간봉 RSI 과매도 TOP10 후보: {rsi_4h_under}")
+        # RSI 값을 기준으로 정렬 (None 값 예외 처리)
+        rsi_4h_over = sorted([c for c in rsi_4h_candidates if (c[1] is not None and c[1] >= 70) or (c[2] is not None and c[2] >= 70)], key=lambda x: (x[1] is None, x[1]), reverse=True)[:10]
+        rsi_4h_under = sorted([c for c in rsi_4h_candidates if (c[1] is not None and c[1] <= 30) or (c[2] is not None and c[2] <= 30)], key=lambda x: (x[1] is None, x[1]))[:10]
 
         if rsi_4h_over:
-            msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
-            for symbol, _, _ in rsi_4h_over:
-                m4h = rsi_dict[symbol].get('4h', {})
-                
-                rsi14_4h = m4h.get('rsi14')
-                rsi7_4h = m4h.get('rsi7')
+            msg = f"📊 <b>4시간봉 RSI 과매수 TOP10 (생성: {generation_time_str})</b>\n\n"
+            for symbol, rsi14, rsi7 in rsi_4h_over:
+                update_time_str = last_update_time_copy.get(f"{symbol}_4h", datetime.now()).strftime('%H:%M:%S')
+                msg += f"<b>{symbol}</b>: (14)-{rsi14:.2f} | (7)-{rsi7:.2f} <i>(업데이트: {update_time_str})</i>\n"
+            messages.append(msg)
 
-                rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
-                rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-                
-                update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
-
-                update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-                
-                msg_4h_over += f"<b>{symbol}</b>\n" \
-                              f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n\n"
-            messages.append(msg_4h_over)
-        
         if rsi_4h_under:
-            msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
-            for symbol, _, _ in rsi_4h_under:
-                m4h = rsi_dict[symbol].get('4h', {})
+            msg = f"📊 <b>4시간봉 RSI 과매도 TOP10 (생성: {generation_time_str})</b>\n\n"
+            for symbol, rsi14, rsi7 in rsi_4h_under:
+                update_time_str = last_update_time_copy.get(f"{symbol}_4h", datetime.now()).strftime('%H:%M:%S')
+                msg += f"<b>{symbol}</b>: (14)-{rsi14:.2f} | (7)-{rsi7:.2f} <i>(업데이트: {update_time_str})</i>\n"
+            messages.append(msg)
 
-                rsi14_4h = m4h.get('rsi14')
-                rsi7_4h = m4h.get('rsi7')
-
-                rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
-                rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-
-                update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
-
-                update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-
-                msg_4h_under += f"<b>{symbol}</b>\n" \
-                               f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n\n"
-            messages.append(msg_4h_under)
-            
         if not messages:
-            messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
+            messages.append(f"ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다. (생성: {generation_time_str})")
 
         return messages
 
     def on_message(self, ws, message):
-        """
-        웹소켓 메시지를 수신하여 처리 큐에 넣습니다.
-        """
         self.message_queue.put(message)
 
     def on_error(self, ws, error):
-        if isinstance(error, Exception):
-            logger.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}", exc_info=True)
-        else:
-            logger.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}")
+        logger.error(f"웹소켓 오류 발생: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
-        url = ws.url
-        logger.warning(f"WebSocket connection closed: url='{url}' code={close_status_code}, msg={close_msg}")
-        with self.lock:
-            self.ws_should_run[url] = False # 해당 웹소켓을 중지 상태로 표시
+        logger.warning(f"웹소켓 연결이 닫혔습니다: code={close_status_code}, msg={close_msg}")
+        self.ws_should_run = False
 
     def on_open(self, ws):
-        logger.info(f"WebSocket connection opened for {ws.url}. Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("웹소켓 연결이 열렸습니다.")
+        self.ws_should_run = True
 
-    def manage_websockets(self):
-        """
-        웹소켓 연결을 관리하고, 비정상 종료 시 재연결합니다.
-        """
-        logger.info("웹소켓 관리자 스레드 시작...")
+    def _connect_websocket(self, symbols):
+        logger.info(f"{len(symbols)}개 심볼에 대한 웹소켓 연결을 시작합니다.")
+        streams = [f"{s.lower()}@kline_4h" for s in symbols]
+        ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
+        
+        self.ws_app = websocket.WebSocketApp(ws_url,
+                                             on_message=self.on_message,
+                                             on_error=self.on_error,
+                                             on_close=self.on_close,
+                                             on_open=self.on_open)
+        
+        self.ws_thread = threading.Thread(target=lambda: self.ws_app.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
+        self.ws_thread.start()
+        logger.info("웹소켓 스레드가 시작되었습니다.")
+
+    def manage_websocket_connection(self, symbols):
+        """웹소켓 연결을 관리하고 필요시 재연결합니다."""
         while True:
-            time.sleep(30) # 30초마다 확인
-            
-            reconnect_targets = []
-            with self.lock:
-                for url, ws_thread in list(self.ws_threads.items()):
-                    if not ws_thread.is_alive() or not self.ws_should_run.get(url, True):
-                        logger.warning(f"웹소켓 연결이 비정상적으로 종료되었습니다: {url}. 재연결 목록에 추가합니다.")
-                        reconnect_targets.append(url)
-
-            if not reconnect_targets:
-                continue
-
-            # 락 외부에서 알림 및 재연결 처리
-            for url in reconnect_targets:
-                self.telegram_bot.send_message(f"🔌 웹소켓 연결이 끊어져 재연결을 시도합니다: {url}")
+            if not self.ws_thread or not self.ws_thread.is_alive() or not self.ws_should_run:
+                logger.warning("웹소켓 연결이 끊어졌습니다. 재연결을 시도합니다...")
+                if self.telegram_bot:
+                    self.telegram_bot.send_message("🔌 웹소켓 연결이 끊어져 재연결을 시도합니다.")
                 
-                # 기존 스레드와 웹소켓 앱 정리
-                with self.lock:
-                    ws_thread = self.ws_threads.pop(url, None)
-                    ws_app = self.ws_apps.pop(url, None)
+                if self.ws_app:
+                    try: self.ws_app.close()
+                    except Exception as e: logger.error(f"기존 웹소켓 종료 중 오류: {e}")
                 
-                if ws_thread and ws_thread.is_alive():
-                    try:
-                        if ws_app:
-                            ws_app.close()
-                    except Exception as e:
-                        logger.error(f"웹소켓 종료 중 오류 발생: {e}")
-                
-                # 새 웹소켓 생성 및 시작
-                new_ws = websocket.WebSocketApp(
-                    url,
-                    on_message=self.on_message,
-                    on_error=self.on_error,
-                    on_close=self.on_close,
-                    on_open=self.on_open
-                )
-                
-                new_thread = threading.Thread(target=lambda: new_ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
-                
-                with self.lock:
-                    self.ws_apps[url] = new_ws
-                    self.ws_should_run[url] = True
-                    self.ws_threads[url] = new_thread
-                
-                new_thread.start()
-                logger.info(f"웹소켓이 성공적으로 재연결되었습니다: {url}")
-                self.telegram_bot.send_message(f"✅ 웹소켓이 성공적으로 재연결되었습니다: {url}")
+                self._connect_websocket(symbols)
+                if self.telegram_bot:
+                    self.telegram_bot.send_message("✅ 웹소켓이 성공적으로 재연결되었습니다.")
+            time.sleep(30) # 30초마다 연결 상태 확인
 
     def _load_initial_data(self, symbols):
-        """
-        백그라운드에서 초기 데이터를 로드하고, 처리 큐로 전송합니다.
-        """
-        logger.info("백그라운드 데이터 로더 시작...")
-        if not symbols:
-            logger.warning("모니터링할 심볼이 없습니다.")
-            return
-
-        total_symbols = len(symbols)
-        logger.info(f"총 {total_symbols}개 심볼의 초기 데이터 로드를 시작합니다.")
-
+        logger.info(f"총 {len(symbols)}개 심볼의 초기 데이터 로드를 시작합니다.")
         for i, symbol in enumerate(symbols):
-            progress = f"[{i + 1}/{total_symbols}]"
-            logger.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
-            time.sleep(0.1)  # API 요청 제한 방지
-
-            # 4시간봉 데이터 로드
-            initial_data_4h = self.get_historical_data(symbol, '4h', limit=self.data_length)
-            if initial_data_4h:
-                # 처리 큐에 초기 데이터 메시지 전송
-                msg = {
-                    "type": "initial_data",
-                    "symbol": symbol,
-                    "interval": "4h",
-                    "data": initial_data_4h
-                }
+            logger.info(f"초기 데이터 로드 진행 중: [{i + 1}/{len(symbols)}] {symbol}")
+            time.sleep(0.1) # API 요청 제한 방지
+            initial_data = self.get_historical_data(symbol, '4h', limit=self.data_length)
+            if initial_data:
+                msg = {"type": "initial_data", "symbol": symbol, "data": initial_data}
                 self.message_queue.put(msg)
-
-        logger.info("모든 심볼의 초기 데이터 요청이 큐로 전송되었습니다.")
-        # 초기 RSI 상태 메시지 전송은 이제 _process_message_queue에서 처리 후 수행
+        logger.info("초기 데이터 로드가 완료되어 큐로 전송되었습니다.")
         if self.telegram_bot:
-            self.telegram_bot.send_message("초기 데이터 로드가 완료되어 곧 첫번째 RSI 요약이 전송됩니다.")
+            self.telegram_bot.send_message("초기 데이터 로드가 완료되었습니다. 곧 첫 RSI 요약이 전송됩니다.")
 
     def _process_message_queue(self):
-        """
-        메시지 큐를 지속적으로 확인하고, 모든 데이터 변경을 이 스레드에서 처리합니다.
-        """
+        logger.info("메시지 처리 스레드 시작...")
+        initial_summary_sent = False
+        last_summary_time = 0
+
         while True:
             try:
                 message = self.message_queue.get()
-
-                # 웹소켓 메시지(문자열)와 내부 메시지(딕셔너리) 구분
+                
                 if isinstance(message, str):
-                    data = json.loads(message)
-                    stream_data = data.get('data', {})
-                    if not stream_data: continue
-                    
-                    symbol = stream_data.get('s', '')
-                    kline = stream_data.get('k', {})
+                    data = json.loads(message)['data']
+                    symbol = data['s']
+                    kline = data['k']
                     interval = kline.get('i', '')
-                    is_closed = kline.get('x', False)
-
-                    if not symbol or not kline: continue
-                    
-                    # 실시간 데이터 처리
-                    self._update_kline_data(symbol, interval, kline, is_closed)
-
+                    logger.info(f"[큐 처리] {symbol} - {interval} 실시간 데이터 처리") # 로그 추가
+                    self._update_kline_data(symbol, interval, kline, kline['x'])
+                
                 elif isinstance(message, dict) and message.get("type") == "initial_data":
-                    # 초기 데이터 처리
                     symbol = message["symbol"]
-                    interval = message["interval"]
-                    initial_data = message["data"]
-                    
-                    logger.info(f"[큐 처리] {symbol} - {interval} 초기 데이터 처리 시작")
-                    
+                    logger.info(f"[큐] {symbol} 초기 데이터 처리")
                     with self.lock:
-                        if interval == '4h':
-                            self.kline_data_4h[symbol] = deque(initial_data, maxlen=self.data_length)
-                        
-                        # 초기 RSI 계산
-                        self._calculate_and_update_rsi(symbol, interval)
+                        self.kline_data_4h[symbol] = deque(message["data"], maxlen=self.data_length)
+                        self._calculate_and_update_rsi(symbol, '4h')
+                
+                # 모든 초기 데이터가 로드된 후 첫 요약 메시지 전송
+                if not initial_summary_sent and self.message_queue.empty():
+                    if len(self.current_rsi_14_4h) >= len(self.futures_usdt_symbols) * 0.9:
+                        logger.info("초기 데이터 처리 완료. 첫번째 RSI 요약을 전송합니다.")
+                        summary_messages = self.get_rsi_summary_messages()
+                        for msg in summary_messages:
+                            self.telegram_bot.send_message(msg)
+                        initial_summary_sent = True
+                        last_summary_time = time.time()
+
+                # 30분마다 정기적으로 요약 메시지 전송
+                if initial_summary_sent and (time.time() - last_summary_time > 1800):
+                    logger.info("정기 RSI 요약을 전송합니다.")
+                    summary_messages = self.get_rsi_summary_messages()
+                    for msg in summary_messages:
+                        self.telegram_bot.send_message(msg)
+                    last_summary_time = time.time()
 
             except json.JSONDecodeError:
-                logger.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
+                logger.error(f"JSON 디코딩 실패: {message}")
             except Exception as e:
-                logger.error(f"메시지 처리 중 예상치 못한 오류 발생: {e}", exc_info=True)
+                logger.error(f"메시지 처리 중 오류 발생: {e}", exc_info=True)
 
     def _update_kline_data(self, symbol, interval, kline, is_closed):
-        """
-        단일 캔들 데이터를 기반으로 상태를 업데이트합니다. (락 내부에서 호출되어야 함)
-        """
-        kline_data_deque = None
         with self.lock:
-            if interval == '4h':
-                kline_data_deque = self.kline_data_4h.get(symbol)
+            kline_data_deque = self.kline_data_4h.get(symbol)
+            if kline_data_deque is None: return
 
-            if kline_data_deque is None:
-                return # 아직 초기 데이터가 로드되지 않음
-
-            new_kline = [
-                kline['t'], kline['o'], kline['h'], kline['l'], kline['c'], kline['v'],
-                kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']
-            ]
+            new_kline = [kline['t'], kline['o'], kline['h'], kline['l'], kline['c'], kline['v'], kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']]
 
             if is_closed:
                 kline_data_deque.append(new_kline)
+            elif kline_data_deque:
+                kline_data_deque[-1] = new_kline
             else:
-                if kline_data_deque:
-                    kline_data_deque[-1] = new_kline
-                else:
-                    kline_data_deque.append(new_kline)
+                kline_data_deque.append(new_kline)
             
-            # RSI 계산 및 업데이트
             self._calculate_and_update_rsi(symbol, interval)
 
     def _calculate_and_update_rsi(self, symbol, interval):
-        """
-        RSI를 계산하고 관련 상태를 업데이트합니다. (락 내부에서 호출되어야 함)
-        """
-        kline_data_deque = None
-        if interval == '4h':
-            kline_data_deque = self.kline_data_4h.get(symbol)
-
-        if not kline_data_deque or len(kline_data_deque) < 14:
-            return
+        kline_data_deque = self.kline_data_4h.get(symbol)
+        if not kline_data_deque or len(kline_data_deque) < 14: return
 
         close_prices = [float(k[4]) for k in kline_data_deque]
-        rsi_14 = calculate_rsi_binance(close_prices, period=14)
-        rsi_7 = calculate_rsi_binance(close_prices, period=7)
-
-        if interval == '4h':
-            self.current_rsi_14_4h[symbol] = rsi_14
-            self.current_rsi_7_4h[symbol] = rsi_7
-            self.last_update_time[f"{symbol}_4h"] = datetime.now()
-            
-            # 알림 상태 업데이트
-            if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
-            else: self.alerted_overbought_14_4h.discard(symbol)
-            if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
-            else: self.alerted_oversold_14_4h.discard(symbol)
+        self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
+        self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
+        self.last_update_time[f"{symbol}_4h"] = datetime.now()
 
     def start_monitoring(self):
         if not self.telegram_bot:
             self.telegram_bot = TelegramBot(self)
-            
-        logging.info("모니터링 시작...")
-        self.telegram_bot.send_message("🔔 RSI 모니터링을 시작합니다.")
+        
+        logger.info("RSI 모니터링 시작 (실시간 웹소켓 방식)")
+        self.telegram_bot.send_message("🔔 RSI 모니터링을 시작합니다. (실시간)")
 
-        # 0. 메시지 처리 스레드 시작
-        threading.Thread(target=self._process_message_queue, daemon=True).start()
-
-        # 1. 모든 심볼 리스트 가져오기
         all_symbols = self.get_futures_usdt_symbols()
         if not all_symbols:
-            logging.critical("모니터링할 심볼을 가져오지 못했습니다. 프로그램을 종료합니다.")
-            self.telegram_bot.send_message("❌ 모니터링할 심볼을 가져오지 못해 프로그램을 종료합니다.")
+            logger.critical("모니터링할 심볼을 가져오지 못했습니다.")
             return
-        logging.info(f"총 {len(all_symbols)}개의 심볼을 모니터링합니다.")
-        self.telegram_bot.send_message(f"✅ 총 {len(all_symbols)}개 심볼에 대한 모니터링을 시작합니다.")
 
-        # 2. 백그라운드에서 데이터 로드 시작
+        # 1. 메시지 처리 스레드 시작
+        threading.Thread(target=self._process_message_queue, daemon=True).start()
+
+        # 2. 초기 데이터 로드 스레드 시작
         threading.Thread(target=self._load_initial_data, args=(all_symbols,), daemon=True).start()
 
-        # 3. 웹소켓 연결 시작
-        logging.info(f"{len(all_symbols)}개 전체 심볼에 대한 실시간 스트림 연결을 시작합니다.")
-        chunk_size = 25
-        symbol_chunks = [all_symbols[i:i + chunk_size] for i in range(0, len(all_symbols), chunk_size)]
-        
-        with self.lock:
-            for chunk in symbol_chunks:
-                streams = [f"{s.lower()}@kline_4h" for s in chunk]
-                ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
-                logging.info(f"Connecting to WebSocket for {len(chunk)} symbols: {ws_url}")
-                
-                ws = websocket.WebSocketApp(
-                    ws_url,
-                    on_message=self.on_message,
-                    on_error=self.on_error,
-                    on_close=self.on_close,
-                    on_open=self.on_open
-                )
-                self.ws_apps[ws_url] = ws
-                self.ws_should_run[ws_url] = True
-                
-                wst = threading.Thread(target=lambda: ws.run_forever(ping_interval=30, ping_timeout=10), daemon=True)
-                self.ws_threads[ws_url] = wst
-                wst.start()
+        # 3. 웹소켓 연결 및 관리 스레드 시작
+        self._connect_websocket(all_symbols)
+        self.ws_manager_thread = threading.Thread(target=self.manage_websocket_connection, args=(all_symbols,), daemon=True)
+        self.ws_manager_thread.start()
 
-        # 4. 웹소켓 관리자 스레드 시작
-        if not self.ws_manager_thread or not self.ws_manager_thread.is_alive():
-            self.ws_manager_thread = threading.Thread(target=self.manage_websockets, daemon=True)
-            self.ws_manager_thread.start()
-            
-        # 메인 스레드가 종료되지 않도록 유지 및 상태 로깅
+        # 메인 스레드는 대기
         while True:
             time.sleep(60)
-            active_threads = threading.active_count()
-            queue_size = self.message_queue.qsize()
-            logger.info(f"[상태] 활성 스레드: {active_threads}개, 메시지 큐 크기: {queue_size}")
+            logger.info(f"[상태] 활성 스레드: {threading.active_count()}개, 메시지 큐 크기: {self.message_queue.qsize()}")
+
+
 
     def _generate_signature(self, params):
         """

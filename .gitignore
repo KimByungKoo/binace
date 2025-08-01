@@ -8,3 +8,4 @@ crypto-bot/__pycache__/config.cpython-311.pyc
 crypto-bot/__pycache__/order_manager.cpython-311.pyc
 kline_cache.pkl
 rsi_monitor.log
+.env

@@ -57,8 +57,6 @@ class RSIMonitor:
         # RSI 임계값
         self.rsi_overbought = 90
         self.rsi_oversold = 10
-        self.rsi_overbought_15m = 80
-        self.rsi_oversold_15m = 20
 
         self.data_length = 200  # RSI 계산을 위한 데이터 길이 (조금 더 넉넉하게)
         self.lock = threading.RLock() # 재진입 가능한 락으로 변경
@@ -74,13 +72,10 @@ class RSIMonitor:
         
         # 데이터 저장 구조 변경: 캔들 전체 정보를 저장
         self.kline_data_4h = {} # 4시간봉 캔들 데이터
-        self.kline_data_15m = {} # 15분봉 캔들 데이터
 
         # 실시간 RSI 값 저장
         self.current_rsi_14_4h = {}
         self.current_rsi_7_4h = {}
-        self.current_rsi_14_15m = {}
-        self.current_rsi_7_15m = {}
 
         # RSI 마지막 업데이트 시간 저장
         self.last_update_time = {}
@@ -90,8 +85,6 @@ class RSIMonitor:
         self.alerted_oversold_14_4h = set()
         self.alerted_overbought_7_4h = set()
         self.alerted_oversold_7_4h = set()
-        self.alerted_overbought_14_15m = set()
-        self.alerted_oversold_14_15m = set()
 
         # ... (기존 나머지 설정들은 유지) ...
         
@@ -108,7 +101,6 @@ class RSIMonitor:
         self.auto_trading = False
         
         self.buy_conditions = {
-            'rsi_15m_oversold': True,
             'rsi_1m_oversold': True,
             'volume_spike': True,
             'price_drop': 0.03
@@ -177,95 +169,50 @@ class RSIMonitor:
             logger.error(f"[{symbol}-{interval}] get_historical_data 함수에서 예상치 못한 오류 발생: {e}", exc_info=True)
             return []
 
-    
-        
-    def check_volume_spike(self, symbol, interval='15m'):
-        """
-        거래량 스파이크를 확인합니다.
-        """
-        if interval == '15m':
-            volume_data = self.volume_data_15m.get(symbol, [])
-        else:
-            volume_data = self.volume_data_1m.get(symbol, [])
-        
-        volume_data = list(volume_data)  # 슬라이스를 위해 리스트로 변환
-        if len(volume_data) < self.volume_lookback_period:
-            return False
-        
-        # 최근 거래량
-        current_volume = volume_data[-1]
-        
-        # 과거 거래량 평균 (최근 거래량 제외)
-        historical_volumes = volume_data[-self.volume_lookback_period:-1]
-        if not historical_volumes:
-            return False
-        
-        avg_volume = sum(historical_volumes) / len(historical_volumes)
-        
-        # 거래량 스파이크 확인
-        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
-        
-        return volume_ratio >= self.volume_spike_threshold, volume_ratio
-        
-    
-    
-
     def get_current_rsi(self):
         """
-        현재 모든 심볼의 4시간봉 및 15분봉 RSI 값을 반환합니다.
+        현재 모든 심볼의 4시간봉 RSI 값을 반환합니다. (스레드 안전 방식)
         """
         print("\n=== 현재 RSI 상태 ===")
+        with self.lock:
+            # 데이터의 스냅샷(복사본)을 만들어 락 점유 시간을 최소화
+            rsi_14_4h_copy = dict(self.current_rsi_14_4h)
+            rsi_7_4h_copy = dict(self.current_rsi_7_4h)
+
         result = {}
-        # with self.lock: # 교착 상태를 유발하므로 제거
-        all_symbols = set(self.current_rsi_14_4h.keys()) | set(self.current_rsi_14_15m.keys())
+        all_symbols = set(rsi_14_4h_copy.keys())
 
         for symbol in all_symbols:
             result[symbol] = {}
-            
-            # 4시간봉 데이터
-            rsi14_4h = self.current_rsi_14_4h.get(symbol)
-            rsi7_4h = self.current_rsi_7_4h.get(symbol)
+            rsi14_4h = rsi_14_4h_copy.get(symbol)
+            rsi7_4h = rsi_7_4h_copy.get(symbol)
             if rsi14_4h is not None and rsi7_4h is not None:
                 result[symbol]['4h'] = {'rsi14': rsi14_4h, 'rsi7': rsi7_4h}
                 print(f"{symbol} 4h: RSI(14)={rsi14_4h:.2f}, RSI(7)={rsi7_4h:.2f}")
-
-            # 15분봉 데이터
-            rsi14_15m = self.current_rsi_14_15m.get(symbol)
-            rsi7_15m = self.current_rsi_7_15m.get(symbol)
-            if rsi14_15m is not None and rsi7_15m is not None:
-                result[symbol]['15m'] = {'rsi14': rsi14_15m, 'rsi7': rsi7_15m}
-                # print(f"{symbol} 15m: RSI(14)={rsi14_15m:.2f}, RSI(7)={rsi7_15m:.2f}")
 
         print("===================\n")
         return result
 
     def get_rsi_summary_messages(self):
         """
-        4시간봉 RSI 요약 메시지들을 생성하여 반환합니다. (15분봉 데이터 포함)
+        4시간봉 RSI 요약 메시지들을 생성하여 반환합니다.
         데이터의 일관성을 유지하고 UI 블로킹을 최소화하기 위해 데이터를 복사한 후 처리합니다.
         """
         with self.lock:
             # 데이터의 스냅샷을 빠르게 생성
             rsi_14_4h_copy = dict(self.current_rsi_14_4h)
             rsi_7_4h_copy = dict(self.current_rsi_7_4h)
-            rsi_14_15m_copy = dict(self.current_rsi_14_15m)
-            rsi_7_15m_copy = dict(self.current_rsi_7_15m)
             last_update_time_copy = dict(self.last_update_time)
 
         # 락을 해제한 후, 복사된 데이터를 기반으로 rsi_dict 생성
         rsi_dict = {}
-        all_symbols = set(rsi_14_4h_copy.keys()) | set(rsi_14_15m_copy.keys())
+        all_symbols = set(rsi_14_4h_copy.keys())
         for symbol in all_symbols:
             rsi_dict[symbol] = {}
             if symbol in rsi_14_4h_copy:
                 rsi_dict[symbol]['4h'] = {
                     'rsi14': rsi_14_4h_copy.get(symbol),
                     'rsi7': rsi_7_4h_copy.get(symbol)
-                }
-            if symbol in rsi_14_15m_copy:
-                rsi_dict[symbol]['15m'] = {
-                    'rsi14': rsi_14_15m_copy.get(symbol),
-                    'rsi7': rsi_7_15m_copy.get(symbol)
                 }
         
         messages = []
@@ -310,55 +257,39 @@ class RSIMonitor:
             msg_4h_over = "📊 <b>4시간봉 RSI(14) 과매수 TOP10 (70~100)</b>\n\n"
             for symbol, _, _ in rsi_4h_over:
                 m4h = rsi_dict[symbol].get('4h', {})
-                m15m = rsi_dict[symbol].get('15m', {})
                 
                 rsi14_4h = m4h.get('rsi14')
                 rsi7_4h = m4h.get('rsi7')
-                rsi14_15m = m15m.get('rsi14')
-                rsi7_15m = m15m.get('rsi7')
 
                 rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
                 rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-                rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
-                rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
                 
                 update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
-                update_time_15m = last_update_time_copy.get(f"{symbol}_15m")
 
                 update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-                update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
                 
                 msg_4h_over += f"<b>{symbol}</b>\n" \
-                              f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
-                              f"  - 15m: (14)-{rsi14_15m_str} | (7)-{rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
+                              f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n\n"
             messages.append(msg_4h_over)
         
         if rsi_4h_under:
             msg_4h_under = "📊 <b>4시간봉 RSI(14) 과매도 TOP10 (0~30)</b>\n\n"
             for symbol, _, _ in rsi_4h_under:
                 m4h = rsi_dict[symbol].get('4h', {})
-                m15m = rsi_dict[symbol].get('15m', {})
 
                 rsi14_4h = m4h.get('rsi14')
                 rsi7_4h = m4h.get('rsi7')
-                rsi14_15m = m15m.get('rsi14')
-                rsi7_15m = m15m.get('rsi7')
 
                 rsi14_4h_str = f"{rsi14_4h:.2f}" if isinstance(rsi14_4h, (int, float)) else 'N/A'
                 rsi7_4h_str = f"{rsi7_4h:.2f}" if isinstance(rsi7_4h, (int, float)) else 'N/A'
-                rsi14_15m_str = f"{rsi14_15m:.2f}" if isinstance(rsi14_15m, (int, float)) else 'N/A'
-                rsi7_15m_str = f"{rsi7_15m:.2f}" if isinstance(rsi7_15m, (int, float)) else 'N/A'
 
                 update_time_4h = last_update_time_copy.get(f"{symbol}_4h")
-                update_time_15m = last_update_time_copy.get(f"{symbol}_15m")
 
                 update_time_4h_str = update_time_4h.strftime('%H:%M:%S') if isinstance(update_time_4h, datetime) else 'N/A'
-                update_time_15m_str = update_time_15m.strftime('%H:%M:%S') if isinstance(update_time_15m, datetime) else 'N/A'
 
                 msg_4h_under += f"<b>{symbol}</b>\n" \
-                               f"  - 4h: {rsi14_4h_str} | {rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n" \
-                               f"  - 15m: {rsi14_15m_str} | {rsi7_15m_str} <i>(업데이트: {update_time_15m_str})</i>\n\n"
-            # messages.append(msg_4h_under)
+                               f"  - 4h: (14)-{rsi14_4h_str} | (7)-{rsi7_4h_str} <i>(업데이트: {update_time_4h_str})</i>\n\n"
+            messages.append(msg_4h_under)
             
         if not messages:
             messages.append("ℹ️ 현재 과매수/과매도 상태인 4시간봉 코인이 없습니다.")
@@ -371,29 +302,6 @@ class RSIMonitor:
         """
         self.message_queue.put(message)
 
-    def create_alert_message(self, symbol, alert_type, price, rsi_14_15m, rsi_7_15m):
-        """
-        조건 동시 만족 시 텔레그램 메시지를 생성합니다.
-        """
-        with self.lock:
-            rsi_14_4h = self.current_rsi_14_4h.get(symbol, 'N/A')
-            rsi_7_4h = self.current_rsi_7_4h.get(symbol, 'N/A')
-        
-        # 'N/A'가 아닐 경우에만 소수점 포매팅
-        rsi_14_4h_str = f"{rsi_14_4h:.2f}" if isinstance(rsi_14_4h, float) else rsi_14_4h
-        rsi_7_4h_str = f"{rsi_7_4h:.2f}" if isinstance(rsi_7_4h, float) else rsi_7_4h
-
-        msg = f"🔥 <b>[조건 동시 만족: {alert_type}] - {symbol}</b>\n\n" \
-              f"4시간봉 {alert_type} 상태에서 15분봉도 {alert_type} 상태에 진입했습니다.\n\n" \
-              f"<b>4시간봉 RSI:</b>\n" \
-              f"  - RSI(14): {rsi_14_4h_str}\n" \
-              f"  - RSI(7): {rsi_7_4h_str}\n" \
-              f"<b>15분봉 RSI:</b>\n" \
-              f"  - RSI(14): {rsi_14_15m:.2f}\n" \
-              f"  - RSI(7): {rsi_7_15m:.2f}\n" \
-              f"<b>현재가:</b> {price:.8f} USDT"
-        return msg
-    
     def on_error(self, ws, error):
         if isinstance(error, Exception):
             logger.error(f"WebSocket error on {ws.url if ws else 'Unknown WebSocket'}: {error}", exc_info=True)
@@ -465,10 +373,9 @@ class RSIMonitor:
 
     def _load_initial_data(self, symbols):
         """
-        백그라운드에서 초기 데이터를 로드하고, 데이터 갭을 채웁니다.
+        백그라운드에서 초기 데이터를 로드하고, 처리 큐로 전송합니다.
         """
-        logger.info("백그라운드 데이터 처리 시작...")
-        # symbols = self.get_futures_usdt_symbols() # 이제 인자로 받으므로 주석 처리
+        logger.info("백그라운드 데이터 로더 시작...")
         if not symbols:
             logger.warning("모니터링할 심볼이 없습니다.")
             return
@@ -479,148 +386,122 @@ class RSIMonitor:
         for i, symbol in enumerate(symbols):
             progress = f"[{i + 1}/{total_symbols}]"
             logger.info(f"초기 데이터 로드 진행 중: {progress} {symbol}")
-            time.sleep(0.1) # API 요청 제한 방지
-            # Initialize deques once per symbol, outside the interval loop
-            with self.lock:
-                self.kline_data_4h[symbol] = deque(maxlen=self.data_length)
-                self.kline_data_15m[symbol] = deque(maxlen=self.data_length)
+            time.sleep(0.1)  # API 요청 제한 방지
 
-            for interval in ['4h', '15m']:
-                kline_data_key = f"kline_data_{interval}"
-                
-                # Select the correct deque based on interval
-                target_kline_deque = None
-                if interval == '4h':
-                    target_kline_deque = self.kline_data_4h[symbol]
-                elif interval == '15m':
-                    target_kline_deque = self.kline_data_15m[symbol]
-                
-                if target_kline_deque is None:
-                    logger.error(f"Invalid interval {interval} for symbol {symbol}")
-                    continue
+            # 4시간봉 데이터 로드
+            initial_data_4h = self.get_historical_data(symbol, '4h', limit=self.data_length)
+            if initial_data_4h:
+                # 처리 큐에 초기 데이터 메시지 전송
+                msg = {
+                    "type": "initial_data",
+                    "symbol": symbol,
+                    "interval": "4h",
+                    "data": initial_data_4h
+                }
+                self.message_queue.put(msg)
 
-                # 캐시가 없으면 전체 데이터 요청 (초기 로드)
-                logger.info(f"{progress} [{symbol}-{interval}] 초기 데이터 로드 중...")
-                initial_data = self.get_historical_data(symbol, interval, limit=self.data_length)
-                logger.debug(f"[{symbol}-{interval}] 초기 데이터 {len(initial_data)}개 수신.")
-                if initial_data:
-                    with self.lock:
-                        target_kline_deque.extend(initial_data)
-                    logger.debug(f"[{symbol}-{interval}] 초기 데이터 추가 후 덱 길이: {len(target_kline_deque)}")
-
-                # 3. 초기 RSI 계산
-                if len(target_kline_deque) >= 14:
-                    close_prices = [float(k[4]) for k in target_kline_deque]
-                    with self.lock:
-                        if interval == '4h':
-                            self.current_rsi_14_4h[symbol] = calculate_rsi_binance(close_prices, period=14)
-                            self.current_rsi_7_4h[symbol] = calculate_rsi_binance(close_prices, period=7)
-                            self.last_update_time[f"{symbol}_4h"] = datetime.now()
-                        elif interval == '15m':
-                            self.current_rsi_14_15m[symbol] = calculate_rsi_binance(close_prices, period=14)
-                            self.current_rsi_7_15m[symbol] = calculate_rsi_binance(close_prices, period=7)
-                            self.last_update_time[f"{symbol}_15m"] = datetime.now()
-
-        logger.info("초기 데이터 로드가 완료되었습니다.")
-        # 초기 RSI 상태 메시지 전송
-        if self.current_rsi_14_4h:
-            logger.info("초기 RSI 요약 메시지를 텔레그램으로 전송합니다.")
-            rsi_messages = self.get_rsi_summary_messages()
-            for message in rsi_messages:
-                self.telegram_bot.send_message(message)
-        else:
-            logger.info("전송할 초기 RSI 데이터가 없습니다.")
+        logger.info("모든 심볼의 초기 데이터 요청이 큐로 전송되었습니다.")
+        # 초기 RSI 상태 메시지 전송은 이제 _process_message_queue에서 처리 후 수행
+        if self.telegram_bot:
+            self.telegram_bot.send_message("초기 데이터 로드가 완료되어 곧 첫번째 RSI 요약이 전송됩니다.")
 
     def _process_message_queue(self):
         """
-        메시지 큐를 지속적으로 확인하고, 수신된 메시지를 처리합니다.
-        이 함수는 별도의 스레드에서 실행됩니다.
+        메시지 큐를 지속적으로 확인하고, 모든 데이터 변경을 이 스레드에서 처리합니다.
         """
         while True:
             try:
-                message = self.message_queue.get() # 큐에서 메시지를 가져옴 (없으면 대기)
-                data = json.loads(message)
-                stream_data = data.get('data', {})
-                symbol = stream_data.get('s', '')
-                kline = stream_data.get('k', {})
-                interval = kline.get('i', '')
-                is_closed = kline.get('x', False)
+                message = self.message_queue.get()
 
-                if not symbol or not kline:
-                    continue
+                # 웹소켓 메시지(문자열)와 내부 메시지(딕셔너리) 구분
+                if isinstance(message, str):
+                    data = json.loads(message)
+                    stream_data = data.get('data', {})
+                    if not stream_data: continue
+                    
+                    symbol = stream_data.get('s', '')
+                    kline = stream_data.get('k', {})
+                    interval = kline.get('i', '')
+                    is_closed = kline.get('x', False)
 
-                logger.info(f"[큐 처리] {symbol} - {interval} 데이터 처리 시작") # 로그 추가
+                    if not symbol or not kline: continue
+                    
+                    # 실시간 데이터 처리
+                    self._update_kline_data(symbol, interval, kline, is_closed)
 
-                kline_data_deque = None
-                if interval == '4h':
-                    kline_data_deque = self.kline_data_4h
-                elif interval == '15m':
-                    kline_data_deque = self.kline_data_15m
-                
-                if kline_data_deque is None or symbol not in kline_data_deque:
-                    continue
-
-                new_kline = [
-                    kline['t'], kline['o'], kline['h'], kline['l'], kline['c'], kline['v'],
-                    kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']
-                ]
-
-                # 모든 데이터 처리는 이 단일 스레드에서만 일어나므로
-                # 복잡한 락 없이 안전하게 상태를 수정할 수 있습니다.
-                with self.lock:
-                    if is_closed:
-                        kline_data_deque[symbol].append(new_kline)
-                    else:
-                        if kline_data_deque[symbol]:
-                            kline_data_deque[symbol][-1] = new_kline
-                        else:
-                            kline_data_deque[symbol].append(new_kline)
-
-                    close_prices = [float(k[4]) for k in kline_data_deque[symbol]]
-                    if len(close_prices) < 14:
-                        continue
-
-                    rsi_14 = calculate_rsi_binance(close_prices, period=14)
-                    rsi_7 = calculate_rsi_binance(close_prices, period=7)
-
-                    alert_message = None
-                    if interval == '4h':
-                        self.current_rsi_14_4h[symbol] = rsi_14
-                        self.current_rsi_7_4h[symbol] = rsi_7
-                        self.last_update_time[f"{symbol}_4h"] = datetime.now()
-                        if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
-                        else: self.alerted_overbought_14_4h.discard(symbol)
-                        if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
-                        else: self.alerted_oversold_14_4h.discard(symbol)
-
-                    elif interval == '15m':
-                        self.current_rsi_14_15m[symbol] = rsi_14
-                        self.current_rsi_7_15m[symbol] = rsi_7
-                        self.last_update_time[f"{symbol}_15m"] = datetime.now()
-                        price = float(kline['c'])
-
-                        if (rsi_14 >= self.rsi_overbought_15m and 
-                            symbol in self.alerted_overbought_14_4h and 
-                            symbol not in self.alerted_overbought_14_15m):
-                            alert_message = self.create_alert_message(symbol, "과매수", price, rsi_14, rsi_7)
-                            self.alerted_overbought_14_15m.add(symbol)
-
-                        elif (rsi_14 <= self.rsi_oversold_15m and
-                              symbol in self.alerted_oversold_14_4h and
-                              symbol not in self.alerted_oversold_14_15m):
-                            alert_message = self.create_alert_message(symbol, "과매도", price, rsi_14, rsi_7)
-                            self.alerted_oversold_14_15m.add(symbol)
+                elif isinstance(message, dict) and message.get("type") == "initial_data":
+                    # 초기 데이터 처리
+                    symbol = message["symbol"]
+                    interval = message["interval"]
+                    initial_data = message["data"]
+                    
+                    logger.info(f"[큐 처리] {symbol} - {interval} 초기 데이터 처리 시작")
+                    
+                    with self.lock:
+                        if interval == '4h':
+                            self.kline_data_4h[symbol] = deque(initial_data, maxlen=self.data_length)
                         
-                        if rsi_14 < self.rsi_overbought_15m: self.alerted_overbought_14_15m.discard(symbol)
-                        if rsi_14 > self.rsi_oversold_15m: self.alerted_oversold_14_15m.discard(symbol)
-                
-                if alert_message:
-                    self.telegram_bot.send_message(alert_message)
+                        # 초기 RSI 계산
+                        self._calculate_and_update_rsi(symbol, interval)
 
             except json.JSONDecodeError:
                 logger.error(f"웹소켓 메시지 JSON 디코딩 실패: {message}")
             except Exception as e:
                 logger.error(f"메시지 처리 중 예상치 못한 오류 발생: {e}", exc_info=True)
+
+    def _update_kline_data(self, symbol, interval, kline, is_closed):
+        """
+        단일 캔들 데이터를 기반으로 상태를 업데이트합니다. (락 내부에서 호출되어야 함)
+        """
+        kline_data_deque = None
+        with self.lock:
+            if interval == '4h':
+                kline_data_deque = self.kline_data_4h.get(symbol)
+
+            if kline_data_deque is None:
+                return # 아직 초기 데이터가 로드되지 않음
+
+            new_kline = [
+                kline['t'], kline['o'], kline['h'], kline['l'], kline['c'], kline['v'],
+                kline['T'], kline['q'], kline['n'], kline['V'], kline['Q'], kline['B']
+            ]
+
+            if is_closed:
+                kline_data_deque.append(new_kline)
+            else:
+                if kline_data_deque:
+                    kline_data_deque[-1] = new_kline
+                else:
+                    kline_data_deque.append(new_kline)
+            
+            # RSI 계산 및 업데이트
+            self._calculate_and_update_rsi(symbol, interval)
+
+    def _calculate_and_update_rsi(self, symbol, interval):
+        """
+        RSI를 계산하고 관련 상태를 업데이트합니다. (락 내부에서 호출되어야 함)
+        """
+        kline_data_deque = None
+        if interval == '4h':
+            kline_data_deque = self.kline_data_4h.get(symbol)
+
+        if not kline_data_deque or len(kline_data_deque) < 14:
+            return
+
+        close_prices = [float(k[4]) for k in kline_data_deque]
+        rsi_14 = calculate_rsi_binance(close_prices, period=14)
+        rsi_7 = calculate_rsi_binance(close_prices, period=7)
+
+        if interval == '4h':
+            self.current_rsi_14_4h[symbol] = rsi_14
+            self.current_rsi_7_4h[symbol] = rsi_7
+            self.last_update_time[f"{symbol}_4h"] = datetime.now()
+            
+            # 알림 상태 업데이트
+            if rsi_14 >= self.rsi_overbought: self.alerted_overbought_14_4h.add(symbol)
+            else: self.alerted_overbought_14_4h.discard(symbol)
+            if rsi_14 <= self.rsi_oversold: self.alerted_oversold_14_4h.add(symbol)
+            else: self.alerted_oversold_14_4h.discard(symbol)
 
     def start_monitoring(self):
         if not self.telegram_bot:
@@ -651,7 +532,7 @@ class RSIMonitor:
         
         with self.lock:
             for chunk in symbol_chunks:
-                streams = [f"{s.lower()}@kline_4h" for s in chunk] + [f"{s.lower()}@kline_15m" for s in chunk]
+                streams = [f"{s.lower()}@kline_4h" for s in chunk]
                 ws_url = f"wss://stream.binance.com:9443/stream?streams={'/'.join(streams)}"
                 logging.info(f"Connecting to WebSocket for {len(chunk)} symbols: {ws_url}")
                 
@@ -808,4 +689,4 @@ class RSIMonitor:
 
 if __name__ == "__main__":
     monitor = RSIMonitor()
-    monitor.start_monitoring() 
+    monitor.start_monitoring()
